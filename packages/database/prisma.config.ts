@@ -1,4 +1,4 @@
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 // Prisma 7 does not load .env files itself.
 try {
@@ -13,6 +13,8 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: env('DATABASE_URL'),
+    // `prisma generate` (part of every build) needs no database, so a fresh clone must build
+    // without one. Migrate/seed commands still need a real DATABASE_URL and fail clearly without it.
+    url: process.env.DATABASE_URL ?? 'postgresql://localhost:5432/orkstage',
   },
 });

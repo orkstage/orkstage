@@ -20,7 +20,7 @@ log() { printf '\n==> %s\n' "$*"; }
 rename_scope() {
   local dir=$1
   (cd "$dir"
-    git ls-files -z -- '*.ts' '*.tsx' '*.mjs' '*.json' '*.md' '*.yaml' '*.yml' 'Dockerfile' '*.Dockerfile' \
+    git ls-files -z -- '*.ts' '*.tsx' '*.mjs' '*.json' '*.md' '*.yaml' '*.yml' '*.prisma' 'Dockerfile' '*.Dockerfile' ':!scripts/polyrepo' \
       | xargs -0 -r grep -lZ '@co/' 2>/dev/null \
       | xargs -0 -r sed -i 's#@co/#@orkstage/#g'
     if ! git diff --quiet; then
