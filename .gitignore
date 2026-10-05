@@ -3,6 +3,10 @@
 
 node_modules/
 dist/
+# Rust build output (cli/) and generated site output
+target/
+site/out/
+site/.source/
 .next/
 .turbo/
 coverage/
