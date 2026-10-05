@@ -73,6 +73,14 @@ cookies over http) — it is for local use only, as is the Docker socket mount.
 Rebuild after code changes: `docker compose -f infra/local/docker-compose.yml --profile platform build`
 then `up -d`. The host workflow below still works when you prefer hot reload.
 
+## License
+
+OrkStage is open core. Everything is licensed under the **GNU AGPL-3.0** ([LICENSE](LICENSE)),
+except directories named `ee/`, which are under the OrkStage Enterprise License
+([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE), draft) and activated with a license key
+(`ORKSTAGE_LICENSE_KEY`). Without a key you run the full Community edition. See
+[docs/OPEN_CORE.md](docs/OPEN_CORE.md) for the feature split and licensing model.
+
 ## Local AWS with MiniStack
 
 ```bash

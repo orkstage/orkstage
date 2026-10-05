@@ -18,6 +18,7 @@
     "@co/contracts": "workspace:*",
     "@co/database": "workspace:*",
     "@co/domain": "workspace:*",
+    "@co/licensing": "workspace:*",
     "@co/provisioning": "workspace:*",
     "@co/runtime": "workspace:*",
     "@co/templates": "workspace:*",

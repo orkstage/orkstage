@@ -12,6 +12,9 @@ import { ErrorFilter } from './common/errors.js';
 import { CONFIG, InfraModule } from './infra/infra.module.js';
 import { InstancesModule } from './instances/instances.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
+import { LicensingModule } from './licensing/licensing.module.js';
+// Enterprise (OrkStage Enterprise License): registered here only; gated per route by license.
+import { EnterpriseModule } from './ee/ee.module.js';
 import { OpsModule } from './ops/ops.module.js';
 
 @Module({
@@ -36,6 +39,8 @@ import { OpsModule } from './ops/ops.module.js';
     InstancesModule,
     OpsModule,
     IntegrationsModule,
+    LicensingModule,
+    EnterpriseModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

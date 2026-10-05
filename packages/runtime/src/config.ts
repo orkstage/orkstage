@@ -39,6 +39,8 @@ const schema = z
     ENCRYPTION_KEY: z.string().optional(),
     // Local development only: allow http:// and private-network webhook URLs.
     WEBHOOK_ALLOW_PRIVATE: bool.default(false),
+    // OrkStage Enterprise license key (orkstage-license.v1.…). Empty = Community edition.
+    ORKSTAGE_LICENSE_KEY: z.string().optional(),
     TOFU_TIMEOUT_MINUTES: z.coerce.number().int().min(1).max(240).default(45),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),

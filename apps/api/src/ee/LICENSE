@@ -1,0 +1,34 @@
+OrkStage Enterprise License — DRAFT (requires legal review before publication)
+
+Copyright (c) 2026 OrkStage
+
+This license applies to all files in this directory and its subdirectories ("Enterprise
+Software"). All other OrkStage files are licensed under the GNU Affero General Public License
+v3.0 (see the LICENSE file at the repository root).
+
+1. Evaluation and development. You may use, copy and modify the Enterprise Software for
+   development and testing purposes, and to evaluate it for up to 30 days, without a
+   subscription.
+
+2. Production use. Use of the Enterprise Software in production requires a valid OrkStage
+   Enterprise subscription covering the number of instances, organizations or other units
+   stated in your order. A license key enables the features you subscribed to.
+
+3. Modifications. You may modify the Enterprise Software for your own use. Modified versions
+   remain subject to this license. You may not remove, disable or circumvent license-key
+   checks or the features they protect.
+
+4. Restrictions. You may not sell, sublicense, distribute, or offer the Enterprise Software, or
+   any modified version, as a hosted or managed service to third parties.
+
+5. Contributions. Contributions to the Enterprise Software are accepted under the OrkStage
+   Contributor License Agreement.
+
+6. No warranty. THE ENTERPRISE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE ENTERPRISE SOFTWARE.
+
+7. Termination. This license terminates automatically if you breach it. Upon termination you
+   must stop using the Enterprise Software in production.
+
+Contact: hello@orkstage.io

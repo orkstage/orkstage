@@ -199,6 +199,9 @@ importers:
       '@co/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@co/licensing':
+        specifier: workspace:*
+        version: link:../../packages/licensing
       '@co/provisioning':
         specifier: workspace:*
         version: link:../../packages/provisioning
@@ -501,6 +504,8 @@ importers:
   packages/domain: {}
 
   packages/iac: {}
+
+  packages/licensing: {}
 
   packages/provisioning:
     dependencies:
