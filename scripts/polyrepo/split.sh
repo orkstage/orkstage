@@ -50,6 +50,13 @@ git clone -q "$ROOT" "$OUT_DIR/orkstage"
   git rm -r -q --ignore-unmatch apps/web cli site infra/tofu infra/docker/tofu-runner.Dockerfile
   git commit -q -m "chore: split console, cli, site and modules into their own repositories (from $HEAD_SHA)")
 rename_scope "$OUT_DIR/orkstage"
+# Shared packages consumed by other repos are published to GitHub Packages.
+(cd "$OUT_DIR/orkstage"
+  for p in domain contracts authorization templates; do
+    node -e "const f='packages/$p/package.json',j=require('./'+f);delete j.private;j.publishConfig={registry:'https://npm.pkg.github.com',access:'public'};j.repository={type:'git',url:'https://github.com/orkstage/orkstage.git',directory:'packages/$p'};j.license='AGPL-3.0-only';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+  done
+  printf '@orkstage:registry=https://npm.pkg.github.com\n' > .npmrc
+  git add -A && git commit -q -m "chore: publish shared packages to GitHub Packages")
 
 # ── single-folder repositories ──
 split_folder apps/web orkstage-console

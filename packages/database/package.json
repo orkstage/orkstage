@@ -30,5 +30,11 @@
   "devDependencies": {
     "@types/pg": "^8.15.0",
     "prisma": "7.10.0"
-  }
+  },
+  "files": [
+    "dist",
+    "prisma",
+    "prisma.config.ts",
+    "src/generated"
+  ]
 }

@@ -21,5 +21,8 @@
     "@co/cloud-aws": "workspace:*",
     "@co/cloud-core": "workspace:*",
     "@co/domain": "workspace:*"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

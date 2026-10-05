@@ -31,5 +31,8 @@
     "vitest": {
       "optional": true
     }
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

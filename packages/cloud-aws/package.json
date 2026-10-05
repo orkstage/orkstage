@@ -36,5 +36,8 @@
     "@co/cloud-core": "workspace:*",
     "@co/domain": "workspace:*",
     "@co/iac": "workspace:*"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

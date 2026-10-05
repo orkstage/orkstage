@@ -24,5 +24,8 @@
   },
   "devDependencies": {
     "@co/cloud-mock": "workspace:*"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
