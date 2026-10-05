@@ -7,6 +7,7 @@ import { HealthMonitor } from './health.js';
 import { Notifier } from './notifier.js';
 import { DeploymentRunner, RetryLater } from './runner.js';
 import { TargetSlots } from './slots.js';
+import { WebhookDispatcher } from './webhooks.js';
 
 const SLOT_WAIT_MS = 5000;
 
@@ -43,10 +44,16 @@ async function main() {
     { connection: redis.duplicate(), concurrency: config.WORKER_CONCURRENCY, maxStalledCount: 3, lockDuration: 60_000 },
   );
 
-  const notify = new Worker<NotificationJob>(QUEUES.notifications, async (job) => notifier.handle(job.data), {
-    connection: redis.duplicate(),
-    concurrency: 4,
-  });
+  const webhooks = new WebhookDispatcher(ctx);
+  const notify = new Worker<NotificationJob>(
+    QUEUES.notifications,
+    async (job) => {
+      // Webhooks first: they are idempotent per job id, so a retry after a mail failure is safe.
+      if ((await webhooks.enqueue(String(job.id), job.data)) > 0) await webhooks.deliverDue();
+      await notifier.handle(job.data);
+    },
+    { connection: redis.duplicate(), concurrency: 4 },
+  );
 
   const healthQueue = new Queue(QUEUES.health, { connection: redis.duplicate() });
   await healthQueue.upsertJobScheduler('health-tick', { every: config.HEALTH_CHECK_INTERVAL_SECONDS * 1000 }, { name: 'tick' });
@@ -55,6 +62,7 @@ async function main() {
     async () => {
       await monitor.tick();
       await notifier.deliverPending();
+      await webhooks.deliverDue();
     },
     { connection: redis.duplicate(), concurrency: 1 },
   );

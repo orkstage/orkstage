@@ -26,8 +26,9 @@ export class AuditService {
   async record(input: AuditInput): Promise<void> {
     await this.prisma.auditEvent.create({
       data: {
-        actorId: input.principal?.userId ?? input.actor?.id ?? null,
-        actorType: input.principal || input.actor ? 'USER' : 'SYSTEM',
+        // API-key calls are attributed to the key itself (its creator is on the key record).
+        actorId: input.principal?.apiKey?.id ?? input.principal?.userId ?? input.actor?.id ?? null,
+        actorType: input.principal?.apiKey ? 'API_KEY' : input.principal || input.actor ? 'USER' : 'SYSTEM',
         actorLabel: input.principal?.email ?? input.actor?.label ?? 'system',
         tenantId: input.tenantId ?? null,
         resourceType: input.resourceType,

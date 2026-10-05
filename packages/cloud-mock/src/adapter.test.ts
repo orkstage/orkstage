@@ -60,12 +60,22 @@ describe('MockAdapter simulation', () => {
     const { adapter, context, sampleRequest } = fixture();
     await adapter.ensureResource(context, sampleRequest);
     expect((await adapter.checkHealth(context, sampleRequest)).state).toBe('HEALTHY');
-    await adapter.setHealthOverride(context, 'database', 'UNHEALTHY');
+    await adapter.setHealthOverride(context, sampleRequest.name, 'UNHEALTHY');
     expect((await adapter.checkHealth(context, sampleRequest)).state).toBe('UNHEALTHY');
 
     expect((await adapter.getResource(context, sampleRequest)).observedSpecHash).toBe('key-1');
-    await adapter.simulateDrift(context, 'database', true);
+    await adapter.simulateDrift(context, sampleRequest.name, true);
     expect((await adapter.getResource(context, sampleRequest)).observedSpecHash).not.toBe('key-1');
+  });
+
+  it('keeps resources of different instances on the same target apart', async () => {
+    const { adapter, context, sampleRequest } = fixture();
+    const other = { ...sampleRequest, name: 'co-globex-staging-database', idempotencyKey: 'other' };
+    await adapter.ensureResource(context, sampleRequest);
+    await adapter.ensureResource(context, other);
+    await adapter.deleteResource(context, other);
+    expect((await adapter.getResource(context, sampleRequest)).exists).toBe(true);
+    expect((await adapter.getResource(context, other)).exists).toBe(false);
   });
 
   it('serves the catalog of the simulated provider', () => {

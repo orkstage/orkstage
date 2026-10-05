@@ -8,7 +8,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import * as client from 'openid-client';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { CorrelationId, CurrentPrincipal, Public } from '../common/auth.js';
+import { CorrelationId, CurrentPrincipal, Public, Scope } from '../common/auth.js';
 import { AppError, notFound } from '../common/errors.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
 import { CONFIG, PRISMA } from '../infra/infra.module.js';
@@ -203,6 +203,7 @@ export class AuthController {
     await this.audit.record({ principal: p, resourceType: 'Session', resourceId: p.sessionId, action: 'LOGOUT', correlationId });
   }
 
+  @Scope('*')
   @Get('me')
   async me(@CurrentPrincipal() p: RequestPrincipal): Promise<MeResponse> {
     const memberships = await this.prisma.membership.findMany({
@@ -214,6 +215,7 @@ export class AuthController {
       user: { id: p.userId, email: p.email, name: p.name, platformRole: p.platformRole ?? null },
       memberships: memberships.map((m) => ({ tenantId: m.tenantId, tenantName: m.tenant.name, tenantSlug: m.tenant.slug, role: m.role })),
       rules: p.ability.rules,
+      ...(p.apiKey ? { apiKey: { id: p.apiKey.id, name: p.apiKey.name, prefix: p.apiKey.prefix, scopes: p.apiKey.scopes } } : {}),
     };
   }
 }

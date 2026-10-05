@@ -716,6 +716,90 @@ model AuditEvent {
   @@index([resourceType, resourceId])
 }
 
+// ───────────────────────────── Integrations ─────────────────────────────
+
+/// Machine credentials for the API (docs/specs/integration-api.md). Only the SHA-256 of the
+/// token is stored; the token is shown once. Tenant keys act inside one tenant with a customer
+/// role; organization keys (tenantId null) act with a platform role.
+model ApiKey {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @db.Uuid
+  tenantId       String?   @db.Uuid
+  name           String
+  /// Public, displayable part, e.g. "ork_live_7f3a9c21".
+  prefix         String    @unique
+  tokenHash      String    @unique
+  role           String
+  scopes         String[]
+  createdById    String    @db.Uuid
+  expiresAt      DateTime? @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+  lastUsedAt     DateTime? @db.Timestamptz(3)
+  lastUsedIp     String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@index([tenantId])
+}
+
+model WebhookEndpoint {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  organizationId      String   @db.Uuid
+  /// Null = receives events of every tenant in the organization (platform staff only).
+  tenantId            String?  @db.Uuid
+  url                 String
+  description         String   @default("")
+  events              String[]
+  /// Signing secret, encrypted at rest (AES-256-GCM). Needed in clear to sign deliveries.
+  secretEncrypted     String
+  enabled             Boolean  @default(true)
+  consecutiveFailures Int      @default(0)
+  disabledReason      String?
+  createdById         String   @db.Uuid
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+  @@index([tenantId])
+}
+
+/// Outbox of webhook deliveries; the worker sends and retries them.
+model WebhookDelivery {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  endpointId     String    @db.Uuid
+  event          String
+  payload        Json
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  responseStatus Int?
+  lastError      String?
+  nextAttemptAt  DateTime  @default(now()) @db.Timestamptz(3)
+  deliveredAt    DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}
+
+/// Result of importing existing IaC (Terraform, CloudFormation, ...) into an OrkStage template.
+model ImportJob {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @db.Uuid
+  tenantId       String?  @db.Uuid
+  createdById    String   @db.Uuid
+  sourceKinds    String[]
+  report         Json
+  validation     Json
+  templateId     String?  @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([organizationId, createdAt])
+}
+
 model FeatureFlag {
   id       String  @id @default(uuid(7)) @db.Uuid
   key      String

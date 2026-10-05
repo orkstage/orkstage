@@ -18,7 +18,7 @@ import { Throttle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
 import { AppError, conflict, notFound, unprocessable } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -72,6 +72,7 @@ export class InstancesController {
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('instances:read')
   @Get()
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.instance.findMany({
@@ -85,6 +86,7 @@ export class InstancesController {
     return page(rows, q.limit, (r) => this.toDto(r, simulated.get(r.id) ?? false));
   }
 
+  @Scope('instances:write')
   @Post()
   @ApiZodBody(createInstanceSchema)
   async create(
@@ -128,6 +130,7 @@ export class InstancesController {
     return this.toDto(instance, resolved.resources.every((r) => r.provider === 'mock'));
   }
 
+  @Scope('instances:read')
   @Get(':id')
   async get(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<InstanceDto> {
     const instance = await this.load(p, id, 'read');
@@ -143,6 +146,7 @@ export class InstancesController {
     };
   }
 
+  @Scope('instances:write')
   @Patch(':id')
   @ApiZodBody(updateInstanceSchema)
   async update(
@@ -176,6 +180,7 @@ export class InstancesController {
   }
 
   /** Compile, policy check, cost estimate and plan diff — without touching any cloud. */
+  @Scope('instances:read')
   @Post(':id/preview')
   @HttpCode(200)
   async preview(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string) {
@@ -192,6 +197,7 @@ export class InstancesController {
     return this.compiler.toPreview(resolved, await this.compiler.knownResources(id), instance.name);
   }
 
+  @Scope('instances:deploy')
   @Post(':id/deploy')
   @HttpCode(202)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -202,6 +208,7 @@ export class InstancesController {
   }
 
   /** Explicit template upgrade (spec §71). Existing infrastructure never changes silently. */
+  @Scope('instances:write')
   @Post(':id/upgrade')
   @ApiZodBody(upgradeInstanceSchema)
   async upgrade(
@@ -221,6 +228,7 @@ export class InstancesController {
     return this.toDto(updated, (await this.simulatedMap([updated])).get(id) ?? false);
   }
 
+  @Scope('instances:deploy')
   @Post(':id/destroy')
   @HttpCode(202)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -236,6 +244,7 @@ export class InstancesController {
     return toDeploymentSummary(await this.launcher.destroy(instance, p, correlationId));
   }
 
+  @Scope('instances:read')
   @Get(':id/deployments')
   async deployments(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @ZodQuery(listQuerySchema) q: ListQuery) {
     await this.load(p, id, 'read');
@@ -248,6 +257,7 @@ export class InstancesController {
     return page(rows, q.limit, toDeploymentSummary);
   }
 
+  @Scope('instances:read')
   @Get(':id/logs')
   async logs(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @Query('resourceId') resourceId: string, @Query('limit') limit = '50') {
     await this.load(p, id, 'read');
@@ -257,6 +267,7 @@ export class InstancesController {
     return { simulated: adapter.simulated, lines };
   }
 
+  @Scope('instances:read')
   @Get(':id/metrics')
   async metrics(
     @CurrentPrincipal() p: RequestPrincipal,
@@ -273,6 +284,7 @@ export class InstancesController {
   }
 
   /** Simulation controls (mock targets only): force health states or drift to exercise incidents. */
+  @Scope('instances:deploy')
   @Post(':id/simulate')
   @HttpCode(204)
   @ApiZodBody(simulateSchema)
@@ -285,8 +297,8 @@ export class InstancesController {
     const instance = await this.load(p, id, 'deploy');
     const { resource, ctx } = await this.resourceContext(id, body.resourceId);
     if (resource.provider !== 'mock') throw unprocessable('NOT_SIMULATED', 'Simulation controls only apply to simulated resources.');
-    if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, body.resourceId, body.health);
-    if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, body.resourceId, body.drift);
+    if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, resource.name, body.health);
+    if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, resource.name, body.drift);
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'InstanceResource', resourceId: `${id}/${body.resourceId}`, action: 'SIMULATE', correlationId, changes: body });
   }
 

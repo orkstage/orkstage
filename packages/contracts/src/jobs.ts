@@ -22,6 +22,11 @@ export interface NotificationJob {
   body: string;
   /** Path in the web console, e.g. `/deployments/<id>`. */
   link?: string;
+  /**
+   * Machine-readable identifiers for webhook subscribers (e.g. deploymentId, instanceId,
+   * status). Ids and states only — never secrets or infrastructure internals.
+   */
+  data?: Record<string, string | number | boolean | null>;
 }
 
 export const NOTIFICATION_EVENTS = [

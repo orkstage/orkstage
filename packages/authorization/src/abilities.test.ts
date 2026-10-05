@@ -70,6 +70,15 @@ describe('tenant isolation', () => {
     expect(mixed.can('read', globexInstance)).toBe(true);
   });
 
+  it('lets tenant admins manage only their own keys and webhooks', () => {
+    const admin = defineAbilityFor({ userId: 'u', memberships: [{ tenantId: 'acme', role: 'CustomerAdmin' }] });
+    expect(admin.can('create', subject('ApiKey', { tenantId: 'acme' }))).toBe(true);
+    expect(admin.can('create', subject('ApiKey', { tenantId: 'globex' }))).toBe(false);
+    expect(admin.can('create', subject('Webhook', { tenantId: null }))).toBe(false);
+    expect(dev.can('create', subject('ApiKey', { tenantId: 'acme' }))).toBe(false);
+    expect(dev.can('create', subject('Import', { tenantId: 'acme' }))).toBe(true);
+  });
+
   it('serialized rules rebuild an equivalent ability for the frontend', () => {
     const rebuilt = abilityFromRules(JSON.parse(JSON.stringify(dev.rules)));
     expect(rebuilt.can('deploy', acmeInstance)).toBe(true);

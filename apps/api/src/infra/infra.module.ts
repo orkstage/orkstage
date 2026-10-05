@@ -5,6 +5,7 @@ import {
   createRedis,
   EnvSecretResolver,
   loadConfig,
+  SecretBox,
   type PlatformConfig,
 } from '@co/runtime';
 import type { AdapterRegistry } from '@co/cloud-core';
@@ -16,6 +17,7 @@ import type { Redis } from 'ioredis';
 export const CONFIG = Symbol('CONFIG');
 export const PRISMA = Symbol('PRISMA');
 export const REDIS = Symbol('REDIS');
+export const SECRET_BOX = Symbol('SECRET_BOX');
 
 /** Cloud adapters, plus the mock adapter for simulation controls. */
 @Injectable()
@@ -83,10 +85,11 @@ export class Lifecycle implements OnApplicationShutdown {
     { provide: CONFIG, useFactory: (): PlatformConfig => loadConfig() },
     { provide: PRISMA, useFactory: (config: PlatformConfig) => createPrismaClient(config.DATABASE_URL), inject: [CONFIG] },
     { provide: REDIS, useFactory: (config: PlatformConfig) => createRedis(config.REDIS_URL), inject: [CONFIG] },
+    { provide: SECRET_BOX, useFactory: (config: PlatformConfig) => new SecretBox(config.ENCRYPTION_KEY, config.SESSION_SECRET), inject: [CONFIG] },
     Adapters,
     Queues,
     Lifecycle,
   ],
-  exports: [CONFIG, PRISMA, REDIS, Adapters, Queues],
+  exports: [CONFIG, PRISMA, REDIS, SECRET_BOX, Adapters, Queues],
 })
 export class InfraModule {}

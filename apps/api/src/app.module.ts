@@ -11,6 +11,7 @@ import { CommonModule } from './common/common.module.js';
 import { ErrorFilter } from './common/errors.js';
 import { CONFIG, InfraModule } from './infra/infra.module.js';
 import { InstancesModule } from './instances/instances.module.js';
+import { IntegrationsModule } from './integrations/integrations.module.js';
 import { OpsModule } from './ops/ops.module.js';
 
 @Module({
@@ -34,6 +35,7 @@ import { OpsModule } from './ops/ops.module.js';
     CatalogModule,
     InstancesModule,
     OpsModule,
+    IntegrationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

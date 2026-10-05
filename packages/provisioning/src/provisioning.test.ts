@@ -215,6 +215,13 @@ describe('executor', () => {
     const second = recordingHooks();
     await executeApply({ resolved, registry: reg, hooks: second.hooks, completed, ...ids });
     expect(second.events).toEqual([]);
+
+    // Someone deletes the storage bucket outside OrkStage: it is re-created, not assumed to exist.
+    const storage = resolved.resources.find((r) => r.id === 'storage')!;
+    await reg.get('mock').deleteResource({ target: resolved.targets[storage.targetId]!, region: storage.region, correlationId: 'x' }, { resourceId: storage.id, serviceKind: storage.type, capability: storage.capability, name: storage.name });
+    const third = recordingHooks();
+    await executeApply({ resolved, registry: reg, hooks: third.hooks, completed, ...ids });
+    expect(third.events).toEqual(['start:storage:1', 'ok:storage']);
   });
 
   it('destroys dependents before dependencies', async () => {

@@ -4,24 +4,22 @@ import {
   validateTemplateSchema,
   type TemplateDto,
   type TemplateVersionDto,
-  type ValidationIssueDto,
 } from '@co/contracts';
 import type { PrismaClient, TemplateVersion } from '@co/database';
-import type { Entitlements, PlanCode } from '@co/domain';
-import { compileInfrastructure } from '@co/provisioning';
-import { toCloudTarget } from '@co/runtime';
-import { parseTemplate, validateTemplate, type EnvironmentTemplate } from '@co/templates';
+import type { PlanCode } from '@co/domain';
+import { parseTemplate, type EnvironmentTemplate } from '@co/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { stringify } from 'yaml';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
 import { conflict, notFound, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
-import { Adapters, PRISMA } from '../infra/infra.module.js';
+import { PRISMA } from '../infra/infra.module.js';
+import { TemplateValidationService } from './template-validation.service.js';
 import type { RequestPrincipal } from '../types.js';
 
 const semverGt = (a: string, b: string) => {
@@ -41,10 +39,11 @@ const semverGt = (a: string, b: string) => {
 export class TemplatesController {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
-    private readonly adapters: Adapters,
+    private readonly validation: TemplateValidationService,
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('templates:read')
   @Get()
   async list(@CurrentPrincipal() p: RequestPrincipal): Promise<TemplateDto[]> {
     authorize(p, 'read', 'Template');
@@ -62,6 +61,7 @@ export class TemplatesController {
     }));
   }
 
+  @Scope('templates:read')
   @Get(':id')
   async get(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<TemplateDto> {
     authorize(p, 'read', 'Template');
@@ -82,6 +82,7 @@ export class TemplatesController {
     };
   }
 
+  @Scope('templates:write')
   @Post()
   @ApiZodBody(createTemplateSchema)
   async create(
@@ -106,6 +107,7 @@ export class TemplatesController {
     return this.get(p, t.id);
   }
 
+  @Scope('templates:write')
   @Post(':id/versions')
   @ApiZodBody(createTemplateSchema)
   async addVersion(
@@ -131,6 +133,7 @@ export class TemplatesController {
     return this.versionDto(v);
   }
 
+  @Scope('templates:read')
   @Post(':id/validate')
   @HttpCode(200)
   @ApiZodBody(validateTemplateSchema)
@@ -149,6 +152,7 @@ export class TemplatesController {
     return this.fullValidation(source, body.planCode ? [body.planCode] : undefined);
   }
 
+  @Scope('templates:write')
   @Post(':id/versions/:versionId/publish')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -175,6 +179,7 @@ export class TemplatesController {
     return this.versionDto(published);
   }
 
+  @Scope('templates:write')
   @Post(':id/clone')
   @ApiZodBody(cloneTemplateSchema)
   async clone(
@@ -208,53 +213,8 @@ export class TemplatesController {
     return parsed.template;
   }
 
-  /**
-   * Schema → semantic → plan compatibility for each declared plan → capability + security
-   * policy, by compiling against every active cloud target allowed for each slot.
-   */
-  private async fullValidation(source: string, plansFilter?: PlanCode[]): Promise<{ valid: boolean; issues: ValidationIssueDto[] }> {
-    const base = validateTemplate(source);
-    if (!base.valid || !base.template) return { valid: false, issues: base.issues };
-    const template = base.template;
-    const issues: ValidationIssueDto[] = [...base.issues];
-
-    const plans = await this.prisma.plan.findMany({ where: { code: { in: plansFilter ?? template.spec.plans } } });
-    const targets = await this.prisma.cloudTarget.findMany({ where: { status: 'ACTIVE', tenantId: null } });
-
-    for (const plan of plans) {
-      const entitlements = plan.entitlements as unknown as Entitlements;
-      const planReport = validateTemplate(template, { code: plan.code as PlanCode, entitlements });
-      issues.push(...planReport.issues.filter((i) => i.stage === 'plan').map((i) => ({ ...i, message: `[${plan.code}] ${i.message}` })));
-
-      // Provider/capability/policy: compile with the first compatible target for each slot.
-      const bindings: Record<string, { target: ReturnType<typeof toCloudTarget>; region: string }> = {};
-      for (const slot of template.spec.placements) {
-        const t = targets.find((x) => slot.providers.length === 0 || slot.providers.includes(x.provider));
-        if (t) bindings[slot.name] = { target: toCloudTarget(t), region: t.defaultRegion };
-      }
-      if (Object.keys(bindings).length < template.spec.placements.length) {
-        issues.push({ stage: 'capability', severity: 'warning', code: 'NO_TARGET_FOR_SLOT', message: 'No shared cloud target is compatible with every placement slot; capability checks were partial.' });
-        continue;
-      }
-      const resolved = compileInfrastructure(
-        {
-          template,
-          plan: { code: plan.code as PlanCode, entitlements },
-          organizationId: 'validation',
-          tenant: { id: 'validation', slug: 'validation' },
-          instance: { id: 'validation', slug: 'validation', environment: template.metadata.nonProduction ? 'sandbox' : 'production' },
-          bindings,
-        },
-        this.adapters.registry,
-      );
-      issues.push(
-        ...resolved.issues
-          .filter((i) => i.stage === 'capability' || i.stage === 'policy')
-          .map((i) => ({ ...i, message: `[${plan.code}] ${i.message}` })),
-      );
-    }
-    const unique = [...new Map(issues.map((i) => [`${i.code}:${i.message}`, i])).values()];
-    return { valid: !unique.some((i) => i.severity === 'error'), issues: unique };
+  private fullValidation(source: string, plansFilter?: PlanCode[]) {
+    return this.validation.validate(source, plansFilter);
   }
 
   private versionDto(v: TemplateVersion): TemplateVersionDto {

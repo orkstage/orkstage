@@ -41,7 +41,7 @@ export class HealthMonitor {
             : []),
         ]);
         if (nextStatus === 'DEGRADED' && instance.status !== 'DEGRADED') {
-          await notify(this.ctx, { tenantId: instance.tenantId, event: 'instance.degraded', title: `${instance.name} is degraded`, body: 'One or more components are not healthy. We are tracking it on your status page.', link: `/instances/${instance.id}` });
+          await notify(this.ctx, { tenantId: instance.tenantId, event: 'instance.degraded', title: `${instance.name} is degraded`, body: 'One or more components are not healthy. We are tracking it on your status page.', link: `/instances/${instance.id}`, data: { instanceId: instance.id, health } });
         }
       }
       await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
@@ -109,7 +109,7 @@ export class HealthMonitor {
           where: { id: open.id },
           data: { status: 'RESOLVED', resolvedAt: new Date(), updates: { create: { status: 'RESOLVED', message: `Health restored for ${r.resourceId}.` } } },
         });
-        await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.resolved', title: `Resolved: ${open.title}`, body: 'The affected component is healthy again.', link: `/incidents/${open.id}` });
+        await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.resolved', title: `Resolved: ${open.title}`, body: 'The affected component is healthy again.', link: `/incidents/${open.id}`, data: { incidentId: open.id, instanceId: instance.id } });
         await systemAudit(this.ctx, { tenantId: instance.tenantId, resourceType: 'Incident', resourceId: open.id, action: 'AUTO_RESOLVE' });
         continue;
       }
@@ -139,7 +139,7 @@ export class HealthMonitor {
         },
       });
       if (rule.actions.includes('notify_owners')) {
-        await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.opened', title: incident.title, body: 'We detected a problem and opened an incident. Follow updates on your status page.', link: `/incidents/${incident.id}` });
+        await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.opened', title: incident.title, body: 'We detected a problem and opened an incident. Follow updates on your status page.', link: `/incidents/${incident.id}`, data: { incidentId: incident.id, instanceId: instance.id, severity: incident.severity } });
       }
       await systemAudit(this.ctx, { tenantId: instance.tenantId, resourceType: 'Incident', resourceId: incident.id, action: 'OPEN', changes: { rule: rule.name, resourceId: r.resourceId } });
     }

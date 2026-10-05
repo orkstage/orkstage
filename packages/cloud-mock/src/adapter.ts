@@ -110,14 +110,14 @@ export class MockAdapter implements CloudProviderAdapter {
   }
 
   async ensureResource(ctx: ProviderContext, req: ResourceRequest): Promise<ResourceResult> {
-    const key = this.key(ctx, req.resourceId);
+    const key = this.key(ctx, req.name);
     const existing = await this.read(key);
     if (existing && existing.idempotencyKey === req.idempotencyKey) {
       return { providerResourceId: existing.providerResourceId, outputs: existing.outputs, unchanged: true };
     }
 
     await this.simulateLatency(ctx, req.resourceId);
-    await this.maybeFail(ctx, req.resourceId);
+    await this.maybeFail(ctx, req.resourceId, req.name);
 
     const cfg = config(ctx.target);
     const simulate = cfg.simulate ?? 'aws';
@@ -134,17 +134,17 @@ export class MockAdapter implements CloudProviderAdapter {
   }
 
   async deleteResource(ctx: ProviderContext, res: ResourceIdentifier): Promise<void> {
-    const key = this.key(ctx, res.resourceId);
+    const key = this.key(ctx, res.name);
     if (!(await this.read(key))) return;
     await this.simulateLatency(ctx, res.resourceId);
     await this.store.delete(key);
-    await this.store.delete(this.healthKey(ctx, res.resourceId));
+    await this.store.delete(this.healthKey(ctx, res.name));
   }
 
   async getResource(ctx: ProviderContext, res: ResourceIdentifier): Promise<ResourceState> {
-    const stored = await this.read(this.key(ctx, res.resourceId));
+    const stored = await this.read(this.key(ctx, res.name));
     if (!stored) return { exists: false, outputs: {} };
-    const drift = await this.store.get(this.driftKey(ctx, res.resourceId));
+    const drift = await this.store.get(this.driftKey(ctx, res.name));
     return {
       exists: true,
       providerResourceId: stored.providerResourceId,
@@ -155,10 +155,10 @@ export class MockAdapter implements CloudProviderAdapter {
 
   async checkHealth(ctx: ProviderContext, res: ResourceIdentifier): Promise<HealthResult> {
     const checkedAt = new Date().toISOString();
-    if (!(await this.read(this.key(ctx, res.resourceId)))) {
+    if (!(await this.read(this.key(ctx, res.name)))) {
       return { state: 'UNHEALTHY', message: 'Resource does not exist.', checkedAt };
     }
-    const override = (await this.store.get(this.healthKey(ctx, res.resourceId))) as HealthState | null;
+    const override = (await this.store.get(this.healthKey(ctx, res.name))) as HealthState | null;
     const cfgUnhealthy = config(ctx.target).unhealthy?.includes(res.resourceId);
     const state: HealthState = override ?? (cfgUnhealthy ? 'UNHEALTHY' : 'HEALTHY');
     const latencyMs = 20 + (parseInt(hash(`${res.resourceId}:${checkedAt.slice(0, 16)}`).slice(0, 4), 16) % 60);
@@ -195,25 +195,28 @@ export class MockAdapter implements CloudProviderAdapter {
   }
 
   /** Simulation control: force a health state for a resource (used to exercise incidents). */
-  async setHealthOverride(ctx: ProviderContext, resourceId: string, state: HealthState | null): Promise<void> {
-    if (state) await this.store.set(this.healthKey(ctx, resourceId), state);
-    else await this.store.delete(this.healthKey(ctx, resourceId));
+  async setHealthOverride(ctx: ProviderContext, name: string, state: HealthState | null): Promise<void> {
+    if (state) await this.store.set(this.healthKey(ctx, name), state);
+    else await this.store.delete(this.healthKey(ctx, name));
   }
 
   /** Simulation control: make a resource report a different observed spec (drift). */
-  async simulateDrift(ctx: ProviderContext, resourceId: string, drifted: boolean): Promise<void> {
-    if (drifted) await this.store.set(this.driftKey(ctx, resourceId), `drift-${Date.now()}`);
-    else await this.store.delete(this.driftKey(ctx, resourceId));
+  async simulateDrift(ctx: ProviderContext, name: string, drifted: boolean): Promise<void> {
+    if (drifted) await this.store.set(this.driftKey(ctx, name), `drift-${Date.now()}`);
+    else await this.store.delete(this.driftKey(ctx, name));
   }
 
-  private key(ctx: ProviderContext, resourceId: string) {
-    return `mock:${ctx.target.id}:${ctx.region}:res:${resourceId}`;
+  private key(ctx: ProviderContext, name: string) {
+    // Physical names are unique per tenant and instance, like real cloud resource names.
+    return `mock:${ctx.target.id}:${ctx.region}:res:${name}`;
   }
-  private healthKey(ctx: ProviderContext, resourceId: string) {
-    return `mock:${ctx.target.id}:${ctx.region}:health:${resourceId}`;
+  private healthKey(ctx: ProviderContext, name: string) {
+    // Physical names are unique per tenant and instance, like real cloud resource names.
+    return `mock:${ctx.target.id}:${ctx.region}:health:${name}`;
   }
-  private driftKey(ctx: ProviderContext, resourceId: string) {
-    return `mock:${ctx.target.id}:${ctx.region}:drift:${resourceId}`;
+  private driftKey(ctx: ProviderContext, name: string) {
+    // Physical names are unique per tenant and instance, like real cloud resource names.
+    return `mock:${ctx.target.id}:${ctx.region}:drift:${name}`;
   }
 
   private async read(key: string): Promise<StoredResource | null> {
@@ -227,10 +230,10 @@ export class MockAdapter implements CloudProviderAdapter {
     await this.sleep(Math.round(min + n * (max - min)), ctx.signal);
   }
 
-  private async maybeFail(ctx: ProviderContext, resourceId: string) {
+  private async maybeFail(ctx: ProviderContext, resourceId: string, name: string) {
     const failure = config(ctx.target).failures?.[resourceId];
     if (!failure) return;
-    const counterKey = `mock:${ctx.target.id}:${ctx.region}:failcount:${resourceId}`;
+    const counterKey = `mock:${ctx.target.id}:${ctx.region}:failcount:${name}`;
     const count = Number((await this.store.get(counterKey)) ?? '0');
     if (failure.times !== undefined && count >= failure.times) return;
     await this.store.set(counterKey, String(count + 1));

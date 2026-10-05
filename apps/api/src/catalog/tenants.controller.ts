@@ -4,7 +4,7 @@ import { Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nes
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
 import { PRISMA } from '../infra/infra.module.js';
@@ -18,12 +18,14 @@ export class TenantsController {
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('templates:read')
   @Get('plans')
   async plans(): Promise<PlanDto[]> {
     const plans = await this.prisma.plan.findMany({ orderBy: { createdAt: 'asc' } });
     return plans.map((p) => ({ id: p.id, code: p.code, name: p.name, entitlements: p.entitlements as Record<string, unknown> }));
   }
 
+  @Scope('instances:read')
   @Get('tenants')
   async list(@CurrentPrincipal() p: RequestPrincipal): Promise<TenantDto[]> {
     const tenants = await this.prisma.tenant.findMany({
@@ -53,6 +55,7 @@ export class TenantsController {
     return this.toDto(tenant);
   }
 
+  @Scope('instances:read')
   @Get('tenants/:id')
   async get(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<TenantDto> {
     authorize(p, 'read', 'Tenant', { tenantId: id });

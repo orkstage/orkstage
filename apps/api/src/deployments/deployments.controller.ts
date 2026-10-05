@@ -3,7 +3,7 @@ import type { PrismaClient } from '@co/database';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
 import { conflict, notFound } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ZodQuery } from '../common/validation.js';
@@ -21,6 +21,7 @@ export class DeploymentsController {
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('instances:read')
   @Get()
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.deployment.findMany({
@@ -37,6 +38,7 @@ export class DeploymentsController {
     return page(rows, q.limit, toDeploymentSummary);
   }
 
+  @Scope('instances:read')
   @Get(':id')
   async get(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<DeploymentDto> {
     const d = await this.load(p, id);
@@ -69,6 +71,7 @@ export class DeploymentsController {
   }
 
   /** Incremental event log for live progress; poll with the last seen id. */
+  @Scope('instances:read')
   @Get(':id/events')
   async events(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @Query('after') after?: string): Promise<DeploymentEventDto[]> {
     await this.load(p, id);
@@ -80,6 +83,7 @@ export class DeploymentsController {
     return rows.map((e) => ({ id: String(e.id), at: e.at.toISOString(), level: e.level as DeploymentEventDto['level'], stepKey: e.stepKey, message: e.message }));
   }
 
+  @Scope('instances:deploy')
   @Post(':id/approve')
   @HttpCode(200)
   async approve(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {
@@ -97,6 +101,7 @@ export class DeploymentsController {
   }
 
   /** Cooperative cancel: the worker stops before the next resource and records what completed. */
+  @Scope('instances:deploy')
   @Post(':id/cancel')
   @HttpCode(200)
   async cancel(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {
@@ -111,6 +116,7 @@ export class DeploymentsController {
     return toDeploymentSummary(await this.prisma.deployment.findUniqueOrThrow({ where: { id } }));
   }
 
+  @Scope('instances:deploy')
   @Post(':id/retry')
   @HttpCode(202)
   async retry(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {

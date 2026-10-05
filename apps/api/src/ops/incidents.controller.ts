@@ -4,7 +4,7 @@ import { Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/com
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -36,6 +36,7 @@ export class IncidentsController {
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('instances:read')
   @Get()
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.incident.findMany({
@@ -52,6 +53,7 @@ export class IncidentsController {
     return page(rows, q.limit, (i) => toIncidentDto(i));
   }
 
+  @Scope('incidents:write')
   @Post()
   @ApiZodBody(createIncidentSchema)
   async create(
@@ -82,6 +84,7 @@ export class IncidentsController {
     return toIncidentDto(incident);
   }
 
+  @Scope('instances:read')
   @Get(':id')
   async get(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<IncidentDto> {
     const incident = await this.prisma.incident.findFirst({ where: { id, ...tenantScope(p) }, include: { updates: { orderBy: { at: 'desc' } } } });
@@ -90,6 +93,7 @@ export class IncidentsController {
     return toIncidentDto(incident);
   }
 
+  @Scope('incidents:write')
   @Post(':id/updates')
   @ApiZodBody(incidentUpdateSchema)
   async addUpdate(

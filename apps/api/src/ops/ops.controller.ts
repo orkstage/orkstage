@@ -5,7 +5,7 @@ import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } 
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Redis } from 'ioredis';
-import { authorize, CurrentPrincipal, isPlatformStaff, Public } from '../common/auth.js';
+import { authorize, CurrentPrincipal, isPlatformStaff, Public, Scope } from '../common/auth.js';
 import { AppError, forbidden, notFound } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ZodQuery } from '../common/validation.js';
@@ -149,6 +149,7 @@ export class OpsController {
   }
 
   /** Private, tenant-scoped status page (spec §26, §52). Never includes other tenants' data. */
+  @Scope('instances:read')
   @Get('status/:tenantId')
   async status(@CurrentPrincipal() p: RequestPrincipal, @Param('tenantId', ParseUUIDPipe) tenantId: string): Promise<StatusPageDto> {
     authorize(p, 'read', 'StatusPage', { tenantId });
@@ -207,6 +208,7 @@ export class OpsController {
     await this.prisma.notification.updateMany({ where: { id, userId: p.userId, readAt: null }, data: { readAt: new Date() } });
   }
 
+  @Scope('audit:read')
   @Get('audit')
   async audit(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     if (q.tenantId) authorize(p, 'read', 'Audit', { tenantId: q.tenantId });

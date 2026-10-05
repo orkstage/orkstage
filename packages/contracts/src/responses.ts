@@ -20,6 +20,8 @@ export interface MeResponse {
   memberships: { tenantId: string; tenantName: string; tenantSlug: string; role: string }[];
   /** CASL rules; rebuild with abilityFromRules() for feature visibility. */
   rules: unknown[];
+  /** Present when the caller authenticated with an API key. */
+  apiKey?: { id: string; name: string; prefix: string; scopes: string[] };
 }
 
 export interface PlanDto {

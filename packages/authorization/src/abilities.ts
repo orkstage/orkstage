@@ -26,6 +26,9 @@ export const SUBJECTS = [
   'Policy',
   'Settings',
   'Audit',
+  'ApiKey',
+  'Webhook',
+  'Import',
 ] as const;
 export type SubjectName = (typeof SUBJECTS)[number];
 
@@ -53,6 +56,28 @@ export interface Principal {
 }
 
 const detectSubjectType = (s: Subject) => (typeof s === 'string' ? s : s.__type);
+
+/**
+ * API key scopes (docs/specs/integration-api.md). A key can never exceed its role; scopes only
+ * narrow it. Routes declare the scope they need; routes without one are closed to API keys.
+ */
+export const API_KEY_SCOPES = [
+  'instances:read',
+  'instances:write',
+  'instances:deploy',
+  'templates:read',
+  'templates:write',
+  'applications:write',
+  'incidents:write',
+  'imports:write',
+  'webhooks:manage',
+  'audit:read',
+] as const;
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
+/** Roles an API key may act as. Platform roles are only for organization-wide keys. */
+export const API_KEY_ROLES = ['PlatformAdmin', 'PlatformOperator', 'CustomerAdmin', 'CustomerDeveloper', 'CustomerViewer'] as const;
+export type ApiKeyRole = (typeof API_KEY_ROLES)[number];
 
 export function defineAbilityFor(principal: Principal): AppAbility {
   const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
@@ -96,6 +121,9 @@ export function defineAbilityFor(principal: Principal): AppAbility {
     can('read', ['Member', 'Audit'], admins);
     can(['create', 'update', 'delete'], 'Member', owners);
     can('update', 'Tenant', owners);
+    // Integrations: tenant admins manage their tenant's keys and webhooks; developers can import IaC.
+    can('manage', ['ApiKey', 'Webhook'], admins);
+    can(['create', 'read'], 'Import', ops);
   }
 
   return build({ detectSubjectType });

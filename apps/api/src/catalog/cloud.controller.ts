@@ -6,7 +6,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
@@ -24,6 +24,7 @@ export class CloudController {
     private readonly audit: AuditService,
   ) {}
 
+  @Scope('templates:read')
   @Get('applications')
   async applications(@CurrentPrincipal() p: RequestPrincipal): Promise<ApplicationDto[]> {
     authorize(p, 'read', 'Application');
@@ -46,6 +47,7 @@ export class CloudController {
     return this.adapters.registry.providers().map((provider) => ({ provider, simulated: this.adapters.registry.get(provider).simulated }));
   }
 
+  @Scope('instances:read')
   @Get('cloud/targets')
   async list(@CurrentPrincipal() p: RequestPrincipal): Promise<CloudTargetDto[]> {
     authorize(p, 'read', 'CloudTarget');
@@ -96,6 +98,7 @@ export class CloudController {
     return this.toDto(updated);
   }
 
+  @Scope('instances:read')
   @Get('cloud/targets/:id/capabilities')
   async capabilities(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string): Promise<CapabilityDto[]> {
     authorize(p, 'read', 'CloudTarget');

@@ -5,6 +5,8 @@ export interface RequestPrincipal extends Principal {
   name: string;
   sessionId: string;
   ability: AppAbility;
+  /** Set when the caller authenticated with an API key instead of a session. */
+  apiKey?: { id: string; name: string; prefix: string; scopes: string[]; organizationId: string };
 }
 
 declare module 'fastify' {

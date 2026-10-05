@@ -35,6 +35,10 @@ const schema = z
     TOFU_MODULES_IN_IMAGE: bool.default(false),
     // Emulator endpoint as reachable from inside containers (e.g. http://ministack:4566).
     AWS_EMULATOR_ENDPOINT: z.string().optional(),
+    // 32 random bytes, base64. Encrypts secrets the platform must read back (webhook secrets).
+    ENCRYPTION_KEY: z.string().optional(),
+    // Local development only: allow http:// and private-network webhook URLs.
+    WEBHOOK_ALLOW_PRIVATE: bool.default(false),
     TOFU_TIMEOUT_MINUTES: z.coerce.number().int().min(1).max(240).default(45),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
@@ -42,6 +46,12 @@ const schema = z
   .superRefine((c, ctx) => {
     if (c.NODE_ENV === 'production' && c.AUTH_DEV_LOGIN_ENABLED) {
       ctx.addIssue({ code: 'custom', path: ['AUTH_DEV_LOGIN_ENABLED'], message: 'Dev login must be disabled in production.' });
+    }
+    if (c.NODE_ENV === 'production' && !c.ENCRYPTION_KEY) {
+      ctx.addIssue({ code: 'custom', path: ['ENCRYPTION_KEY'], message: 'Set ENCRYPTION_KEY (32 bytes, base64) in production.' });
+    }
+    if (c.NODE_ENV === 'production' && c.WEBHOOK_ALLOW_PRIVATE) {
+      ctx.addIssue({ code: 'custom', path: ['WEBHOOK_ALLOW_PRIVATE'], message: 'Private webhook targets are not allowed in production.' });
     }
     if (c.NODE_ENV === 'production' && c.SESSION_SECRET.startsWith('change-me')) {
       ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Set a real session secret in production.' });

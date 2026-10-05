@@ -1,4 +1,12 @@
-import { defineAbilityFor, type Action, type SubjectName, subject as tagSubject } from '@co/authorization';
+import {
+  defineAbilityFor,
+  subject as tagSubject,
+  type Action,
+  type ApiKeyScope,
+  type PlatformRole,
+  type SubjectName,
+  type TenantRole,
+} from '@co/authorization';
 import type { PrismaClient } from '@co/database';
 import { sha256 } from '@co/domain';
 import {
@@ -17,14 +25,32 @@ import { AppError, forbidden } from './errors.js';
 
 export const SESSION_COOKIE = 'co_session';
 const IS_PUBLIC = 'co:isPublic';
+const SCOPE = 'co:apiKeyScope';
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+const KEY_TOUCH_INTERVAL_MS = 60 * 1000;
+const BEARER = /^Bearer\s+(ork_(?:live|test)_[a-f0-9]{8}_[A-Za-z0-9_-]{20,})$/;
 
 /** Marks a route as reachable without a session (login, health). */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
 
 /**
- * Resolves the session cookie to a principal. Sessions are opaque random tokens; only their
- * SHA-256 is stored, so a database leak does not leak usable sessions.
+ * Opens a route to API keys holding `scope`. Routes without it are closed to API keys
+ * (default deny), so a new endpoint never becomes machine-accessible by accident.
+ */
+export const Scope = (scope: ApiKeyScope | '*') => SetMetadata(SCOPE, scope);
+
+function bearerToken(req: FastifyRequest): string | null {
+  const header = req.headers.authorization;
+  if (!header) return null;
+  const match = BEARER.exec(header.trim());
+  if (!match) throw new AppError(401, 'INVALID_API_KEY', 'Malformed API key. Expected "Authorization: Bearer ork_…".');
+  return match[1]!;
+}
+
+/**
+ * Resolves the caller: an API key (`Authorization: Bearer ork_…`) or the session cookie.
+ * Sessions and keys are opaque random tokens; only their SHA-256 is stored, so a database leak
+ * does not leak usable credentials.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -36,6 +62,14 @@ export class AuthGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [ctx.getHandler(), ctx.getClass()])) return true;
     const req = ctx.switchToHttp().getRequest<FastifyRequest>();
+
+    const apiKeyToken = bearerToken(req);
+    if (apiKeyToken) {
+      const required = this.reflector.getAllAndOverride<ApiKeyScope | '*' | undefined>(SCOPE, [ctx.getHandler(), ctx.getClass()]);
+      req.principal = await this.fromApiKey(apiKeyToken, req, required);
+      return true;
+    }
+
     const token = req.cookies?.[SESSION_COOKIE];
     if (!token) throw new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
 
@@ -62,14 +96,47 @@ export class AuthGuard implements CanActivate {
     };
     return true;
   }
+
+  private async fromApiKey(token: string, req: FastifyRequest, required: ApiKeyScope | '*' | undefined): Promise<RequestPrincipal> {
+    const key = await this.prisma.apiKey.findUnique({ where: { tokenHash: sha256(token) } });
+    const now = new Date();
+    if (!key || key.revokedAt || (key.expiresAt && key.expiresAt < now)) {
+      throw new AppError(401, 'INVALID_API_KEY', 'The API key is invalid, expired or revoked.');
+    }
+    if (!required) throw new AppError(403, 'API_KEY_NOT_ALLOWED', 'This endpoint is not available to API keys.');
+    if (required !== '*' && !key.scopes.includes(required)) {
+      throw new AppError(403, 'API_KEY_SCOPE', `This API key lacks the "${required}" scope.`, { required });
+    }
+    if (!key.lastUsedAt || now.getTime() - key.lastUsedAt.getTime() > KEY_TOUCH_INTERVAL_MS) {
+      await this.prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: now, lastUsedIp: req.ip } });
+    }
+    const isPlatform = key.role.startsWith('Platform');
+    const base = {
+      userId: key.createdById,
+      platformRole: isPlatform ? (key.role as PlatformRole) : null,
+      memberships: !isPlatform && key.tenantId ? [{ tenantId: key.tenantId, role: key.role as TenantRole }] : [],
+    };
+    return {
+      ...base,
+      email: `${key.name} (${key.prefix})`,
+      name: key.name,
+      sessionId: '',
+      ability: defineAbilityFor(base),
+      apiKey: { id: key.id, name: key.name, prefix: key.prefix, scopes: key.scopes, organizationId: key.organizationId },
+    };
+  }
 }
 
-/** Rejects state-changing requests without the custom CSRF header (see docs/API.md). */
+/**
+ * Rejects state-changing requests without the custom CSRF header (see docs/API.md). API-key
+ * requests are exempt: they carry no ambient browser credentials.
+ */
 @Injectable()
 export class CsrfGuard implements CanActivate {
   canActivate(ctx: ExecutionContext): boolean {
     const req = ctx.switchToHttp().getRequest<FastifyRequest>();
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
+    if (req.headers.authorization?.startsWith('Bearer ')) return true;
     if (req.headers['x-co-csrf'] !== '1') throw new AppError(403, 'CSRF_REJECTED', 'Missing CSRF header.');
     return true;
   }

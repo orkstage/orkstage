@@ -68,8 +68,12 @@ export async function executeApply(opts: ExecuteOptions): Promise<ExecutionOutco
     const done = completed[r.id];
     const runIt = !opts.only || opts.only.has(r.id);
     if (done && (done.idempotencyKey === idempotencyKeyFor(opts.tenantId, opts.instanceId, r) || !runIt)) {
-      status[r.id] = 'SUCCEEDED';
-      outputs[r.id] = done.outputs;
+      // Our records are KNOWN state, not ACTUAL (spec §93): only skip what the provider confirms
+      // still exists. A resource deleted out of band is converged again instead of assumed.
+      if (await stillExists(registry, resolved, r, opts.correlationId)) {
+        status[r.id] = 'SUCCEEDED';
+        outputs[r.id] = done.outputs;
+      }
     }
   }
 
@@ -224,6 +228,18 @@ export async function executeDestroy(opts: DestroyOptions): Promise<ExecutionOut
     await Promise.race(running.values());
   }
   return status;
+}
+
+async function stillExists(registry: AdapterRegistry, resolved: ResolvedInfrastructure, r: ResolvedResource, correlationId: string): Promise<boolean> {
+  try {
+    const state = await registry.get(r.provider).getResource(
+      { target: resolved.targets[r.targetId]!, region: r.region, correlationId },
+      { resourceId: r.id, serviceKind: r.type, capability: r.capability, name: r.name },
+    );
+    return state.exists;
+  } catch {
+    return false; // unknown → converge again; ensureResource is idempotent
+  }
 }
 
 export function toFailure(err: unknown): StepFailure {
