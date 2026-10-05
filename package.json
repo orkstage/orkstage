@@ -1,0 +1,35 @@
+{
+  "name": "orkstage",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-cloud instance management platform (control plane)",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=4 run build",
+    "build:packages": "pnpm -r --filter \"./packages/**\" run build",
+    "dev": "pnpm -r --parallel --filter \"./apps/**\" run dev",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @co/database run generate",
+    "db:migrate": "pnpm --filter @co/database run migrate:dev",
+    "db:deploy": "pnpm --filter @co/database run migrate:deploy",
+    "db:seed": "pnpm --filter @co/database run seed",
+    "local:up": "docker compose -f infra/local/docker-compose.yml up -d --wait",
+    "local:aws": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator up -d --wait ministack",
+    "local:down": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator down",
+    "platform:up": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator up -d --build --wait",
+    "platform:logs": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator logs -f api worker web",
+    "platform:down": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator down"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@co/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && node --watch --enable-source-maps dist/main.js",
+    "start": "node --enable-source-maps dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@co/cloud-core": "workspace:*",
+    "@co/contracts": "workspace:*",
+    "@co/database": "workspace:*",
+    "@co/domain": "workspace:*",
+    "@co/provisioning": "workspace:*",
+    "@co/runtime": "workspace:*",
+    "@co/templates": "workspace:*",
+    "bullmq": "6.3.11",
+    "ioredis": "6.0.0",
+    "nodemailer": "10.0.13",
+    "pino": "10.4.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "8.0.2"
+  }
+}

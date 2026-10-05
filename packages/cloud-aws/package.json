@@ -1,0 +1,40 @@
+{
+  "name": "@co/cloud-aws",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "default": "./dist/catalog.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "3.1146.0",
+    "@aws-sdk/client-ec2": "3.1146.0",
+    "@aws-sdk/client-ecr": "3.1146.0",
+    "@aws-sdk/client-ecs": "3.1146.0",
+    "@aws-sdk/client-elastic-load-balancing-v2": "3.1146.0",
+    "@aws-sdk/client-elasticache": "3.1146.0",
+    "@aws-sdk/client-rds": "3.1146.0",
+    "@aws-sdk/client-route-53": "3.1146.0",
+    "@aws-sdk/client-s3": "3.1146.0",
+    "@aws-sdk/client-sqs": "3.1146.0",
+    "@aws-sdk/client-sts": "3.1146.0",
+    "@co/cloud-core": "workspace:*",
+    "@co/domain": "workspace:*",
+    "@co/iac": "workspace:*"
+  }
+}

@@ -1,0 +1,75 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: starter-standard
+  version: 1.0.0
+  displayName: Starter standard
+  description: Balanced production environment with a dedicated network, managed Postgres, cache and queue.
+  profile: starter
+spec:
+  plans: [STARTER, GROWTH]
+  placements:
+    - name: primary
+      providers: [aws, azure, gcp, mock]
+  variables:
+    - name: apiReplicas
+      type: number
+      default: 1
+      min: 1
+      max: 2
+      target: api.replicas
+    - name: databaseSize
+      type: string
+      default: small
+      allowed: [micro, small, medium]
+      target: database.size
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 2
+    - id: registry
+      type: container-registry
+    - id: api
+      type: compute.container-service
+      implementation: ecs-fargate
+      image: catalog://sample-api
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: worker
+      type: compute.container-service
+      implementation: ecs-fargate
+      image: catalog://sample-worker
+      cpu: 0.25
+      memoryMiB: 512
+      critical: false
+    - id: database
+      type: database.postgresql
+      size: small
+      storageGiB: 20
+      backup:
+        enabled: true
+        retentionDays: 7
+    - id: cache
+      type: cache.redis
+      size: micro
+    - id: messaging
+      type: queue
+      deadLetter: true
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+      customDomain: optional
+  connectivity:
+    - { from: api, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: worker, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: api, to: cache, protocol: redis, port: 6379, mode: private-required }
+    - { from: api, to: messaging, protocol: https, mode: secure }
+    - { from: worker, to: messaging, protocol: https, mode: secure }

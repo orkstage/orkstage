@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+packages/database/src/generated
+apps/web/next-env.d.ts
+cloud_instance_management_platform_superprompt_v2_multicloud.md
+**/.terraform
+**/*.tfstate*

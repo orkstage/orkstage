@@ -1,0 +1,23 @@
+# Personal Claude Code settings (project settings.json is shared)
+.claude/settings.local.json
+
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+next-env.d.ts
+.tmp_*
+!.env.example
+packages/database/src/generated/
+
+# IaC state and secrets must never be committed
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+.tofu-work/

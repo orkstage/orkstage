@@ -1,0 +1,72 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: multicloud-reference
+  version: 1.0.0
+  displayName: Multi-cloud reference
+  description: >
+    Reference topology from spec §42.17 — API on AWS ECS Fargate behind an ALB with ECR and
+    Route 53, Postgres on Azure Flexible Server, object storage on OCI. Bind every slot to the
+    same AWS target for the AWS-only variant of the same template.
+  profile: growth
+spec:
+  plans: [GROWTH, SCALE]
+  placements:
+    - name: primary
+      description: Application runtime, registry, ingress and DNS.
+      providers: [aws, mock]
+    - name: data
+      description: Relational database.
+      providers: [aws, azure, mock]
+    - name: storage
+      description: Object storage.
+      providers: [aws, oci, mock]
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 2
+    - id: registry
+      type: container-registry
+      implementation: ecr
+    - id: api
+      type: compute.container-service
+      implementation: ecs-fargate
+      image: catalog://sample-api
+      replicas: 2
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: worker
+      type: compute.container-service
+      implementation: ecs-ec2
+      image: catalog://sample-worker
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      critical: false
+    - id: database
+      type: database.postgresql
+      placement: data
+      size: small
+      storageGiB: 50
+      highAvailability: zone-redundant
+      backup: { enabled: true, retentionDays: 7 }
+    - id: storage
+      type: object-storage
+      placement: storage
+      tier: standard
+      versioning: true
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+  connectivity:
+    - { from: api, to: database, protocol: postgres, port: 5432, mode: private-preferred }
+    - { from: worker, to: database, protocol: postgres, port: 5432, mode: private-preferred }
+    - { from: api, to: storage, protocol: https, mode: secure }
+  observability: { logs: true, metrics: true, traces: true, uptime: true, alerts: true }

@@ -1,0 +1,64 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: sandbox-min-cost
+  version: 1.0.0
+  displayName: Sandbox (minimum cost)
+  description: Realistic application testing at low monthly cost, easy to reset. Not for production.
+  nonProduction: true
+  profile: dedicated-sandbox
+spec:
+  plans: [SANDBOX, STARTER]
+  placements:
+    - name: primary
+  variables:
+    - name: enableCache
+      description: Provision a small Redis cache.
+      type: boolean
+      default: false
+      target: cache.enabled
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 1
+    - id: registry
+      type: container-registry
+    - id: api
+      type: compute.container-service
+      image: catalog://sample-api
+      cpu: 0.25
+      memoryMiB: 512
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: worker
+      type: compute.container-service
+      image: catalog://sample-worker
+      cpu: 0.25
+      memoryMiB: 512
+      critical: false
+    - id: database
+      type: database.postgresql
+      size: micro
+      storageGiB: 10
+      backup:
+        enabled: true
+        retentionDays: 1
+    - id: cache
+      type: cache.redis
+      size: micro
+      enabled: false
+    - id: messaging
+      type: queue
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+  connectivity:
+    - { from: api, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: worker, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: api, to: cache, protocol: redis, port: 6379, mode: private-required }
+    - { from: worker, to: messaging, protocol: https, mode: secure }

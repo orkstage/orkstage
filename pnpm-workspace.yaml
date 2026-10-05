@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  # Install-time telemetry (via swagger-ui-dist): not needed, not allowed.
+  '@scarf/scarf': false
+  # Optional native accelerator for BullMQ's msgpack; prebuilt fallback is fine.
+  msgpackr-extract: false

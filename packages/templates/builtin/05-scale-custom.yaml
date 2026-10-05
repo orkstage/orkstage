@@ -1,0 +1,82 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: scale-custom
+  version: 1.0.0
+  displayName: Scale (custom)
+  description: Fully configurable enterprise baseline. Clone it to tailor topology, sizing and placement.
+  profile: scale
+spec:
+  plans: [SCALE]
+  placements:
+    - name: primary
+      description: Application runtime, ingress and DNS.
+    - name: data
+      description: Database and cache. Bind to the same target as primary for a single-cloud deployment.
+  variables:
+    - { name: apiMinReplicas, type: number, default: 2, min: 1, max: 20, target: api.replicas }
+    - { name: apiCpu, type: number, default: 1, min: 0.25, max: 8, target: api.cpu }
+    - { name: apiMemoryMiB, type: number, default: 2048, min: 512, max: 32768, target: api.memoryMiB }
+    - { name: databaseSize, type: string, default: large, allowed: [medium, large, xlarge], target: database.size }
+    - { name: databaseStorageGiB, type: number, default: 500, min: 50, max: 4000, target: database.storageGiB }
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 3
+      natGateway: true
+    - id: data-network
+      type: network
+      placement: data
+      availabilityZones: 3
+    - id: registry
+      type: container-registry
+    - id: api
+      type: compute.container-service
+      image: catalog://sample-api
+      replicas: 2
+      cpu: 1
+      memoryMiB: 2048
+      port: 8080
+      public: true
+      healthCheckPath: /health
+      autoscaling: { minReplicas: 2, maxReplicas: 10, targetCpuPercent: 60 }
+    - id: worker
+      type: compute.container-service
+      image: catalog://sample-worker
+      replicas: 2
+      cpu: 1
+      memoryMiB: 2048
+      critical: false
+    - id: database
+      type: database.postgresql
+      placement: data
+      size: large
+      storageGiB: 500
+      highAvailability: zone-redundant
+      backup: { enabled: true, retentionDays: 35 }
+    - id: cache
+      type: cache.redis
+      placement: data
+      size: medium
+      replicas: 2
+    - id: messaging
+      type: queue
+    - id: storage
+      type: object-storage
+      versioning: true
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+      customDomain: optional
+  connectivity:
+    - { from: api, to: database, protocol: postgres, port: 5432, mode: private-preferred }
+    - { from: worker, to: database, protocol: postgres, port: 5432, mode: private-preferred }
+    - { from: api, to: cache, protocol: redis, port: 6379, mode: private-preferred }
+    - { from: api, to: messaging, protocol: https, mode: secure }
+    - { from: worker, to: messaging, protocol: https, mode: secure }
+    - { from: api, to: storage, protocol: https, mode: secure }
+  observability: { logs: true, metrics: true, traces: true, uptime: true, alerts: true }

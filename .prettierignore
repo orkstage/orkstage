@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+dist
+.next
+packages/database/src/generated
+cloud_instance_management_platform_superprompt_v2_multicloud.md

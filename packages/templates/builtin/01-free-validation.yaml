@@ -1,0 +1,57 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: free-validation
+  version: 1.0.0
+  displayName: Free validation
+  description: >
+    Proves the platform at minimum cost. Single region, one small API replica, smallest
+    database, no HA, short retention. NOT FOR PRODUCTION.
+  nonProduction: true
+  profile: shared-sandbox
+spec:
+  plans: [FREE, SANDBOX]
+  placements:
+    - name: primary
+      description: Everything runs in one account and region.
+  resources:
+    - id: network
+      type: network
+      strategy: shared
+      availabilityZones: 1
+    - id: registry
+      type: container-registry
+    - id: api
+      type: compute.container-service
+      image: catalog://sample-api
+      replicas: 1
+      cpu: 0.25
+      memoryMiB: 512
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: database
+      type: database.postgresql
+      size: micro
+      storageGiB: 1
+      backup:
+        enabled: false
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+  connectivity:
+    - from: api
+      to: database
+      protocol: postgres
+      port: 5432
+      mode: private-required
+  observability:
+    logs: true
+    metrics: true
+    traces: false
+    uptime: true
+    alerts: true

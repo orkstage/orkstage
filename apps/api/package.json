@@ -1,0 +1,47 @@
+{
+  "name": "@co/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && node --watch --enable-source-maps dist/main.js",
+    "start": "node --enable-source-maps dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@co/authorization": "workspace:*",
+    "@co/cloud-core": "workspace:*",
+    "@co/cloud-mock": "workspace:*",
+    "@co/contracts": "workspace:*",
+    "@co/database": "workspace:*",
+    "@co/domain": "workspace:*",
+    "@co/provisioning": "workspace:*",
+    "@co/runtime": "workspace:*",
+    "@co/templates": "workspace:*",
+    "@fastify/cookie": "11.1.2",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/static": "10.1.5",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-fastify": "12.1.2",
+    "@nestjs/swagger": "12.0.2",
+    "@nestjs/throttler": "6.7.1",
+    "bullmq": "6.3.11",
+    "fastify": "5.12.5",
+    "ioredis": "6.0.0",
+    "nestjs-pino": "5.3.1",
+    "openid-client": "6.8.8",
+    "pino": "10.4.0",
+    "pino-http": "11.0.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "yaml": "2.9.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "pino-pretty": "13.1.3"
+  }
+}

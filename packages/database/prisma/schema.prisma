@@ -1,0 +1,732 @@
+// Control-plane database. The database records DESIRED and KNOWN state; providers hold ACTUAL
+// state (spec §61, §93). Every tenant-owned row carries an explicit tenantId (spec §12).
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity & tenancy ─────────────────────────────
+
+enum PlatformRole {
+  PlatformOwner
+  PlatformAdmin
+  PlatformOperator
+}
+
+enum TenantRole {
+  CustomerOwner
+  CustomerAdmin
+  CustomerDeveloper
+  CustomerViewer
+}
+
+model User {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  email        String        @unique
+  name         String
+  platformRole PlatformRole?
+  disabledAt   DateTime?     @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  memberships        Membership[]
+  externalIdentities ExternalIdentity[]
+  sessions           Session[]
+  notifications      Notification[]
+  preferences        NotificationPreference[]
+}
+
+model Organization {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  tenants Tenant[]
+}
+
+model Tenant {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  slug           String   @unique
+  planId         String   @db.Uuid
+  /// Email domains allowed to join via enterprise SSO, e.g. ["acme.com"].
+  allowedEmailDomains String[] @default([])
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  plan         Plan         @relation(fields: [planId], references: [id])
+  memberships  Membership[]
+  invitations  Invitation[]
+  instances    Instance[]
+  incidents    Incident[]
+  cloudTargets CloudTarget[]
+
+  @@index([organizationId])
+}
+
+model Membership {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  tenantId  String     @db.Uuid
+  userId    String     @db.Uuid
+  role      TenantRole
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id         String     @id @default(uuid(7)) @db.Uuid
+  tenantId   String     @db.Uuid
+  email      String
+  role       TenantRole
+  /// SHA-256 of the invitation token; the token itself is only ever emailed.
+  tokenHash  String     @unique
+  expiresAt  DateTime   @db.Timestamptz(3)
+  acceptedAt DateTime?  @db.Timestamptz(3)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model IdentityProvider {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  /// Stable key used in URLs, e.g. "entra", "google".
+  key       String   @unique
+  kind      String
+  name      String
+  issuer    String
+  clientId  String
+  /// Reference into the secret store; the client secret never lives in this table.
+  clientSecretRef String
+  scopes    String[] @default(["openid", "email", "profile"])
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  identities ExternalIdentity[]
+}
+
+model ExternalIdentity {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  providerId String   @db.Uuid
+  /// The provider's subject claim. Stored separately from internal user ids (spec §14).
+  subject    String
+  userId     String   @db.Uuid
+  email      String?
+  lastLoginAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  provider IdentityProvider @relation(fields: [providerId], references: [id])
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, subject])
+  @@index([userId])
+}
+
+model Session {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
+  /// SHA-256 of the opaque session token held in the cookie.
+  tokenHash  String    @unique
+  method     String
+  ip         String?
+  userAgent  String?
+  expiresAt  DateTime  @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Plans & templates ─────────────────────────────
+
+model Plan {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  code         String   @unique
+  name         String
+  /// Entitlements document (see @co/domain Entitlements).
+  entitlements Json
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  tenants Tenant[]
+}
+
+enum TemplateVisibility {
+  SYSTEM
+  ORGANIZATION
+}
+
+enum TemplateVersionStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+}
+
+model Template {
+  id          String             @id @default(uuid(7)) @db.Uuid
+  name        String             @unique
+  displayName String
+  description String             @default("")
+  visibility  TemplateVisibility @default(ORGANIZATION)
+  createdById String?            @db.Uuid
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
+
+  versions TemplateVersion[]
+}
+
+/// Published versions are immutable (spec §7, §71). Edits create a new DRAFT version.
+model TemplateVersion {
+  id            String                @id @default(uuid(7)) @db.Uuid
+  templateId    String                @db.Uuid
+  version       String
+  status        TemplateVersionStatus @default(DRAFT)
+  /// Original YAML as authored.
+  source        String
+  /// Parsed, defaults-applied template document.
+  document      Json
+  validation    Json?
+  publishedAt   DateTime?             @db.Timestamptz(3)
+  publishedById String?               @db.Uuid
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+
+  template  Template   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  instances Instance[]
+
+  @@unique([templateId, version])
+}
+
+// ───────────────────────────── Application catalog ─────────────────────────────
+
+model Application {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// Referenced by templates as catalog://<name>.
+  name        String   @unique
+  displayName String
+  registryKind String  @default("ecr")
+  repository  String
+  port        Int
+  healthPath  String   @default("/health")
+  readinessPath String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  versions ApplicationVersion[]
+}
+
+model ApplicationVersion {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  applicationId String   @db.Uuid
+  version       String
+  imageUri      String
+  /// Immutable image digest (sha256:...). Mutable tags alone are never deployed (spec §10).
+  digest        String
+  architectures String[] @default(["amd64"])
+  scanStatus    String   @default("UNKNOWN")
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, version])
+}
+
+// ───────────────────────────── Cloud targets ─────────────────────────────
+
+enum CloudProvider {
+  aws
+  azure
+  gcp
+  oci
+  mock
+}
+
+enum TargetStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// An AWS account, Azure subscription, GCP project or OCI tenancy (spec §42.5).
+model CloudTarget {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  /// Null for platform-shared targets; set when a target belongs to one tenant.
+  tenantId       String?       @db.Uuid
+  provider       CloudProvider
+  name           String
+  environment    String        @default("production")
+  /// Non-secret configuration (account id, role ARN, subscription id, simulation settings).
+  config         Json
+  /// Reference into the secret store. Raw credentials are never stored here (spec §11).
+  credentialRef  String?
+  allowedRegions String[]
+  defaultRegion  String
+  allowedServices String[]     @default([])
+  maxConcurrentDeployments Int @default(3)
+  status         TargetStatus  @default(ACTIVE)
+  health         String        @default("UNKNOWN")
+  lastValidation Json?
+  lastValidatedAt DateTime?    @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ───────────────────────────── Instances & deployments ─────────────────────────────
+
+enum InstanceStatus {
+  DRAFT
+  VALIDATING
+  PLANNING
+  AWAITING_APPROVAL
+  PROVISIONING
+  DEPLOYING
+  CONFIGURING
+  VERIFYING
+  READY
+  VALIDATION_FAILED
+  PLAN_FAILED
+  PROVISION_FAILED
+  DEPLOY_FAILED
+  VERIFICATION_FAILED
+  DEGRADED
+  DESTROYING
+  DESTROY_FAILED
+  DESTROYED
+}
+
+enum HealthState {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  UNKNOWN
+  MAINTENANCE
+}
+
+/// A logical customer environment composed of many resources, possibly across clouds (spec §2).
+model Instance {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  tenantId          String         @db.Uuid
+  name              String
+  slug              String
+  environment       String         @default("production")
+  status            InstanceStatus @default(DRAFT)
+  health            HealthState    @default(UNKNOWN)
+  templateVersionId String         @db.Uuid
+  /// Variable values supplied for the template.
+  variables         Json           @default("{}")
+  /// Placement slot → { targetId, region }.
+  bindings          Json
+  desiredStateHash  String?
+  protectedFromDestroy Boolean     @default(false)
+  createdById       String?        @db.Uuid
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @db.Timestamptz(3)
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  templateVersion TemplateVersion     @relation(fields: [templateVersionId], references: [id])
+  resources       InstanceResource[]
+  deployments     Deployment[]
+  transitions     InstanceTransition[]
+  components      StatusComponent[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+/// Every lifecycle transition is persisted (spec §15).
+model InstanceTransition {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  instanceId   String         @db.Uuid
+  tenantId     String         @db.Uuid
+  from         InstanceStatus
+  to           InstanceStatus
+  deploymentId String?        @db.Uuid
+  reason       String?
+  at           DateTime       @default(now()) @db.Timestamptz(3)
+
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId, at])
+}
+
+enum ResourceStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  DELETED
+}
+
+enum KnowledgeState {
+  DESIRED
+  KNOWN
+  ACTUAL
+  UNKNOWN
+}
+
+enum DriftStatus {
+  IN_SYNC
+  DRIFT_DETECTED
+  REMEDIATION_PENDING
+  REMEDIATION_FAILED
+  UNKNOWN
+}
+
+model InstanceResource {
+  id                 String         @id @default(uuid(7)) @db.Uuid
+  tenantId           String         @db.Uuid
+  instanceId         String         @db.Uuid
+  /// Logical id from the template, e.g. "api".
+  resourceId         String
+  type               String
+  slot               String
+  provider           CloudProvider
+  simulatedProvider  String?
+  targetId           String         @db.Uuid
+  region             String
+  capability         String
+  capabilityName     String
+  name               String
+  critical           Boolean        @default(true)
+  providerResourceId String?
+  specHash           String?
+  idempotencyKey     String?
+  outputs            Json           @default("{}")
+  status             ResourceStatus @default(PENDING)
+  knowledge          KnowledgeState @default(DESIRED)
+  health             HealthState    @default(UNKNOWN)
+  healthMessage      String?
+  healthCheckedAt    DateTime?      @db.Timestamptz(3)
+  consecutiveHealthFailures Int     @default(0)
+  drift              DriftStatus    @default(UNKNOWN)
+  driftCheckedAt     DateTime?      @db.Timestamptz(3)
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(3)
+
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, resourceId])
+  @@index([tenantId])
+  @@index([status, healthCheckedAt])
+}
+
+enum DeploymentKind {
+  APPLY
+  DESTROY
+}
+
+enum DeploymentStatus {
+  QUEUED
+  RUNNING
+  AWAITING_APPROVAL
+  SUCCEEDED
+  FAILED
+  PARTIALLY_FAILED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+model Deployment {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  tenantId          String           @db.Uuid
+  instanceId        String           @db.Uuid
+  kind              DeploymentKind
+  status            DeploymentStatus @default(QUEUED)
+  templateVersionId String           @db.Uuid
+  requestedById     String?          @db.Uuid
+  correlationId     String
+  /// tenant + instance + desired state hash; prevents duplicate concurrent runs (spec §35).
+  operationKey      String
+  simulated         Boolean          @default(false)
+  approvalRequired  Boolean          @default(false)
+  approvedById      String?          @db.Uuid
+  approvedAt        DateTime?        @db.Timestamptz(3)
+  cancelRequestedAt DateTime?        @db.Timestamptz(3)
+  /// Resources to (re)run on a retry; empty means all.
+  onlyResources     String[]         @default([])
+  retryOfId         String?          @db.Uuid
+  resolved          Json?
+  plan              Json?
+  cost              Json?
+  outputs           Json?
+  errorClass        String?
+  errorMessage      String?
+  queuedAt          DateTime         @default(now()) @db.Timestamptz(3)
+  startedAt         DateTime?        @db.Timestamptz(3)
+  finishedAt        DateTime?        @db.Timestamptz(3)
+
+  instance Instance          @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  steps    DeploymentStep[]
+  events   DeploymentEvent[]
+
+  @@index([tenantId, queuedAt])
+  @@index([instanceId, queuedAt])
+  @@index([operationKey])
+}
+
+model DeploymentStep {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  deploymentId String     @db.Uuid
+  /// "phase:<name>" for workflow phases, otherwise the logical resource id.
+  key          String
+  kind         String
+  name         String
+  position     Int
+  status       StepStatus @default(PENDING)
+  attempt      Int        @default(0)
+  provider     String?
+  region       String?
+  errorClass   String?
+  errorMessage String?
+  startedAt    DateTime?  @db.Timestamptz(3)
+  finishedAt   DateTime?  @db.Timestamptz(3)
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@unique([deploymentId, key])
+}
+
+model DeploymentEvent {
+  id           BigInt   @id @default(autoincrement())
+  deploymentId String   @db.Uuid
+  at           DateTime @default(now()) @db.Timestamptz(3)
+  level        String
+  stepKey      String?
+  message      String
+  data         Json?
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, id])
+}
+
+model HealthCheckResult {
+  id         BigInt      @id @default(autoincrement())
+  tenantId   String      @db.Uuid
+  instanceId String      @db.Uuid
+  resourceId String
+  state      HealthState
+  latencyMs  Int?
+  message    String?
+  checkedAt  DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@index([instanceId, checkedAt])
+}
+
+// ───────────────────────────── Status & incidents ─────────────────────────────
+
+enum StatusState {
+  OPERATIONAL
+  DEGRADED
+  PARTIAL_OUTAGE
+  MAJOR_OUTAGE
+  MAINTENANCE
+  UNKNOWN
+}
+
+model StatusComponent {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  tenantId    String      @db.Uuid
+  instanceId  String      @db.Uuid
+  name        String
+  /// Logical resource ids whose health drives this component.
+  resourceIds String[]
+  critical    Boolean     @default(true)
+  status      StatusState @default(UNKNOWN)
+  position    Int         @default(0)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
+
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, name])
+  @@index([tenantId])
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+enum IncidentSource {
+  MANUAL
+  AUTOMATED
+}
+
+model Incident {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  tenantId     String         @db.Uuid
+  instanceId   String?        @db.Uuid
+  title        String
+  status       IncidentStatus @default(INVESTIGATING)
+  impact       StatusState    @default(DEGRADED)
+  severity     String         @default("medium")
+  source       IncidentSource @default(MANUAL)
+  /// Groups repeated alerts into one open incident (alert-storm protection, spec §27).
+  dedupKey     String?
+  componentIds String[]       @default([])
+  deploymentId String?        @db.Uuid
+  openedAt     DateTime       @default(now()) @db.Timestamptz(3)
+  resolvedAt   DateTime?      @db.Timestamptz(3)
+  createdById  String?        @db.Uuid
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id])
+  updates IncidentUpdate[]
+
+  @@index([tenantId, openedAt])
+  @@index([dedupKey, status])
+}
+
+model IncidentUpdate {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  incidentId  String         @db.Uuid
+  status      IncidentStatus
+  message     String
+  createdById String?        @db.Uuid
+  at          DateTime       @default(now()) @db.Timestamptz(3)
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, at])
+}
+
+model MaintenanceWindow {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @db.Uuid
+  instanceId String?  @db.Uuid
+  title      String
+  startsAt   DateTime @db.Timestamptz(3)
+  endsAt     DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([tenantId, startsAt])
+}
+
+/// Alert rules are data, not code (spec §29). Null tenantId = platform default rule.
+model AlertRule {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String?  @db.Uuid
+  name          String
+  /// { signal: "health", resourceTypes?: [...], consecutiveFailures: n } or metric thresholds.
+  condition     Json
+  severity      String
+  actions       String[]
+  cooldownSeconds Int    @default(900)
+  autoResolve   Boolean  @default(true)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([tenantId])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  tenantId  String?   @db.Uuid
+  userId    String    @db.Uuid
+  event     String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id      String  @id @default(uuid(7)) @db.Uuid
+  userId  String  @db.Uuid
+  event   String
+  channel String
+  enabled Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, event, channel])
+}
+
+model NotificationDelivery {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  notificationId String    @db.Uuid
+  channel        String
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  lastError      String?
+  sentAt         DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ───────────────────────────── Governance ─────────────────────────────
+
+/// Append-only. UPDATE and DELETE are blocked by a database trigger (spec §38).
+model AuditEvent {
+  id            BigInt   @id @default(autoincrement())
+  at            DateTime @default(now()) @db.Timestamptz(3)
+  actorId       String?  @db.Uuid
+  actorType     String
+  actorLabel    String?
+  tenantId      String?  @db.Uuid
+  resourceType  String
+  resourceId    String?
+  action        String
+  result        String
+  ip            String?
+  userAgent     String?
+  correlationId String?
+  changes       Json?
+
+  @@index([tenantId, at])
+  @@index([resourceType, resourceId])
+}
+
+model FeatureFlag {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  key      String
+  tenantId String? @db.Uuid
+  enabled  Boolean
+
+  @@unique([key, tenantId])
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
