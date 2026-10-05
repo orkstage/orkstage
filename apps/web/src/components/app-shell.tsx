@@ -15,6 +15,7 @@ import {
   Rocket,
   ScrollText,
   Moon,
+  Plug,
   Sun,
   Siren,
   X,
@@ -33,6 +34,7 @@ import { NotificationsBell } from './notifications-bell';
 import { Button } from './ui/button';
 import { ErrorNotice } from './ui/error-notice';
 import { PageSpinner } from './ui/spinner';
+import { EditionBadge } from './edition-badge';
 
 interface NavItem {
   href: string;
@@ -54,6 +56,7 @@ function navFor(me: MeResponse): NavItem[] {
       { href: '/cloud-targets', label: 'Cloud targets', icon: Cloud },
       { href: '/incidents', label: 'Incidents', icon: Siren },
       { href: '/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/settings/integrations', label: 'Integrations', icon: Plug },
     ];
   }
   const first = me.memberships[0]?.tenantId;
@@ -64,6 +67,9 @@ function navFor(me: MeResponse): NavItem[] {
     { href: '/incidents', label: 'Incidents', icon: Siren },
   ];
   if (first) items.push({ href: `/status/${first}`, label: 'Status page', icon: Activity, match: ['/status'] });
+  if (me.memberships.some((m) => m.role === 'CustomerOwner' || m.role === 'CustomerAdmin')) {
+    items.push({ href: '/settings/integrations', label: 'Integrations', icon: Plug });
+  }
   return items;
 }
 
@@ -155,7 +161,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           );
         })}
       </ul>
-      <div className="border-t border-border px-4 py-3 text-[11px] text-fg-subtle">{roleLabel(me.data)}</div>
+      <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3 text-[11px] text-fg-subtle">
+        <span>{roleLabel(me.data)}</span>
+        <EditionBadge />
+      </div>
     </nav>
   );
 

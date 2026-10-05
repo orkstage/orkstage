@@ -26,9 +26,12 @@ export default function TemplatesPage() {
         description="Templates are forged once, deployed many times. Published versions never change; each instance pins the version it runs."
         actions={
           can('create', 'Template') ? (
-            <ButtonLink href="/templates/new" variant="primary">
-              <Plus size={14} aria-hidden /> New template
-            </ButtonLink>
+            <div className="flex gap-2">
+              <ButtonLink href="/templates/import">Import IaC</ButtonLink>
+              <ButtonLink href="/templates/new" variant="primary">
+                <Plus size={14} aria-hidden /> New template
+              </ButtonLink>
+            </div>
           ) : null
         }
       />
