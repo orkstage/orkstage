@@ -114,6 +114,23 @@
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
 }
 
+/* Brand kit artwork per theme (components/brand/logo.tsx). Dark is the default theme. */
+.brand-on-light {
+  display: none;
+}
+:root[data-theme='light'] .brand-on-dark {
+  display: none;
+}
+:root[data-theme='light'] .brand-on-light {
+  display: block;
+}
+/* Sized by their width/height attributes; never let layout stretch the artwork. */
+.brand-on-dark,
+.brand-on-light {
+  max-width: none;
+  object-fit: contain;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
