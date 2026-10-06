@@ -33,9 +33,12 @@ group and healthy), Route 53 + ACM. The adapter contract suite passes against it
 
 ## Known gaps
 
-- MiniStack reports in-place changes on a second apply for some RDS/ElastiCache attributes, so
-  refresh-only drift plans are noisy on the emulator; drift is shown as UNKNOWN for AWS until
-  the drift job filters emulator noise.
+- Drift (resolved): a scheduled refresh-only plan per resource reports out-of-band changes at
+  attribute level (`tofu show -json`, names only). Representation-only differences (null vs
+  `{}`/`[]`, set order) are ignored everywhere; a few `type.attribute` pairs MiniStack does not
+  round-trip (e.g. `aws_iam_role.inline_policy`) are filtered on emulator targets only.
+- MiniStack does not implement Application Auto Scaling: services with `autoscaling` run fixed
+  replicas there (logged); real AWS gets target tracking.
 - MiniStack does not serve the public SSM parameter for the ECS-optimized AMI; `ecs-ec2` uses a
   placeholder AMI on the emulator (`ecsAmiId` on real AWS is optional, SSM is used by default).
 - In containerized deployments of the worker the runner needs Docker access (socket or a remote

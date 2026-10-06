@@ -1,12 +1,12 @@
-import { publishApplicationVersionSchema, validateSourceSchema } from '@co/contracts';
+import { APPLICATION_NAME, publishApplicationVersionSchema, upsertApplicationSchema, validateSourceSchema } from '@co/contracts';
 import type { PrismaClient } from '@co/database';
 import type { PlanCode } from '@co/domain';
-import { Controller, HttpCode, Inject, Param, Post } from '@nestjs/common';
+import { Controller, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
-import { conflict, notFound } from '../common/errors.js';
+import { conflict, notFound, unprocessable } from '../common/errors.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
 import { PRISMA } from '../infra/infra.module.js';
 import { TemplateValidationService } from '../catalog/template-validation.service.js';
@@ -30,6 +30,31 @@ export class CiController {
   async validate(@CurrentPrincipal() p: RequestPrincipal, @ZodBody(validateSourceSchema) body: z.infer<typeof validateSourceSchema>) {
     authorize(p, 'read', 'Template');
     return this.validation.validate(body.source, body.planCode ? [body.planCode as PlanCode] : undefined);
+  }
+
+  /**
+   * Registers (or updates) a catalog application so CI can publish versions without a manual
+   * setup step. Idempotent: the same body twice changes nothing.
+   */
+  @Scope('applications:write')
+  @Put('applications/:name')
+  @ApiZodBody(upsertApplicationSchema)
+  async upsertApplication(
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Param('name') name: string,
+    @ZodBody(upsertApplicationSchema) body: z.infer<typeof upsertApplicationSchema>,
+    @CorrelationId() correlationId: string,
+  ) {
+    authorize(p, 'update', 'Application');
+    if (!APPLICATION_NAME.test(name)) throw unprocessable('INVALID_NAME', 'Application names are lowercase letters, digits and dashes (2–63), starting with a letter.');
+    const before = await this.prisma.application.findUnique({ where: { name } });
+    const data = { displayName: body.displayName, repository: body.repository, registryKind: body.registryKind, port: body.port, healthPath: body.healthPath, readinessPath: body.readinessPath ?? null };
+    const app = await this.prisma.application.upsert({ where: { name }, create: { name, ...data }, update: data });
+    const changed = !before || Object.entries(data).some(([k, v]) => (before as Record<string, unknown>)[k] !== v);
+    if (changed) {
+      await this.audit.record({ principal: p, resourceType: 'Application', resourceId: app.id, action: before ? 'UPDATE' : 'CREATE', correlationId, changes: { name, ...data } });
+    }
+    return { ...app, createdAt: app.createdAt.toISOString(), created: !before };
   }
 
   /** CI publishes a new immutable image version of a catalog application. */

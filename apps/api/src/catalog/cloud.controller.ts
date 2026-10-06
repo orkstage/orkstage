@@ -10,7 +10,7 @@ import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/aut
 import { notFound, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
-import { Adapters, PRISMA } from '../infra/infra.module.js';
+import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 
 const VALIDATION_TIMEOUT_MS = 20_000;
@@ -22,6 +22,7 @@ export class CloudController {
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     private readonly adapters: Adapters,
     private readonly audit: AuditService,
+    private readonly queues: Queues,
   ) {}
 
   @Scope('templates:read')
@@ -95,6 +96,17 @@ export class CloudController {
       data: { lastValidation: result as object, lastValidatedAt: new Date(), health: result.ok ? 'HEALTHY' : 'UNHEALTHY' },
     });
     await this.audit.record({ principal: p, tenantId: row.tenantId, resourceType: 'CloudTarget', resourceId: id, action: 'VALIDATE', result: result.ok ? 'SUCCESS' : 'FAILURE', correlationId });
+    // Tenant-owned targets: tell the tenant when the connection breaks (once, on the transition).
+    if (!result.ok && row.health !== 'UNHEALTHY' && row.tenantId) {
+      await this.queues.notify({
+        tenantId: row.tenantId,
+        event: 'cloud_target.unhealthy',
+        title: `Cloud target ${row.name} failed validation`,
+        body: 'Deployments to this target will fail until the connection is fixed. Open the target to see which check failed.',
+        link: '/cloud-targets',
+        data: { cloudTargetId: row.id, provider: row.provider },
+      });
+    }
     return this.toDto(updated);
   }
 

@@ -128,6 +128,16 @@ export class DeploymentRunner {
           const serviceKinds = [...new Set(resolved.resources.filter((r) => r.targetId === targetId && r.region === region).map((r) => r.type))];
           const result = await this.ctx.registry.get(row.provider).validateTarget({ target: toCloudTarget(row), region, correlationId: d.correlationId }, { serviceKinds });
           await prisma.cloudTarget.update({ where: { id: targetId }, data: { lastValidation: result as object, lastValidatedAt: new Date(), health: result.ok ? 'HEALTHY' : 'UNHEALTHY' } });
+          if (!result.ok && row.health !== 'UNHEALTHY') {
+            await notify(this.ctx, {
+              tenantId: d.tenantId,
+              event: 'cloud_target.unhealthy',
+              title: `Cloud target ${row.name} failed validation`,
+              body: 'A deployment could not start because the cloud connection failed its checks.',
+              link: `/deployments/${d.id}`,
+              data: { cloudTargetId: row.id, provider: row.provider, deploymentId: d.id },
+            });
+          }
           if (!result.ok) {
             const failed = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').map((c) => `${c.name}: ${c.message}`);
             const onlyPermissions = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').every((c) => c.name.startsWith('Permissions'));

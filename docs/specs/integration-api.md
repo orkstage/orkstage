@@ -38,7 +38,8 @@ Contract shared by the platform, the `ork` CLI and the docs. Base path `/api/v1`
 - Retries: non-2xx or network error → retried with backoff (1m, 5m, 30m, 2h, 6h), then FAILED.
   Endpoint auto-disables after 20 consecutive failed deliveries.
 - Events: `deployment.started|succeeded|failed|awaiting_approval`, `instance.degraded`, `instance.drift_detected`,
-  `incident.opened|updated|resolved`, `cloud_target.unhealthy`, `ping`.
+  `incident.opened|updated|resolved`, `cloud_target.unhealthy`. Test deliveries use the type
+  `ping` (sent by `POST /webhooks/:id/test`; it cannot be subscribed to).
 
 | Method | Path | Notes |
 |---|---|---|
@@ -53,6 +54,7 @@ Contract shared by the platform, the `ork` CLI and the docs. Base path `/api/v1`
 
 | Method | Path | Body |
 |---|---|---|
+| PUT | `/applications/:name` | `{ displayName, repository, port, registryKind?, healthPath?, readinessPath? }`: create or update the catalog entry (scope `applications:write`, idempotent) |
 | POST | `/applications/:name/versions` | `{ version, imageUri, digest: "sha256:…", architectures? }` (scope `applications:write`) |
 | POST | `/templates/validate` | `{ source, planCode? }` → validation report (stateless, no template id) |
 

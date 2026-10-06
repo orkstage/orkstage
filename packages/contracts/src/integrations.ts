@@ -51,6 +51,18 @@ export const updateWebhookSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+/** PUT /applications/:name — create or update a catalog application (templates use catalog://<name>). */
+export const upsertApplicationSchema = z.object({
+  displayName: z.string().min(1).max(120),
+  repository: z.string().min(3).max(500),
+  registryKind: z.enum(['ecr', 'acr', 'ocir', 'gar', 'dockerhub', 'ghcr', 'other']).default('ecr'),
+  port: z.number().int().min(1).max(65535),
+  healthPath: z.string().startsWith('/').max(200).default('/health'),
+  readinessPath: z.string().startsWith('/').max(200).optional(),
+});
+
+export const APPLICATION_NAME = /^[a-z][a-z0-9-]{1,62}$/;
+
 export const publishApplicationVersionSchema = z.object({
   version: z.string().min(1).max(64),
   imageUri: z.string().min(3).max(500),

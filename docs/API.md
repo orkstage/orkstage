@@ -34,6 +34,7 @@ source of truth; this page is the map.
 | POST | `/auth/logout` | revokes the session |
 | GET | `/me` | `MeResponse` incl. CASL rules |
 | GET | `/overview` | `OverviewDto` (platform staff) |
+| GET | `/overview/trends` | deployment/health trend series for the dashboard charts |
 | GET | `/plans` | `PlanDto[]` |
 | GET/POST | `/tenants` | list (scoped) / create (platform admin) |
 | GET/PATCH | `/tenants/:id` | |
@@ -72,3 +73,34 @@ source of truth; this page is the map.
 | GET | `/notifications` | current user's in-app notifications |
 | POST | `/notifications/:id/read` | |
 | GET | `/audit` | `Page<AuditEventDto>` (`?tenantId`) |
+
+### Integrations (API keys, webhooks, CI, imports)
+
+Authenticate with a session cookie or `Authorization: Bearer ork_<env>_<id>_<secret>`; every
+route requires an explicit key scope. Full contract: [specs/integration-api.md](specs/integration-api.md).
+
+| Method | Path | Notes |
+|---|---|---|
+| GET/POST | `/api-keys` | list (`?tenantId`) / create — the secret is returned once |
+| DELETE | `/api-keys/:id` | revoke |
+| GET/POST | `/webhooks` | list / create (secret returned once) |
+| PATCH/DELETE | `/webhooks/:id` | update / delete |
+| POST | `/webhooks/:id/rotate-secret` | new signing secret |
+| POST | `/webhooks/:id/test` | sends a `ping` delivery |
+| GET | `/webhooks/:id/deliveries` | delivery log |
+| POST | `/webhooks/:id/deliveries/:deliveryId/redeliver` | |
+| POST | `/templates/validate` `{source, planCode?}` | stateless validation (CI) |
+| PUT | `/applications/:name` | create/update a catalog application (CI) |
+| POST | `/applications/:name/versions` | publish an immutable image digest (CI) |
+| POST | `/imports` `{report}` or `{files}` | ScanReport v1 from `ork import`, or files scanned server-side |
+| GET | `/imports`, `/imports/:id` | |
+| POST | `/imports/:id/template` `{name, displayName}` | draft template from an import |
+
+### Licensing & Enterprise
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/license` | edition, features, expiry/grace |
+| GET | `/audit/export?format=csv\|ndjson` | Enterprise (`402 ENTERPRISE_REQUIRED` otherwise); streamed |
+
+The OpenAPI document is served at `/api/docs-json` (Swagger UI at `/api/docs`).

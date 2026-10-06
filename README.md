@@ -77,7 +77,7 @@ then `up -d`. The host workflow below still works when you prefer hot reload.
 
 OrkStage is open core. Everything is licensed under the **GNU AGPL-3.0** ([LICENSE](LICENSE)),
 except directories named `ee/`, which are under the OrkStage Enterprise License
-([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE), draft) and activated with a license key
+([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE), draft; `ee/` directories in general) and activated with a license key
 (`ORKSTAGE_LICENSE_KEY`). Without a key you run the full Community edition. See
 [docs/OPEN_CORE.md](docs/OPEN_CORE.md) for the feature split and licensing model.
 
@@ -127,8 +127,12 @@ packages/
   contracts/      HTTP request schemas, response types, queue contracts
   runtime/        config validation, logging, secrets, adapter registry wiring
   database/       Prisma schema, migrations, seed
+  licensing/      Enterprise license keys (Ed25519, offline) and feature flags
 infra/local/      docker compose for local development (+ MiniStack profile)
 infra/aws/        CloudFormation for the customer-side deployment role
+cli/              `ork` CLI and the scan engine (Rust; WebAssembly build used by the API)
+site/             orkstage.io landing page and documentation (Next.js + Fumadocs)
+scripts/polyrepo/ local split into the planned repositories (docs/POLYREPO.md)
 infra/tofu/       OpenTofu modules per logical resource kind (aws/*)
 docs/             architecture, API map, ADRs
 ```
