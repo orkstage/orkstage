@@ -30,6 +30,7 @@ export const WEBHOOK_EVENTS = [
   'deployment.failed',
   'deployment.awaiting_approval',
   'instance.degraded',
+  'instance.drift_detected',
   'incident.opened',
   'incident.updated',
   'incident.resolved',

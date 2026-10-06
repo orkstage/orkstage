@@ -58,6 +58,8 @@ export function toResourceDto(r: InstanceResource): ResourceDto {
     healthMessage: r.healthMessage,
     healthCheckedAt: iso(r.healthCheckedAt),
     drift: r.drift,
+    driftCheckedAt: r.driftCheckedAt?.toISOString() ?? null,
+    driftChanges: ((r.driftDetails as { actions?: { address: string; action: string }[] } | null)?.actions ?? []).slice(0, 50),
   };
 }
 

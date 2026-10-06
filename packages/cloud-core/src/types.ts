@@ -103,6 +103,13 @@ export interface ResourceState {
   observedSpecHash?: string;
 }
 
+/** One resource changed outside the platform: which attributes (names only, never values). */
+export interface DriftChange {
+  address: string;
+  action: string;
+  attributes: string[];
+}
+
 export interface ResourcePlan {
   changes: { add: number; change: number; remove: number };
   actions: { address: string; action: string }[];
@@ -181,6 +188,12 @@ export interface CloudProviderAdapter {
    * actions (delete/replace) before approval.
    */
   planResource?(ctx: ProviderContext, request: ResourceRequest): Promise<ResourcePlan>;
+
+  /**
+   * Changes made to the real resource outside the platform since it was applied (refresh-only).
+   * Empty when in sync. Adapters whose getResource reports observedSpecHash need not implement it.
+   */
+  detectDrift?(ctx: ProviderContext, request: ResourceRequest): Promise<DriftChange[]>;
 
   getLogs?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<LogLine[]>;
   getMetric?(ctx: ProviderContext, resource: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]>;

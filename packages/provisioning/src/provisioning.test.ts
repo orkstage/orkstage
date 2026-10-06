@@ -103,6 +103,16 @@ describe('compiler — spec §42.17 multi-cloud reference', () => {
     expect(plan.groups.map((g) => g.provider).sort()).toEqual(['aws', 'azure', 'oci']);
     expect(renderPlan('acme-prod', plan)).toContain('AZURE / Simulated azure (azure-b) / eastus');
   });
+
+  it('applies drifted resources again, even when their spec is unchanged', () => {
+    const known = resolved.resources.map((r) => ({
+      resourceId: r.id, type: r.type, specHash: r.specHash, targetId: r.targetId, region: r.region,
+      provider: r.provider, capabilityName: r.capabilityName, name: r.name, drifted: r.id === 'database',
+    }));
+    const plan = diffPlan(resolved, known);
+    expect(plan.counts).toMatchObject({ UPDATE: 1, NOOP: resolved.resources.length - 1 });
+    expect(renderPlan('acme-prod', plan)).toMatch(/UPDATE .* database \(restore drift\)/);
+  });
 });
 
 describe('compiler — same template, AWS-only variant', () => {

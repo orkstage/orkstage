@@ -90,6 +90,7 @@ export class CompileService {
   async knownResources(instanceId: string): Promise<KnownResource[]> {
     const rows = await this.prisma.instanceResource.findMany({ where: { instanceId, status: { in: ['ACTIVE', 'FAILED'] } } });
     return rows.map((r) => ({
+      drifted: r.drift === 'DRIFT_DETECTED',
       resourceId: r.resourceId,
       type: r.type,
       specHash: r.status === 'ACTIVE' ? r.specHash : null,

@@ -5,6 +5,8 @@ export type PlanAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'NOOP';
 
 /** What the platform currently believes exists (KNOWN, not ACTUAL — spec §93). */
 export interface KnownResource {
+  /** Changed outside the platform (last drift check): applying again restores it. */
+  drifted?: boolean;
   resourceId: string;
   type: string;
   specHash: string | null;
@@ -27,6 +29,8 @@ export interface PlannedChange {
   region: string;
   /** A change of target/region/capability means replacement, which is destructive. */
   replacement: boolean;
+  /** Why an otherwise unchanged resource is applied again. */
+  reason?: 'restore-drift';
 }
 
 export interface PlanGroup {
@@ -91,8 +95,10 @@ export function diffPlan(resolved: ResolvedInfrastructure, known: KnownResource[
 
 function change(r: ResolvedResource, k: KnownResource | undefined, resolved: ResolvedInfrastructure): PlannedChange {
   const replacement = Boolean(k && (k.targetId !== r.targetId || k.region !== r.region || k.capabilityName !== r.capabilityName));
-  const action: PlanAction = !k || k.specHash === null ? 'CREATE' : k.specHash === r.specHash ? 'NOOP' : 'UPDATE';
+  const unchanged = Boolean(k && k.specHash !== null && k.specHash === r.specHash);
+  const action: PlanAction = !k || k.specHash === null ? 'CREATE' : unchanged && !k.drifted ? 'NOOP' : 'UPDATE';
   return {
+    ...(unchanged && k?.drifted ? { reason: 'restore-drift' as const } : {}),
     resourceId: r.id,
     action,
     type: r.type,
@@ -111,7 +117,7 @@ export function renderPlan(instanceName: string, plan: DeploymentPlan): string {
   const lines = ['Deployment Plan', '', `Instance: ${instanceName}`, ''];
   for (const g of plan.groups) {
     lines.push(`${g.provider.toUpperCase()} / ${g.targetName} / ${g.region}`);
-    for (const c of g.changes) lines.push(`  ${c.action.padEnd(6)} ${c.capabilityName} ${c.resourceId}${c.replacement ? ' (replace)' : ''}`);
+    for (const c of g.changes) lines.push(`  ${c.action.padEnd(6)} ${c.capabilityName} ${c.resourceId}${c.replacement ? ' (replace)' : ''}${c.reason === 'restore-drift' ? ' (restore drift)' : ''}`);
     lines.push('');
   }
   if (plan.crossCloud.length) {

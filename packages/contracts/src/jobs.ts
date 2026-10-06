@@ -3,6 +3,7 @@ export const QUEUES = {
   deployments: 'deployments',
   health: 'health-checks',
   notifications: 'notifications',
+  drift: 'drift-scans',
 } as const;
 
 /** Payloads carry ids only; the worker reloads authoritative state from the database. */
@@ -35,6 +36,7 @@ export const NOTIFICATION_EVENTS = [
   'deployment.failed',
   'deployment.awaiting_approval',
   'instance.degraded',
+  'instance.drift_detected',
   'incident.opened',
   'incident.updated',
   'incident.resolved',

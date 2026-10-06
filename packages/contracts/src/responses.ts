@@ -120,6 +120,9 @@ export interface ResourceDto {
   healthMessage: string | null;
   healthCheckedAt: string | null;
   drift: string;
+  driftCheckedAt: string | null;
+  /** From the last drift scan: what the provider would change to restore the applied configuration. */
+  driftChanges: { address: string; action: string }[];
 }
 
 export interface InstanceDto {

@@ -243,7 +243,8 @@ export class DeploymentRunner {
     const prisma = this.ctx.prisma;
     const existing = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, status: 'ACTIVE' } });
     const completed: CompletedResources = Object.fromEntries(
-      existing.filter((r) => r.idempotencyKey).map((r) => [r.resourceId, { idempotencyKey: r.idempotencyKey!, outputs: r.outputs as Record<string, string>, providerResourceId: r.providerResourceId ?? '' }]),
+      // Drifted resources are applied again: that is what restores the template's configuration.
+      existing.filter((r) => r.idempotencyKey && r.drift !== 'DRIFT_DETECTED').map((r) => [r.resourceId, { idempotencyKey: r.idempotencyKey!, outputs: r.outputs as Record<string, string>, providerResourceId: r.providerResourceId ?? '' }]),
     );
     const byId = new Map(resolved.resources.map((r) => [r.id, r]));
     const abort = new AbortController();
@@ -301,6 +302,8 @@ export class DeploymentRunner {
                 specHash: r.specHash,
                 idempotencyKey: idempotencyKeyFor(d.tenantId, d.instanceId, r),
                 drift: 'IN_SYNC',
+                driftCheckedAt: new Date(),
+                driftDetails: { actions: [] },
               },
             });
             await this.step(d.id, id, 'SUCCEEDED');
@@ -564,6 +567,6 @@ export class DeploymentRunner {
 
   private async known(instanceId: string): Promise<KnownResource[]> {
     const rows = await this.ctx.prisma.instanceResource.findMany({ where: { instanceId, status: { in: ['ACTIVE', 'FAILED'] } } });
-    return rows.map((r) => ({ resourceId: r.resourceId, type: r.type, specHash: r.status === 'ACTIVE' ? r.specHash : null, targetId: r.targetId, region: r.region, provider: r.simulatedProvider ?? r.provider, capabilityName: r.capabilityName, name: r.name }));
+    return rows.map((r) => ({ drifted: r.drift === 'DRIFT_DETECTED', resourceId: r.resourceId, type: r.type, specHash: r.status === 'ACTIVE' ? r.specHash : null, targetId: r.targetId, region: r.region, provider: r.simulatedProvider ?? r.provider, capabilityName: r.capabilityName, name: r.name }));
   }
 }

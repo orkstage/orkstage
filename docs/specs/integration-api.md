@@ -37,7 +37,7 @@ Contract shared by the platform, the `ork` CLI and the docs. Base path `/api/v1`
   Receivers must reject timestamps older than 5 minutes (replay protection).
 - Retries: non-2xx or network error → retried with backoff (1m, 5m, 30m, 2h, 6h), then FAILED.
   Endpoint auto-disables after 20 consecutive failed deliveries.
-- Events: `deployment.started|succeeded|failed|awaiting_approval`, `instance.degraded`,
+- Events: `deployment.started|succeeded|failed|awaiting_approval`, `instance.degraded`, `instance.drift_detected`,
   `incident.opened|updated|resolved`, `cloud_target.unhealthy`, `ping`.
 
 | Method | Path | Notes |

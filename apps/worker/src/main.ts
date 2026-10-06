@@ -3,6 +3,7 @@ import { createPrismaClient } from '@co/database';
 import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv } from '@co/runtime';
 import { DelayedError, Queue, Worker } from 'bullmq';
 import type { WorkerContext } from './context.js';
+import { DriftDetector } from './drift.js';
 import { HealthMonitor } from './health.js';
 import { Notifier } from './notifier.js';
 import { DeploymentRunner, RetryLater } from './runner.js';
@@ -67,16 +68,35 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 1 },
   );
 
-  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health]] as const) {
+  // Drift scans: one OpenTofu plan per applied resource on real providers, on their own queue so a
+  // long scan never delays health checks. The scheduler runs each scan once across all workers.
+  const driftQueue = new Queue(QUEUES.drift, { connection: redis.duplicate() });
+  if (config.DRIFT_CHECK_INTERVAL_MINUTES > 0) {
+    await driftQueue.upsertJobScheduler('drift-scan', { every: config.DRIFT_CHECK_INTERVAL_MINUTES * 60_000 }, { name: 'scan' });
+  } else {
+    await driftQueue.removeJobScheduler('drift-scan');
+  }
+  const detector = new DriftDetector(ctx);
+  const drift = new Worker(
+    QUEUES.drift,
+    async () => {
+      const result = await detector.scan();
+      logger.info(result, 'drift scan finished');
+      return result;
+    },
+    { connection: redis.duplicate(), concurrency: 1, lockDuration: 120_000 },
+  );
+
+  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health], ['drift', drift]] as const) {
     w.on('failed', (job, err) => logger.error({ queue: name, jobId: job?.id, err: err.message }, 'job failed'));
     w.on('error', (err) => logger.error({ queue: name, err: err.message }, 'worker error'));
   }
-  logger.info({ concurrency: config.WORKER_CONCURRENCY, healthIntervalSeconds: config.HEALTH_CHECK_INTERVAL_SECONDS }, 'worker started');
+  logger.info({ concurrency: config.WORKER_CONCURRENCY, healthIntervalSeconds: config.HEALTH_CHECK_INTERVAL_SECONDS, driftIntervalMinutes: config.DRIFT_CHECK_INTERVAL_MINUTES }, 'worker started');
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down: finishing in-flight jobs');
-    await Promise.all([deployments.close(), notify.close(), health.close()]);
-    await Promise.all([healthQueue.close(), notifications.close()]);
+    await Promise.all([deployments.close(), notify.close(), health.close(), drift.close()]);
+    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close()]);
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

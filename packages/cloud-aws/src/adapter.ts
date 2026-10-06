@@ -14,6 +14,7 @@ import {
   type CloudCapability,
   type CloudProviderAdapter,
   type CloudTarget,
+  type DriftChange,
   type HealthResult,
   type LogLine,
   type ProviderContext,
@@ -166,6 +167,16 @@ export class AwsAdapter implements CloudProviderAdapter {
     try {
       const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req)));
       return { ...plan, destructive: isDestructivePlan(plan.actions) };
+    } catch (err) {
+      throw toProviderError(err);
+    }
+  }
+
+  async detectDrift(rawCtx: ProviderContext, req: ResourceRequest): Promise<DriftChange[]> {
+    const ctx = this.effective(rawCtx);
+    const runner = this.requireRunner();
+    try {
+      return await runner.drift(await this.stack(ctx, req.name, rootConfig(ctx, req)));
     } catch (err) {
       throw toProviderError(err);
     }

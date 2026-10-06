@@ -42,7 +42,7 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 | Cross-cloud connectivity | 🟡 | Strategy chosen + surfaced; **no VPN/interconnect or allowlist provisioning** (e.g. Azure PG firewall rule from AWS NAT IPs). |
 | Topology and cost preview | ✅ | Static pricing; **pricing API adapters** missing. |
 | Retry only failed resources | ✅ | |
-| Detect drift | 🟡 | Mock ✅; AWS shows UNKNOWN — **refresh-only plan job with emulator-noise filtering** pending. |
+| Detect drift | ✅ | Mock per health check; AWS via scheduled refresh-only plans (attribute-level, emulator noise filtered); redeploy restores drifted resources. |
 | Incident on unhealthy managed dependency | ✅ | |
 | Dependency-aware destroy | ✅ | |
 
@@ -55,7 +55,6 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 
 **Provisioning**
 - Production runner isolation: run the OpenTofu container as an ECS RunTask / Kubernetes Job with a scoped role instead of the worker's Docker socket.
-- Drift job (scheduled refresh-only plans) + remediation flow.
 - Backups API: last successful backup, restore to a new instance.
 - Brownfield import/adoption (spec §89).
 
@@ -81,7 +80,7 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 ## Suggested order
 
 1. **Real AWS hardening:** ~~tofu plan before apply + approval~~, ~~permission probing~~,
-   ~~secret-manager resolver~~, ~~autoscaling~~, runner as ECS task, drift job. Then test against a
+   ~~secret-manager resolver~~, ~~autoscaling~~, runner as ECS task, ~~drift job~~. Then test against a
    real sandbox account.
 2. **Azure adapter** (the spec's second provider) incl. cross-cloud allowlisting.
 3. **Product completeness:** teams/invitations, catalog + CI intake, preferences.

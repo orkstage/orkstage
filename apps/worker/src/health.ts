@@ -67,18 +67,18 @@ export class HealthMonitor {
     }
 
     let drift = r.drift;
+    let driftChecked = true;
     try {
-      const actual = await adapter.getResource(pctx, ident);
-      // A missing resource is drift; otherwise only adapters that observe the running spec can say.
-      drift = !actual.exists
-        ? 'DRIFT_DETECTED'
-        : actual.observedSpecHash === undefined
-          ? 'UNKNOWN'
-          : actual.observedSpecHash !== r.idempotencyKey
-            ? 'DRIFT_DETECTED'
-            : 'IN_SYNC';
+      let actual = await adapter.getResource(pctx, ident);
+      // One read saying "gone" is not enough (a state read can fail transiently): confirm it.
+      if (!actual.exists) actual = await adapter.getResource(pctx, ident);
+      // A missing resource is drift. Adapters that observe the running spec answer here; for the
+      // others (real providers) the scheduled drift scan owns the value, so keep what it found.
+      if (!actual.exists) drift = 'DRIFT_DETECTED';
+      else if (actual.observedSpecHash !== undefined) drift = actual.observedSpecHash !== r.idempotencyKey ? 'DRIFT_DETECTED' : 'IN_SYNC';
+      else driftChecked = false;
     } catch {
-      drift = 'UNKNOWN';
+      driftChecked = false;
     }
     if (drift === 'DRIFT_DETECTED' && r.drift !== 'DRIFT_DETECTED') {
       await systemAudit(this.ctx, { tenantId: r.tenantId, resourceType: 'InstanceResource', resourceId: `${r.instanceId}/${r.resourceId}`, action: 'DRIFT_DETECTED' });
@@ -92,7 +92,7 @@ export class HealthMonitor {
         healthCheckedAt: new Date(),
         consecutiveHealthFailures: state === 'UNHEALTHY' ? r.consecutiveHealthFailures + 1 : 0,
         drift,
-        driftCheckedAt: new Date(),
+        ...(driftChecked ? { driftCheckedAt: new Date() } : {}),
       },
     });
     await prisma.healthCheckResult.create({ data: { tenantId: r.tenantId, instanceId: r.instanceId, resourceId: r.resourceId, state, latencyMs, message } });

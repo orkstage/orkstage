@@ -207,6 +207,21 @@ function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: Reso
         {drifted ? <StatusBadge status={r.drift} prefix="Drift" /> : null}
         {r.critical ? <Badge>critical</Badge> : null}
       </div>
+      {drifted && r.driftChanges?.length ? (
+        <div className="mt-1.5 rounded border border-warn/40 bg-warn/8 px-2 py-1.5 text-xs">
+          <p className="text-warn-ink">
+            Changed outside OrkStage{r.driftCheckedAt ? <span className="text-fg-subtle"> · {formatRelative(r.driftCheckedAt)}</span> : null}. Redeploy to restore.
+          </p>
+          <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-fg-muted">
+            {r.driftChanges.slice(0, 4).map((c) => (
+              <li key={`${c.action}:${c.address}`} className="truncate" title={c.address}>
+                {c.action} {c.address.replace(/^module\.resource\./, '')}
+              </li>
+            ))}
+            {r.driftChanges.length > 4 ? <li className="text-fg-subtle">+{r.driftChanges.length - 4} more</li> : null}
+          </ul>
+        </div>
+      ) : null}
       {r.healthMessage ? (
         <p className="mt-1.5 text-xs text-fg-muted">
           {r.healthMessage}

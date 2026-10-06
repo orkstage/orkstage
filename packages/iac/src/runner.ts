@@ -66,6 +66,52 @@ export class TofuError extends Error {
   }
 }
 
+export interface DriftChange {
+  address: string;
+  action: string;
+  /** Top-level attributes whose value changed outside OpenTofu (names only, never values). */
+  attributes: string[];
+}
+
+interface ShownPlan {
+  resource_drift?: { address: string; change: { actions: string[]; before: Record<string, unknown> | null; after: Record<string, unknown> | null } }[];
+}
+
+/**
+ * Comparable form of an attribute value. Providers flip between null, {} and [] for "nothing"
+ * (e.g. `tags` under default_tags) and return sets in any order; neither is a real change.
+ */
+function normalize(v: unknown): unknown {
+  if (v === null || v === undefined || v === '') return null;
+  if (Array.isArray(v)) {
+    const items = v.map(normalize).filter((x) => x !== null);
+    if (items.length === 0) return null;
+    return items.every((x) => typeof x !== 'object') ? [...items].sort() : items;
+  }
+  if (typeof v === 'object') {
+    const entries = Object.entries(v as Record<string, unknown>)
+      .map(([k, x]) => [k, normalize(x)] as const)
+      .filter(([, x]) => x !== null)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.length === 0 ? null : Object.fromEntries(entries);
+  }
+  return v;
+}
+
+/** Attribute-level view of a refresh-only plan (`tofu show -json`). */
+export function driftChanges(plan: ShownPlan): DriftChange[] {
+  return (plan.resource_drift ?? []).flatMap((d) => {
+    const before = d.change.before ?? {};
+    const after = d.change.after ?? {};
+    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+    const attributes = keys.filter((k) => JSON.stringify(normalize(before[k])) !== JSON.stringify(normalize(after[k]))).sort();
+    const action = d.change.actions.includes('delete') ? 'delete' : d.change.actions.join('-') || 'update';
+    // Only representation changed (see normalize): not drift.
+    if (action !== 'delete' && attributes.length === 0) return [];
+    return [{ address: d.address, action, attributes }];
+  });
+}
+
 interface JsonLine {
   '@level'?: string;
   '@message'?: string;
@@ -112,13 +158,24 @@ export class TofuRunner {
     return { changes: { add: summary.add, change: summary.change, remove: summary.remove }, actions };
   }
 
-  /** Exit-code plan: true when the real infrastructure differs from the configuration. */
-  async hasDrift(stack: TofuStack): Promise<boolean> {
+  /**
+   * Refresh-only plan: what changed in the real infrastructure since the last apply (edited or
+   * deleted outside OpenTofu). Configuration changes (e.g. a newer module) are not drift and do
+   * not appear here.
+   */
+  async drift(stack: TofuStack): Promise<DriftChange[]> {
     const dir = await this.prepare(stack);
     await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
-    const lines = await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false', '-refresh-only'], true);
-    const summary = lines.find((l) => l.type === 'change_summary')?.changes;
-    return Boolean(summary && summary.add + summary.change + summary.remove > 0);
+    const planFile = 'drift.tfplan';
+    try {
+      await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false', '-refresh-only', `-out=${planFile}`], true);
+      const shown = await this.exec(stack, dir, ['show', '-json', planFile]);
+      if (shown.code !== 0) throw new TofuError(`tofu show failed: ${shown.stderr.slice(0, 300)}`, [], shown.kind);
+      return driftChanges(JSON.parse(shown.stdout) as ShownPlan);
+    } finally {
+      // The saved plan holds attribute values (possibly sensitive): never leave it behind.
+      await rm(join(dir, planFile), { force: true });
+    }
   }
 
   async destroy(stack: TofuStack): Promise<void> {
