@@ -3,14 +3,30 @@ title: CI/CD intake
 description: Connect your pipelines to OrkStage. Publish immutable application image versions by digest, validate templates statelessly, deploy an instance and wait for the result, with GitHub Actions examples.
 ---
 
-Two endpoints are designed for pipelines, plus the regular deploy and deployment endpoints.
+Three endpoints are designed for pipelines, plus the regular deploy and deployment endpoints.
 
 | Method | Path | Scope | Body |
 |---|---|---|---|
+| `PUT` | `/api/v1/applications/:name` | `applications:write` | `{ displayName, repository, port, registryKind?, healthPath?, readinessPath? }` |
 | `POST` | `/api/v1/applications/:name/versions` | `applications:write` | `{ version, imageUri, digest: "sha256:…", architectures? }` |
 | `POST` | `/api/v1/templates/validate` | `templates:read` | `{ source, planCode? }` → validation report |
 | `POST` | `/api/v1/instances/:id/deploy` | `instances:deploy` | `{}` → `202` deployment summary |
 | `GET` | `/api/v1/deployments/:id/events?after=` | `instances:read` | progress events |
+
+## Register the application (once, idempotent)
+
+Versions belong to a catalog application. Create it from the pipeline before the first publish;
+sending the same body again changes nothing, so it is safe to run on every build.
+
+```bash
+curl -fsS -X PUT "$ORK_API_URL/api/v1/applications/orders-api"   -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json"   -d '{ "displayName": "Orders API", "repository": "123456789012.dkr.ecr.us-east-1.amazonaws.com/orders-api", "port": 8080, "healthPath": "/health" }'
+```
+
+- Names are lowercase letters, digits and dashes (2–63), starting with a letter (`422 INVALID_NAME`).
+- `registryKind`: `ecr` (default), `acr`, `ocir`, `gar`, `dockerhub`, `ghcr` or `other`.
+- The response says `"created": true` the first time; changes are audited (`CREATE`/`UPDATE` on `Application`).
+- Requires a platform-level key (role `PlatformAdmin`) with `applications:write`: the catalog is
+  shared by all tenants.
 
 ## Publish an image version
 
@@ -33,12 +49,6 @@ curl -fsS -X POST "$ORK_API_URL/api/v1/applications/orders-api/versions" \
 - Versions are immutable. Publishing the same version with the **same** digest is idempotent
   (`"idempotent": true`); with a different digest it fails with `409 VERSION_EXISTS`.
 - Every publish is audited (`PUBLISH` on `ApplicationVersion`).
-
-<Callout type="warn" title="Applications must exist">
-  This endpoint adds versions to an existing application (`404` otherwise). Creating and editing
-  applications in the catalog through the API or the console is on the roadmap; today they are
-  created by the platform's seed or directly by an administrator.
-</Callout>
 
 ## Validate a template in a pull request
 

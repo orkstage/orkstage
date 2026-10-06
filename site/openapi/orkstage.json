@@ -9,7 +9,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -31,7 +31,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -90,7 +90,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -120,7 +120,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -142,7 +142,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -164,7 +164,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -186,7 +186,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -208,7 +208,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -228,7 +228,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -302,7 +302,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -330,7 +330,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -380,7 +380,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -400,7 +400,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -451,7 +451,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -481,7 +481,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -532,7 +532,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -598,7 +598,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -628,7 +628,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -676,7 +676,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -698,7 +698,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -720,7 +720,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -740,7 +740,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -844,7 +844,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -890,7 +890,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -912,7 +912,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -932,7 +932,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1049,7 +1049,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1077,7 +1077,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1165,7 +1165,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1195,7 +1195,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1225,7 +1225,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1276,7 +1276,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1325,7 +1325,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1363,7 +1363,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1401,7 +1401,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1431,7 +1431,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1493,7 +1493,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1523,7 +1523,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1561,7 +1561,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1591,7 +1591,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1621,7 +1621,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1651,7 +1651,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1673,7 +1673,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1695,7 +1695,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1717,7 +1717,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1747,7 +1747,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1777,7 +1777,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1799,7 +1799,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1829,7 +1829,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1851,7 +1851,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1873,7 +1873,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1893,7 +1893,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -1992,7 +1992,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2022,7 +2022,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2094,7 +2094,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2114,7 +2114,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2214,7 +2214,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2244,7 +2244,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2264,7 +2264,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2297,6 +2297,7 @@
                         "deployment.failed",
                         "deployment.awaiting_approval",
                         "instance.degraded",
+                        "instance.drift_detected",
                         "incident.opened",
                         "incident.updated",
                         "incident.resolved",
@@ -2344,7 +2345,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2376,6 +2377,7 @@
                         "deployment.failed",
                         "deployment.awaiting_approval",
                         "instance.degraded",
+                        "instance.drift_detected",
                         "incident.opened",
                         "incident.updated",
                         "incident.resolved",
@@ -2415,7 +2417,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2445,7 +2447,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2475,7 +2477,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2505,7 +2507,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2543,7 +2545,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2565,7 +2567,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2610,6 +2612,95 @@
         ]
       }
     },
+    "/api/v1/applications/{name}": {
+      "put": {
+        "operationId": "CiController_upsertApplication",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-co-csrf",
+            "in": "header",
+            "required": false,
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
+            "schema": {}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "repository": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "registryKind": {
+                    "default": "ecr",
+                    "type": "string",
+                    "enum": [
+                      "ecr",
+                      "acr",
+                      "ocir",
+                      "gar",
+                      "dockerhub",
+                      "ghcr",
+                      "other"
+                    ]
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "healthPath": {
+                    "default": "/health",
+                    "type": "string",
+                    "maxLength": 200,
+                    "format": "starts_with",
+                    "pattern": "^\\/.*"
+                  },
+                  "readinessPath": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "format": "starts_with",
+                    "pattern": "^\\/.*"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "repository",
+                  "port"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ci"
+        ]
+      }
+    },
     "/api/v1/applications/{name}/versions": {
       "post": {
         "operationId": "CiController_publishVersion",
@@ -2626,7 +2717,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2689,7 +2780,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2763,7 +2854,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2793,7 +2884,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2823,7 +2914,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2871,7 +2962,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2917,7 +3008,7 @@
             "name": "x-co-csrf",
             "in": "header",
             "required": false,
-            "description": "Send \"1\" on POST/PATCH/PUT/DELETE.",
+            "description": "Cookie sessions: send \"1\" on POST/PATCH/PUT/DELETE. Not needed with an API key.",
             "schema": {}
           }
         ],
@@ -2939,15 +3030,33 @@
     "contact": {}
   },
   "tags": [],
-  "servers": [],
+  "servers": [
+    {
+      "url": "http://localhost:4000"
+    }
+  ],
   "components": {
     "securitySchemes": {
       "cookie": {
         "type": "apiKey",
         "in": "cookie",
         "name": "co_session"
+      },
+      "apiKey": {
+        "scheme": "bearer",
+        "bearerFormat": "ork_<env>_<id>_<secret>",
+        "type": "http",
+        "description": "Organization API key (scoped). Sessions use the cookie instead."
       }
     },
     "schemas": {}
-  }
+  },
+  "security": [
+    {
+      "apiKey": []
+    },
+    {
+      "cookie": []
+    }
+  ]
 }
