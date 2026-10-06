@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeWebhookUrl, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, verifyWebhook } from './index.js';
+import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, verifyWebhook } from './index.js';
 
 const base = {
   DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
@@ -28,6 +28,42 @@ describe('secrets', () => {
     const r = new EnvSecretResolver({ EXT_ID: 'abc' });
     await expect(r.resolve('env://EXT_ID')).resolves.toBe('abc');
     await expect(r.resolve('vault://x')).rejects.toThrow(/Unsupported/);
+  });
+
+  it('reads aws-sm references, JSON keys and ARN regions, with a short cache', async () => {
+    const calls: { region: string; id: string }[] = [];
+    let t = 0;
+    const r = new AwsSecretsManagerResolver({
+      defaultRegion: 'us-east-1',
+      now: () => t,
+      clientFor: (region) => ({
+        send: (async (cmd: { input: { SecretId: string } }) => {
+          calls.push({ region, id: cmd.input.SecretId });
+          if (cmd.input.SecretId.endsWith('missing')) throw Object.assign(new Error('arn:aws:secretsmanager:us-east-1:123456789012:secret:missing'), { name: 'ResourceNotFoundException' });
+          return { SecretString: cmd.input.SecretId.includes('json') ? '{"password":"p@ss","port":5432}' : 'plain-value' };
+        }) as never,
+      }),
+    });
+    await expect(r.resolve('aws-sm://acme/plain')).resolves.toBe('plain-value');
+    await expect(r.resolve('aws-sm://acme/json#password')).resolves.toBe('p@ss');
+    await expect(r.resolve('aws-sm://acme/json#port')).resolves.toBe('5432');
+    await expect(r.resolve('aws-sm://acme/json#nope')).rejects.toThrow(/no string field/);
+    await expect(r.resolve('aws-sm://acme/plain#key')).rejects.toThrow(/not JSON/);
+    await r.resolve('aws-sm://arn:aws:secretsmanager:eu-west-1:123456789012:secret:db-AbCdEf');
+    expect(calls.filter((c) => c.id === 'acme/json')).toHaveLength(1); // cached
+    expect(calls.at(-1)!.region).toBe('eu-west-1');
+    t += 10 * 60_000;
+    await r.resolve('aws-sm://acme/json#password');
+    expect(calls.filter((c) => c.id === 'acme/json')).toHaveLength(2); // expired
+    const err = await r.resolve('aws-sm://arn:aws:secretsmanager:us-east-1:123456789012:secret:missing').catch((e: Error) => e.message);
+    expect(err).toMatch(/ResourceNotFoundException/);
+    expect(err).not.toContain('123456789012');
+  });
+
+  it('routes references by scheme', async () => {
+    const r = new CompositeSecretResolver({ env: new EnvSecretResolver({ A: '1' }) });
+    await expect(r.resolve('env://A')).resolves.toBe('1');
+    await expect(r.resolve('aws-sm://x')).rejects.toThrow(/Supported: env:\/\//);
   });
 
   it('flags secret-looking keys in non-secret config', () => {

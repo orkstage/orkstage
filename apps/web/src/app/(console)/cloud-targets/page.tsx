@@ -1,6 +1,6 @@
 'use client';
 
-import { createCloudTargetSchema, PROVIDERS, type CapabilityDto, type CloudTargetDto, type Page } from '@co/contracts';
+import { createCloudTargetSchema, PROVIDERS, SECRET_REF_PATTERN, type CapabilityDto, type CloudTargetDto, type Page } from '@co/contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cloud, ListChecks, Plus, ShieldCheck } from 'lucide-react';
@@ -276,7 +276,6 @@ const REGION_HINT: Record<string, string> = {
   oci: 'us-ashburn-1, eu-frankfurt-1',
   mock: 'us-east-1, eu-west-1',
 };
-const REF_PATTERN = /^(env|secret|vault|ssm):\/\/\S+$/;
 
 /** UI-level form; the request is assembled and checked with createCloudTargetSchema on submit. */
 const registerFormSchema = z
@@ -299,8 +298,8 @@ const registerFormSchema = z
       if (!/^\d{12}$/.test(v.accountId)) ctx.addIssue({ code: 'custom', path: ['accountId'], message: 'A 12-digit AWS account id.' });
       if (!/^arn:aws[a-z-]*:iam::\d{12}:role\/.+$/.test(v.roleArn)) ctx.addIssue({ code: 'custom', path: ['roleArn'], message: 'An IAM role ARN, e.g. arn:aws:iam::123456789012:role/co-deploy' });
     }
-    if (v.credentialRef && !REF_PATTERN.test(v.credentialRef)) {
-      ctx.addIssue({ code: 'custom', path: ['credentialRef'], message: 'Use a reference such as env://NAME — never paste the secret value itself.' });
+    if (v.credentialRef && !SECRET_REF_PATTERN.test(v.credentialRef)) {
+      ctx.addIssue({ code: 'custom', path: ['credentialRef'], message: 'Use a reference such as env://NAME or aws-sm://name — never paste the secret value itself.' });
     }
     const regions = splitList(v.regions);
     if (v.defaultRegion && !regions.includes(v.defaultRegion)) ctx.addIssue({ code: 'custom', path: ['defaultRegion'], message: 'Must be one of the allowed regions.' });
@@ -417,7 +416,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
             className="sm:col-span-2"
             hint={
               <>
-                A reference such as <code className="font-mono">env://ACME_AWS_EXTERNAL_ID</code> resolved by the worker. Never paste the secret value.
+                A reference such as <code className="font-mono">env://ACME_AWS_EXTERNAL_ID</code> or <code className="font-mono">aws-sm://orkstage/acme-external-id</code>, resolved at use. Never paste the secret value.
               </>
             }
             error={errors.credentialRef?.message}
@@ -466,7 +465,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
             <Input id="ct-max" type="number" min={1} max={20} {...form.register('maxConcurrentDeployments', { valueAsNumber: true })} />
           </Field>
           {provider !== 'aws' ? (
-            <Field label="Credential reference" htmlFor="ct-cred2" hint="Optional, e.g. env://NAME." error={errors.credentialRef?.message}>
+            <Field label="Credential reference" htmlFor="ct-cred2" hint="Optional, e.g. env://NAME or aws-sm://name." error={errors.credentialRef?.message}>
               <Input id="ct-cred2" className="font-mono" autoComplete="off" {...form.register('credentialRef')} />
             </Field>
           ) : null}

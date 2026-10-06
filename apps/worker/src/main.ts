@@ -1,6 +1,6 @@
 import { QUEUES, type DeploymentJob, type NotificationJob } from '@co/contracts';
 import { createPrismaClient } from '@co/database';
-import { createAdapterRegistry, createLogger, createRedis, createTofuRunner, EnvSecretResolver, loadConfig, loadDotEnv } from '@co/runtime';
+import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv } from '@co/runtime';
 import { DelayedError, Queue, Worker } from 'bullmq';
 import type { WorkerContext } from './context.js';
 import { HealthMonitor } from './health.js';
@@ -19,7 +19,7 @@ async function main() {
   const prisma = createPrismaClient(config.DATABASE_URL);
   // Only the worker provisions: it alone gets an OpenTofu runner (the API validates targets only).
   const tofu = createTofuRunner(config);
-  const { registry } = createAdapterRegistry({ redis, secrets: new EnvSecretResolver(), runner: tofu, awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
+  const { registry } = createAdapterRegistry({ redis, secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }), runner: tofu, awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
   const notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection: redis.duplicate() });
   const ctx: WorkerContext = { config, prisma, redis, registry, logger, notifications };
 

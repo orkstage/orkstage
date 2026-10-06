@@ -35,6 +35,10 @@ const schema = z
     TOFU_MODULES_IN_IMAGE: bool.default(false),
     // Emulator endpoint as reachable from inside containers (e.g. http://ministack:4566).
     AWS_EMULATOR_ENDPOINT: z.string().optional(),
+    // aws-sm:// secret references: default region (ARNs carry their own) and an optional endpoint
+    // override for emulators, as reachable from the API/worker process.
+    SECRETS_AWS_REGION: z.string().default('us-east-1'),
+    SECRETS_AWS_ENDPOINT: z.string().optional(),
     // 32 random bytes, base64. Encrypts secrets the platform must read back (webhook secrets).
     ENCRYPTION_KEY: z.string().optional(),
     // Local development only: allow http:// and private-network webhook URLs.

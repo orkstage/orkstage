@@ -3,7 +3,7 @@ import { createPrismaClient, type PrismaClient } from '@co/database';
 import {
   createAdapterRegistry,
   createRedis,
-  EnvSecretResolver,
+  createSecretResolver,
   loadConfig,
   SecretBox,
   type PlatformConfig,
@@ -25,7 +25,7 @@ export class Adapters {
   readonly registry: AdapterRegistry;
   readonly mock: MockAdapter;
   constructor(@Inject(REDIS) redis: Redis, @Inject(CONFIG) config: PlatformConfig) {
-    const { registry, mock } = createAdapterRegistry({ redis, secrets: new EnvSecretResolver(), awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
+    const { registry, mock } = createAdapterRegistry({ redis, secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }), awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
     this.registry = registry;
     this.mock = mock;
   }

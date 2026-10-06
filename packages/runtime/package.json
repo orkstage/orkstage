@@ -18,6 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "3.1146.0",
     "@co/cloud-aws": "workspace:*",
     "@co/cloud-core": "workspace:*",
     "@co/cloud-mock": "workspace:*",
