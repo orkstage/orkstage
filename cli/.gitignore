@@ -2,3 +2,5 @@
 *.snap.new
 *.pending-snap
 # dist/scan-wasm is committed on purpose (the platform depends on it by path).
+# IDE/Gradle caches created when editors import the Kotlin fixture
+.gradle/
