@@ -128,6 +128,7 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
           target_group_arn: targetGroups[req.resourceId] ?? '',
           lb_sg_id: ingress?.lb_sg_id ?? '',
           ec2_ami_id: cfg.ecsAmiId ?? (isEmulator(cfg) ? 'ami-0emulated0000000' : ''),
+          autoscaling: serviceAutoscaling(spec, isEmulator(cfg)),
         },
       };
     }
@@ -238,4 +239,14 @@ export function flattenOutputs(all: unknown): ResourceOutputs {
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') out[k] = v;
   }
   return out;
+}
+
+/**
+ * Template `autoscaling` → module input. Emulators do not implement Application Auto Scaling, so
+ * there the service runs with fixed `replicas` (the adapter logs that).
+ */
+export function serviceAutoscaling(spec: Spec, emulator: boolean): { min_replicas: number; max_replicas: number; target_cpu_percent: number } | null {
+  const a = spec.autoscaling as { minReplicas: number; maxReplicas: number; targetCpuPercent: number } | undefined;
+  if (!a || emulator) return null;
+  return { min_replicas: a.minReplicas, max_replicas: a.maxReplicas, target_cpu_percent: a.targetCpuPercent };
 }

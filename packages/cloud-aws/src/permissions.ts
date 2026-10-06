@@ -18,6 +18,7 @@ export const REQUIRED_ACTIONS: Record<string, string[]> = {
     'ecs:DeleteService', 'ecs:PutClusterCapacityProviders', 'ecs:CreateCapacityProvider', 'iam:CreateRole', 'iam:DeleteRole', 'iam:PutRolePolicy',
     'iam:AttachRolePolicy', 'iam:PassRole', 'iam:CreateInstanceProfile', 'iam:AddRoleToInstanceProfile', 'logs:CreateLogGroup', 'logs:DeleteLogGroup',
     'logs:PutRetentionPolicy', 'ec2:CreateLaunchTemplate', 'autoscaling:CreateAutoScalingGroup', 'ec2:CreateSecurityGroup',
+    'application-autoscaling:RegisterScalableTarget', 'application-autoscaling:PutScalingPolicy', 'application-autoscaling:DeregisterScalableTarget',
   ],
   'database.postgresql': [
     'rds:CreateDBInstance', 'rds:ModifyDBInstance', 'rds:DeleteDBInstance', 'rds:CreateDBSubnetGroup', 'rds:AddTagsToResource',

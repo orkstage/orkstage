@@ -49,11 +49,11 @@ resource "aws_security_group" "lb" {
 }
 
 resource "aws_lb" "this" {
-  name               = var.name
-  load_balancer_type = "application"
-  internal           = false
-  subnets            = var.public_subnet_ids
-  security_groups    = [aws_security_group.lb.id]
+  name                       = var.name
+  load_balancer_type         = "application"
+  internal                   = false
+  subnets                    = var.public_subnet_ids
+  security_groups            = [aws_security_group.lb.id]
   drop_invalid_header_fields = true
 }
 

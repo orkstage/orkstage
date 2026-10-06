@@ -22,7 +22,7 @@ resource "aws_sqs_queue" "this" {
   name                    = "${var.name}${local.suffix}"
   fifo_queue              = var.fifo
   sqs_managed_sse_enabled = true
-  redrive_policy = var.dead_letter ? jsonencode({ deadLetterTargetArn = aws_sqs_queue.dlq[0].arn, maxReceiveCount = 5 }) : null
+  redrive_policy          = var.dead_letter ? jsonencode({ deadLetterTargetArn = aws_sqs_queue.dlq[0].arn, maxReceiveCount = 5 }) : null
 }
 
 output "kind" { value = "queue" }

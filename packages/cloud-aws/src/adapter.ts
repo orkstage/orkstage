@@ -142,6 +142,9 @@ export class AwsAdapter implements CloudProviderAdapter {
   async ensureResource(rawCtx: ProviderContext, req: ResourceRequest): Promise<ResourceResult> {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
+    if (req.spec.autoscaling && isEmulator(awsConfig(ctx.target))) {
+      ctx.log?.('warn', `${req.resourceId}: autoscaling is not emulated; running ${String(req.spec.replicas ?? 1)} fixed replica(s).`);
+    }
     await this.ensureStateBucket(ctx);
     const config = rootConfig(ctx, req);
     const stack = await this.stack(ctx, req.name, config);

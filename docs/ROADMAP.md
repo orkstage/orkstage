@@ -51,7 +51,7 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 **Cloud providers**
 - Azure adapter (Container Apps, PostgreSQL Flexible Server, Blob, Service Bus, App Gateway, DNS) + OpenTofu `azurerm` modules + workload-identity auth.
 - OCI adapter (Object Storage first) + modules; GCP adapter later.
-- AWS: ECS autoscaling (`aws_appautoscaling_*` from template `autoscaling`), custom domains (verification + ACM for customer domains), WAF option, ECS Managed Instances.
+- AWS: custom domains (verification + ACM for customer domains), WAF option, ECS Managed Instances.
 
 **Provisioning**
 - Production runner isolation: run the OpenTofu container as an ECS RunTask / Kubernetes Job with a scoped role instead of the worker's Docker socket.
@@ -81,7 +81,7 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 ## Suggested order
 
 1. **Real AWS hardening:** ~~tofu plan before apply + approval~~, ~~permission probing~~,
-   ~~secret-manager resolver~~, autoscaling, runner as ECS task, drift job. Then test against a
+   ~~secret-manager resolver~~, ~~autoscaling~~, runner as ECS task, drift job. Then test against a
    real sandbox account.
 2. **Azure adapter** (the spec's second provider) incl. cross-cloud allowlisting.
 3. **Product completeness:** teams/invitations, catalog + CI intake, preferences.

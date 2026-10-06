@@ -11,7 +11,7 @@ variable "capacity" {
   }
 }
 variable "image" { type = string }
-variable "cpu" { type = number }        # vCPU, e.g. 0.25
+variable "cpu" { type = number } # vCPU, e.g. 0.25
 variable "memory_mib" { type = number }
 variable "replicas" { type = number }
 variable "port" {
@@ -56,6 +56,15 @@ variable "ec2_instance_type" {
   type    = string
   default = "t3.small"
 }
+# Target tracking on average CPU. null = fixed `replicas`.
+variable "autoscaling" {
+  type = object({
+    min_replicas       = number
+    max_replicas       = number
+    target_cpu_percent = number
+  })
+  default = null
+}
 
 data "aws_region" "current" {}
 
@@ -65,6 +74,10 @@ locals {
   container = var.name
   env       = [for k, v in var.environment : { name = k, value = v }]
   secrets   = [for k, v in var.secrets : { name = k, valueFrom = v }]
+  scaled    = var.autoscaling != null
+  # Start inside the scaling range; afterwards the autoscaler owns the task count.
+  initial_count = local.scaled ? min(max(var.replicas, var.autoscaling.min_replicas), var.autoscaling.max_replicas) : var.replicas
+  service       = one(concat(aws_ecs_service.this, aws_ecs_service.scaled))
 }
 
 resource "aws_cloudwatch_log_group" "this" {
@@ -229,6 +242,7 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_ecs_service" "this" {
+  count           = local.scaled ? 0 : 1
   name            = var.name
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
@@ -260,10 +274,81 @@ resource "aws_ecs_service" "this" {
   depends_on = [aws_ecs_cluster_capacity_providers.this]
 }
 
+# Same service when autoscaling is on, except that deployments leave the running task count to
+# the autoscaler (otherwise every deploy would reset it). Switching modes replaces the service,
+# which the provider plan flags for approval in production.
+resource "aws_ecs_service" "scaled" {
+  count           = local.scaled ? 1 : 0
+  name            = var.name
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.this.arn
+  desired_count   = local.initial_count
+  # Roll tasks on every service change; also required by the provider whenever the capacity
+  # provider strategy is (re)applied.
+  force_new_deployment = true
+  capacity_provider_strategy {
+    capacity_provider = var.capacity == "EC2" ? aws_ecs_capacity_provider.ec2[0].name : var.capacity
+    weight            = 1
+  }
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = compact([aws_security_group.service.id, var.lb_sg_id])
+    assign_public_ip = local.fargate ? var.assign_public_ip : false
+  }
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn != "" && var.port != null ? [1] : []
+    content {
+      target_group_arn = var.target_group_arn
+      container_name   = local.container
+      container_port   = var.port
+    }
+  }
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+  depends_on = [aws_ecs_cluster_capacity_providers.this]
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+}
+
+moved {
+  from = aws_ecs_service.this
+  to   = aws_ecs_service.this[0]
+}
+
+resource "aws_appautoscaling_target" "service" {
+  count              = local.scaled ? 1 : 0
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.scaled[0].name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.autoscaling.min_replicas
+  max_capacity       = var.autoscaling.max_replicas
+}
+
+resource "aws_appautoscaling_policy" "cpu" {
+  count              = local.scaled ? 1 : 0
+  name               = "${var.name}-cpu"
+  policy_type        = "TargetTrackingScaling"
+  service_namespace  = aws_appautoscaling_target.service[0].service_namespace
+  resource_id        = aws_appautoscaling_target.service[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.service[0].scalable_dimension
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = var.autoscaling.target_cpu_percent
+    scale_out_cooldown = 60
+    scale_in_cooldown  = 300
+  }
+}
+
 output "kind" { value = "compute.container-service" }
 output "cluster_name" { value = aws_ecs_cluster.this.name }
-output "service_name" { value = aws_ecs_service.this.name }
-output "service_arn" { value = aws_ecs_service.this.id }
+output "service_name" { value = local.service.name }
+output "service_arn" { value = local.service.id }
 output "log_group" { value = aws_cloudwatch_log_group.this.name }
 output "image" { value = var.image }
 output "capacity" { value = var.capacity }
+output "autoscaling" { value = local.scaled ? "${var.autoscaling.min_replicas}-${var.autoscaling.max_replicas} @ ${var.autoscaling.target_cpu_percent}% CPU" : "off" }

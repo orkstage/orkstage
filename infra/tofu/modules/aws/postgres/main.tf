@@ -61,24 +61,24 @@ resource "aws_secretsmanager_secret_version" "credentials" {
 }
 
 resource "aws_db_instance" "this" {
-  identifier                = var.name
-  engine                    = "postgres"
-  engine_version            = var.engine_version
-  instance_class            = var.instance_class
-  allocated_storage         = var.storage_gib
-  storage_encrypted         = true
-  username                  = var.username
-  password_wo               = ephemeral.random_password.master.result
-  password_wo_version       = var.password_version
-  multi_az                  = var.multi_az
-  backup_retention_period   = var.backup_retention_days
-  db_subnet_group_name      = aws_db_subnet_group.this.name
-  vpc_security_group_ids    = [aws_security_group.db.id]
-  publicly_accessible       = false
-  deletion_protection       = var.production
-  skip_final_snapshot       = !var.production
-  final_snapshot_identifier = var.production ? "${var.name}-final" : null
-  copy_tags_to_snapshot     = true
+  identifier                 = var.name
+  engine                     = "postgres"
+  engine_version             = var.engine_version
+  instance_class             = var.instance_class
+  allocated_storage          = var.storage_gib
+  storage_encrypted          = true
+  username                   = var.username
+  password_wo                = ephemeral.random_password.master.result
+  password_wo_version        = var.password_version
+  multi_az                   = var.multi_az
+  backup_retention_period    = var.backup_retention_days
+  db_subnet_group_name       = aws_db_subnet_group.this.name
+  vpc_security_group_ids     = [aws_security_group.db.id]
+  publicly_accessible        = false
+  deletion_protection        = var.production
+  skip_final_snapshot        = !var.production
+  final_snapshot_identifier  = var.production ? "${var.name}-final" : null
+  copy_tags_to_snapshot      = true
   auto_minor_version_upgrade = true
 }
 

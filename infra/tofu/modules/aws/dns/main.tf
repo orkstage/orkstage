@@ -1,7 +1,7 @@
 # Logical "dns": a platform subdomain aliased to the ingress, with an ACM certificate (DNS
 # validated) and an HTTPS listener on the load balancer when TLS is requested.
 
-variable "zone_name" { type = string }   # platform zone, e.g. apps.example.com
+variable "zone_name" { type = string } # platform zone, e.g. apps.example.com
 variable "create_zone" {
   type    = bool
   default = false
@@ -53,12 +53,12 @@ resource "aws_acm_certificate" "this" {
 }
 
 resource "aws_route53_record" "validation" {
-  for_each = var.tls ? { for o in aws_acm_certificate.this[0].domain_validation_options : o.domain_name => o } : {}
-  zone_id  = local.zone_id
-  name     = each.value.resource_record_name
-  type     = each.value.resource_record_type
-  records  = [each.value.resource_record_value]
-  ttl      = 60
+  for_each        = var.tls ? { for o in aws_acm_certificate.this[0].domain_validation_options : o.domain_name => o } : {}
+  zone_id         = local.zone_id
+  name            = each.value.resource_record_name
+  type            = each.value.resource_record_type
+  records         = [each.value.resource_record_value]
+  ttl             = 60
   allow_overwrite = true
 }
 

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AwsAdapter, isDestructivePlan } from './adapter.js';
 import { isAwsNotFound } from './health.js';
 import { probePermissions, REQUIRED_ACTIONS } from './permissions.js';
-import { moduleInputs, rootConfig } from './stacks.js';
+import { moduleInputs, rootConfig, serviceAutoscaling } from './stacks.js';
 
 const target: CloudTarget = {
   id: 't1',
@@ -71,6 +71,14 @@ describe('AwsAdapter.validateTarget', () => {
 });
 
 describe('OpenTofu stack rendering', () => {
+  it('maps template autoscaling to the module, and to fixed replicas on emulators', () => {
+    const spec = { replicas: 2, autoscaling: { minReplicas: 2, maxReplicas: 6, targetCpuPercent: 60 } };
+    expect(serviceAutoscaling(spec, false)).toEqual({ min_replicas: 2, max_replicas: 6, target_cpu_percent: 60 });
+    expect(serviceAutoscaling(spec, true)).toBeNull();
+    expect(serviceAutoscaling({ replicas: 2 }, false)).toBeNull();
+    expect(moduleInputs(ctx, request({ spec: { image: 'x@sha256:1', port: 8080, ...spec }, dependencyOutputs: { network } })).inputs.autoscaling).toEqual({ min_replicas: 2, max_replicas: 6, target_cpu_percent: 60 });
+  });
+
   it('wires services to network, ingress target group and dependency references', () => {
     const { module, inputs } = moduleInputs(ctx, request({
       dependencyOutputs: {
