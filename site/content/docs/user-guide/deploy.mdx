@@ -1,0 +1,89 @@
+---
+title: Deploying and watching progress
+description: Start an OrkStage deployment, follow its phases and resources live, approve high-risk production changes, cancel, retry failed resources, upgrade the template and destroy safely.
+---
+
+Click **Deploy** on an instance. The API validates the request, records the deployment with all its
+steps and returns immediately (`202`); the worker does the work. You can close the browser.
+
+## Phases
+
+```text
+validate → targets → plan → [approval] → resources (DAG) → rollout → configure → verify → observability → finalize
+```
+
+| Phase | What happens |
+|---|---|
+| Validate template and policies | The stored snapshot is checked again; a failing policy stops here. |
+| Validate cloud targets | Credentials, state bucket and, on real AWS, the IAM permissions the deployed services need. |
+| Generate plan | Platform diff, plus a real `tofu plan` for each existing resource that changes. |
+| Approval | Only for high-risk production changes (see below). Otherwise skipped with the reason. |
+| Resources | One step per resource, in dependency order; independent branches in parallel. |
+| Application rollout | Services run their images by immutable digest. |
+| Configure secrets and connections | Connection references are wired; secret values stay in the secret store. |
+| Health and connectivity verification | Each resource is checked until healthy, within one settle window. |
+| Register observability, Finalize | Monitoring is registered and the instance becomes `READY` or `DEGRADED`. |
+
+The deployment page shows each step with its status, the Gantt **timeline** and the **event log**
+(polling every 1 to 2 seconds).
+
+## Approvals
+
+A deployment of a `production` instance stops at `AWAITING_APPROVAL` when the change is high risk:
+
+- the platform plan deletes or replaces a resource, or changes an existing database; or
+- the **provider plan** (a real `tofu plan` run per changed resource in the plan phase) deletes or
+  replaces something, which can happen even when the platform diff only shows an update, for
+  example when an attribute forces replacement. Routine ECS task definition revisions do not count.
+
+The provider plan for every changed resource is written to the event log, destructive ones as
+warnings:
+
+```text
+WARN  [phase:plan] ingress: 1 to add, 0 to change, 1 to destroy — replace aws_lb_target_group.route[0]
+WARN  [phase:plan] The provider plan deletes or replaces existing resources: production approval required.
+WARN  [phase:approval] High-risk production change: waiting for approval.
+```
+
+Owners and admins are notified (and the `deployment.awaiting_approval` webhook fires). A user with
+the `approve` permission clicks **Approve** and the deployment continues. When nothing high-risk is
+planned, the approval step is marked skipped with "no high-risk or destructive changes planned".
+Non-production instances never wait for approval.
+
+## Failures, retries and cancel
+
+- Transient failures (throttling, timeouts) are retried with exponential backoff. Destructive
+  operations are never retried automatically.
+- A failed resource skips only its dependents; unrelated branches finish. Partial failure is a normal
+  outcome, shown per resource.
+- **Retry** re-runs only failed and skipped resources. Converged resources are not touched.
+- **Cancel** stops cooperatively after the current step.
+- If the worker restarts, the deployment resumes: finished phases are skipped and converged
+  resources (same idempotency key) are not applied again.
+
+## Resources deleted outside OrkStage
+
+If someone deletes a resource directly in the provider console, verification asks the provider
+whether it still exists. A resource that is gone fails verification immediately ("Resource no longer
+exists at the provider. Redeploy to re-create it.") instead of waiting for it to settle. The next
+deployment re-creates it.
+
+## Upgrading the template
+
+**Upgrade template** switches the instance to another published version of its template. Review the
+new plan, then deploy. Instances never change version on their own.
+
+## Destroying
+
+**Destroy** removes every cloud resource in reverse dependency order:
+
+```text
+validate → backup → plan → [approval] → resources (reverse DAG) → cleanup → finalize
+```
+
+You must type the instance slug to confirm. Instances marked *Destroy protected* refuse. Only
+customer owners and admins (and platform owners and admins) can destroy.
+
+<Callout type="warn">
+  The backup phase checks that a backup policy exists, but does not verify a restorable backup yet.
+</Callout>

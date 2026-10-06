@@ -1,0 +1,9 @@
+# orkstage.io is its own pnpm workspace (and later its own repository, orkstage-site).
+# This file stops pnpm from treating site/ as part of the platform monorepo at the parent level.
+packages: []
+
+# Supply chain: build scripts are allow-listed, nothing else runs at install time.
+allowBuilds:
+  esbuild: true
+  sharp: false
+  '@tailwindcss/oxide': true

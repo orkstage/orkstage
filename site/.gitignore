@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.source/
+# Generated from openapi/orkstage.json before dev/build (scripts/generate-api-reference.mjs).
+content/docs/developer/api-reference/*
+!content/docs/developer/api-reference/index.mdx

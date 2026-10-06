@@ -1,0 +1,38 @@
+---
+title: API reference
+description: Every operation of the OrkStage Control API v1, generated from the OpenAPI document the API serves at /api/docs-json.
+---
+
+These pages are generated with `fumadocs-openapi` from `openapi/orkstage.json`, the document a
+running API serves at `/api/docs-json` (the interactive Swagger UI is at `/api/docs`). Read the
+[REST API overview](/docs/developer/api-overview/) first for authentication, errors, pagination and
+correlation ids.
+
+<Cards>
+  <Card title="Authentication" href="/docs/developer/api-reference/auth/get-me/" description="Providers, OIDC login, development login, logout, the current principal." />
+  <Card title="Instances" href="/docs/developer/api-reference/instances/get-instances/" description="Create, preview, deploy, upgrade, destroy; logs and metrics." />
+  <Card title="Deployments" href="/docs/developer/api-reference/deployments/get-deployments/" description="Progress, events, approve, cancel, retry." />
+  <Card title="Templates" href="/docs/developer/api-reference/templates/get-templates/" description="Templates, versions, validation, publishing, cloning." />
+  <Card title="API keys and webhooks" href="/docs/developer/api-reference/api-keys/get-api-keys/" description="Automation credentials and outbound events." />
+  <Card title="CI/CD and imports" href="/docs/developer/api-reference/ci/post-templates-validate/" description="Stateless validation, image versions, IaC import." />
+</Cards>
+
+## Authentication in the reference
+
+The exported document declares the `co_session` cookie. The API also accepts API keys as
+`Authorization: Bearer ork_…` on every operation that declares a scope; the reference adds that
+scheme so examples show both.
+
+## Refreshing
+
+The site never calls the API at build time. To update the reference after an API change:
+
+```bash
+# with the platform running (for example: pnpm platform:up in the platform repository)
+pnpm openapi:refresh                       # saves http://localhost:4000/api/docs-json
+ORKSTAGE_API_URL=https://api.example.com pnpm openapi:refresh
+pnpm build                                 # regenerates these pages (prebuild step)
+```
+
+After the repositories are split, the platform's CI publishes the OpenAPI file as a release asset
+and the site pins the version it documents.

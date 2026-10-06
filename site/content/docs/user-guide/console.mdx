@@ -1,0 +1,73 @@
+---
+title: Navigating the console
+description: A tour of the OrkStage web console for operators, tenant users and engineering managers. Navigation per role, the overview, instances, deployments, incidents, status and settings.
+---
+
+The console is a Next.js application served next to the API. It talks to the API through its own
+origin, so session cookies stay first-party and no cross-origin requests are needed.
+
+## Signing in
+
+- **Single sign-on**: providers configured with OIDC appear on the login page (Microsoft Entra ID is
+  the reference; any OIDC provider can be added by configuration, see
+  [Configuration](/docs/self-hosting/configuration/#single-sign-on-oidc)).
+- **Development login**: an email-only login for local installs. It is refused when
+  `NODE_ENV=production`.
+
+Sessions last 12 hours and are revoked on sign-out.
+
+## Navigation
+
+What you see depends on your [role](/docs/user-guide/roles/). The console hides what you cannot do,
+but the API re-checks every action, so a hidden button is never the only protection.
+
+| Platform staff (owner, admin, operator) | Tenant members (owner, admin, developer, viewer) |
+|---|---|
+| Overview | Overview |
+| Tenants | Instances |
+| Instances | Deployments |
+| Deployments | Incidents |
+| Templates | Status page (your tenant's) |
+| Applications | Integrations (owners and admins) |
+| Cloud targets | |
+| Incidents | |
+| Audit log | |
+| Integrations | |
+
+## The overview
+
+The overview shows instance and deployment counts, health, open incidents and trends. A new
+installation shows an **onboarding checklist**:
+
+1. Connect or validate a cloud target.
+2. Pick or forge a template.
+3. Create an instance.
+4. Review plan & cost.
+5. Deploy and watch.
+
+## Instances
+
+The instance list shows status, health, environment, template version and tenant. An instance page
+has five tabs:
+
+| Tab | What it shows |
+|---|---|
+| Overview | Details, variables, the topology diagram, resources with their placement, outputs and health |
+| Plan & cost | A fresh preview: resolved resources, policies, connectivity, cost estimate and the diff |
+| Deployments | Every deployment of this instance with status and duration |
+| Logs | Recent log lines per resource (CloudWatch Logs on AWS, simulated elsewhere) |
+| Metrics | CPU, memory, requests, latency and errors per resource |
+
+Actions in the header: **Deploy**, **Upgrade template** and **Destroy**, each shown only when your
+role allows it.
+
+## Deployments and incidents
+
+**Deployments** lists every deployment across the instances you can see; a deployment page has the
+step list, a Gantt timeline, the plan, the event log and, when needed, **Approve**, **Cancel** and
+**Retry**. **Incidents** lists open and resolved incidents with their updates.
+
+## Theme
+
+The console is dark by default. Switch to the light theme from the user menu; the choice is applied
+before first paint.

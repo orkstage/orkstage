@@ -1,0 +1,35 @@
+---
+title: Notifications
+description: Who OrkStage notifies about deployments and incidents, through which channels (in-app, email, signed webhooks), and what is not available yet.
+---
+
+## Channels
+
+| Channel | Status |
+|---|---|
+| In-app (the bell in the console header) | Available |
+| Email (SMTP, through an outbox) | Available |
+| [Webhooks](/docs/developer/webhooks/) (HMAC-signed HTTP POST) | Available |
+| Slack, Microsoft Teams | Planned |
+
+## Who receives what
+
+Deployment and incident notifications go to the tenant's **owners and admins** and to **platform
+admins**. Examples:
+
+- a deployment succeeded or failed;
+- a production deployment is waiting for approval;
+- an incident opened, was updated or resolved.
+
+Each in-app notification links to the deployment or incident. Mark it read from the bell; the API is
+`GET /notifications` and `POST /notifications/:id/read`.
+
+## Email
+
+Emails are queued in an outbox and sent by the worker through SMTP (`SMTP_HOST`, `SMTP_PORT`,
+`SMTP_SECURE`, `EMAIL_FROM`). In the local stack they land in Mailpit at http://localhost:8025.
+
+## Not yet
+
+- Per-user notification preferences.
+- Slack and Teams channels (use a webhook receiver in the meantime).

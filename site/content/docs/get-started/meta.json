@@ -1,0 +1,6 @@
+{
+  "title": "Get started",
+  "description": "Install, run and understand OrkStage",
+  "root": true,
+  "pages": ["index", "quickstart", "local-aws", "core-concepts"]
+}

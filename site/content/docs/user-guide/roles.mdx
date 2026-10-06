@@ -1,0 +1,52 @@
+---
+title: Roles and permissions
+description: The seven built-in OrkStage roles, three platform roles and four tenant roles, what each can do, and how tenant isolation is enforced on every request.
+---
+
+OrkStage has seven built-in roles. **Platform roles** apply to the whole installation; **tenant
+roles** apply per tenant, so one user can be an admin in one tenant and a viewer in another.
+
+## Platform roles
+
+| Role | Can |
+|---|---|
+| `PlatformOwner` | Everything, including global settings. |
+| `PlatformAdmin` | Everything except changing global settings (read-only) and deleting the organization. Manages cloud targets, templates, tenants. |
+| `PlatformOperator` | Read everything except settings; deploy, restart, scale and approve instances; create and update incidents; update status pages. Cannot manage cloud targets, publish templates or destroy instances. |
+
+## Tenant roles
+
+| Capability | Owner | Admin | Developer | Viewer |
+|---|:-:|:-:|:-:|:-:|
+| Read instances, deployments, services, incidents, status page, notifications | ✓ | ✓ | ✓ | ✓ |
+| Read templates, plans, applications | ✓ | ✓ | ✓ | ✓ |
+| Deploy and restart instances | ✓ | ✓ | ✓ | |
+| Import IaC | ✓ | ✓ | ✓ | |
+| Create, update, scale, destroy and approve instances | ✓ | ✓ | | |
+| Read members and the audit log | ✓ | ✓ | | |
+| Manage API keys and webhooks | ✓ | ✓ | | |
+| Manage members, update the tenant | ✓ | | | |
+
+Tenant roles never get access to cloud targets, settings or template publishing.
+
+## How it is enforced
+
+1. The request is authenticated: a session cookie or an [API key](/docs/developer/api-keys/).
+2. Tenant-owned queries are filtered by the caller's memberships.
+3. Every loaded record is checked with the same rules (CASL) before any action.
+4. The action is written to the audit log.
+
+Records of other tenants are answered with **404**, not 403, so their existence is not revealed. The
+console receives the rules from `GET /me` only to hide what you cannot do; the API stays
+authoritative.
+
+## API keys and roles
+
+An API key acts **with a role**: `CustomerAdmin`, `CustomerDeveloper` or `CustomerViewer` for a tenant
+key, `PlatformAdmin` or `PlatformOperator` for an organization-wide key. Scopes then narrow what the
+role allows; a key never outranks its role.
+
+<Callout title="Enterprise">
+  Custom roles and fine-grained permissions are planned for the Enterprise edition. See
+  [Community vs Enterprise](/docs/enterprise/editions/).
+</Callout>

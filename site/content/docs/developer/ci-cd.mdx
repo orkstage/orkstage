@@ -1,0 +1,127 @@
+---
+title: CI/CD intake
+description: Connect your pipelines to OrkStage. Publish immutable application image versions by digest, validate templates statelessly, deploy an instance and wait for the result, with GitHub Actions examples.
+---
+
+Two endpoints are designed for pipelines, plus the regular deploy and deployment endpoints.
+
+| Method | Path | Scope | Body |
+|---|---|---|---|
+| `POST` | `/api/v1/applications/:name/versions` | `applications:write` | `{ version, imageUri, digest: "sha256:…", architectures? }` |
+| `POST` | `/api/v1/templates/validate` | `templates:read` | `{ source, planCode? }` → validation report |
+| `POST` | `/api/v1/instances/:id/deploy` | `instances:deploy` | `{}` → `202` deployment summary |
+| `GET` | `/api/v1/deployments/:id/events?after=` | `instances:read` | progress events |
+
+## Publish an image version
+
+Templates reference images through the application catalog (`image: catalog://orders-api`). When an
+instance is compiled, each reference resolves to the **most recently published version** of that
+application, by digest, so a deployment always runs an immutable image.
+
+```bash
+curl -fsS -X POST "$ORK_API_URL/api/v1/applications/orders-api/versions" \
+  -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "version": "1.14.2",
+    "imageUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/orders-api:1.14.2",
+    "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "architectures": ["amd64", "arm64"]
+  }'
+```
+
+- `digest` must be `sha256:` followed by 64 hex characters.
+- Versions are immutable. Publishing the same version with the **same** digest is idempotent
+  (`"idempotent": true`); with a different digest it fails with `409 VERSION_EXISTS`.
+- Every publish is audited (`PUBLISH` on `ApplicationVersion`).
+
+<Callout type="warn" title="Applications must exist">
+  This endpoint adds versions to an existing application (`404` otherwise). Creating and editing
+  applications in the catalog through the API or the console is on the roadmap; today they are
+  created by the platform's seed or directly by an administrator.
+</Callout>
+
+## Validate a template in a pull request
+
+Stateless: no template id, nothing stored.
+
+```bash
+jq -Rs '{source: ., planCode: "GROWTH"}' < .ork/template.yaml \
+  | curl -fsS -X POST "$ORK_API_URL/api/v1/templates/validate" \
+      -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json" -d @- \
+  | tee report.json | jq -e '.valid'
+```
+
+The report lists every issue with `stage`, `severity`, `code`, `message` and `path`.
+
+## Deploy and wait
+
+```bash
+DEPLOYMENT=$(curl -fsS -X POST "$ORK_API_URL/api/v1/instances/$INSTANCE_ID/deploy" \
+  -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json" -d '{}' | jq -r '.id')
+
+while :; do
+  STATUS=$(curl -fsS "$ORK_API_URL/api/v1/deployments/$DEPLOYMENT" -H "Authorization: Bearer $ORK_TOKEN" | jq -r '.status')
+  case "$STATUS" in
+    SUCCEEDED) echo "deployed"; break ;;
+    FAILED|PARTIALLY_FAILED|CANCELLED) echo "deployment $STATUS"; exit 1 ;;
+    AWAITING_APPROVAL) echo "waiting for approval in the console…" ;;
+  esac
+  sleep 5
+done
+```
+
+A second deploy while one is running answers `409 INSTANCE_BUSY`; treat it as "try later", not as a
+failure of your build.
+
+## GitHub Actions
+
+<Tabs items={['curl', 'ork CLI (Preview)']}>
+<Tab value="curl">
+
+```yaml title=".github/workflows/release.yml"
+name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      ORK_API_URL: https://orkstage.example.com
+      ORK_TOKEN: ${{ secrets.ORK_TOKEN }}   # preset "CI/CD deploy" + applications:write
+    steps:
+      - uses: actions/checkout@v5
+      # … build and push the image, capture its digest in steps.push.outputs.digest …
+      - name: Publish the version to OrkStage
+        run: |
+          curl -fsS -X POST "$ORK_API_URL/api/v1/applications/orders-api/versions" \
+            -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"version\":\"${GITHUB_REF_NAME#v}\",\"imageUri\":\"$IMAGE:${GITHUB_REF_NAME}\",\"digest\":\"${{ steps.push.outputs.digest }}\"}"
+      - name: Deploy staging
+        run: ./scripts/orkstage-deploy.sh "${{ vars.STAGING_INSTANCE_ID }}"
+```
+
+</Tab>
+<Tab value="ork CLI (Preview)">
+
+```yaml title=".github/workflows/deploy.yml"
+- name: Deploy with ork
+  env:
+    ORK_API_URL: https://orkstage.example.com
+    ORK_TOKEN: ${{ secrets.ORK_TOKEN }}
+  run: |
+    ork -o json template push
+    ork deploy --instance shop-staging --wait   # non-zero exit if the deployment fails
+```
+
+The CLI is not released as binaries yet; build it in a previous step or use a container image you
+build from source. See [the ork CLI](/docs/developer/cli/).
+
+</Tab>
+</Tabs>
+
+## Notifications instead of polling
+
+Subscribe a [webhook](/docs/developer/webhooks/) to `deployment.succeeded`, `deployment.failed` and
+`deployment.awaiting_approval` to react without keeping a job running.

@@ -1,0 +1,85 @@
+---
+title: Development setup
+description: Set up an OrkStage development environment. Node.js 24 and pnpm 12 workspaces, local infrastructure in Docker, building, testing and type-checking, the Rust CLI built in Docker, and this documentation site.
+---
+
+## Requirements
+
+- **Node.js 24+** and **pnpm 12** (`corepack enable` picks the version pinned in `package.json`).
+- **Docker** for Postgres, Redis, Mailpit, MiniStack and OpenTofu runner containers.
+- For the CLI: nothing beyond Docker (Rust builds run in a container).
+
+## The platform workspace
+
+The repository is a **pnpm workspace** (`apps/*`, `packages/*`), without Turborepo: `pnpm -r` runs
+scripts in dependency order (see
+[ADR 0006](/docs/contributing/architecture-decisions/#0006-toolchain-choices)). Everything is ESM
+TypeScript 7 with `module: NodeNext`.
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm local:up                  # Postgres, Redis, Mailpit
+pnpm build                     # all packages and apps, in dependency order
+pnpm db:deploy && pnpm db:seed
+pnpm --filter @co/api start    # http://localhost:4000/api/docs
+pnpm --filter @co/worker start
+pnpm --filter @co/web dev      # http://localhost:3000
+```
+
+| Command | Does |
+|---|---|
+| `pnpm build` / `pnpm test` / `pnpm typecheck` | Across the workspace, in dependency order. |
+| `pnpm db:migrate` | Create a migration after editing `packages/database/prisma/schema.prisma`. |
+| `pnpm db:deploy` / `pnpm db:seed` | Apply migrations / load idempotent demo data. |
+| `pnpm local:aws` | Start MiniStack. |
+| `pnpm platform:up` / `platform:logs` / `platform:down` | The full stack in Docker Compose. |
+| `MINISTACK_E2E=1 pnpm --filter @co/cloud-aws test` | Adapter contract tests against MiniStack. |
+| `pnpm format` / `pnpm format:check` | Prettier. |
+
+<Callout title="Package names">
+  Workspace packages are still named `@co/*` (the working name before the rebrand) on purpose; they
+  are renamed to `@orkstage/*` when the repositories are split.
+</Callout>
+
+## Supply-chain settings
+
+- Build scripts are allow-listed in `pnpm-workspace.yaml` (`allowBuilds`); install-time telemetry is
+  denied.
+- Very recent releases are avoided through pnpm's minimum release age. If a dependency is too new,
+  pin the newest acceptable older version rather than adding an exemption.
+
+## The CLI and scan engine (Rust)
+
+Development machines may block unsigned native executables, so the CLI is built, tested and linted
+in containers:
+
+```bash
+cd cli
+docker build -t orkstage/cli-builder:1.99 -f docker/builder.Dockerfile docker
+RUN="docker run --rm -v $PWD:/work -v orkstage-cargo-registry:/usr/local/cargo/registry -v orkstage-cli-target:/work/target -w /work orkstage/cli-builder:1.99"
+$RUN cargo fmt --all --check
+$RUN cargo clippy --workspace --all-targets -- -D warnings
+$RUN cargo test --workspace
+$RUN sh scripts/build-wasm.sh          # regenerates dist/scan-wasm (@orkstage/scan)
+```
+
+On Windows with Git Bash use `$(pwd -W)` and `MSYS_NO_PATHCONV=1`; in PowerShell use `${PWD}`.
+Snapshot tests use `insta`; fixtures live in `crates/orkstage-scan/tests/fixtures/<kind>/<project>/`.
+
+OpenTofu also runs only in containers (the worker's runner); you do not need it installed.
+
+## This site
+
+The website and docs (`site/`, later `orkstage-site`) are their own pnpm workspace:
+
+```bash
+cd site
+pnpm install
+pnpm dev          # http://localhost:3100
+pnpm build        # static export to out/
+pnpm serve        # serve out/ locally on :4321
+```
+
+Docs are MDX files in `content/docs/`; each section folder has a `meta.json` with `"root": true`,
+which makes it a sidebar tab. The API reference is generated from `openapi/orkstage.json`.

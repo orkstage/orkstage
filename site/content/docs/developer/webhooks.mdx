@@ -1,0 +1,227 @@
+---
+title: Webhooks
+description: Receive OrkStage deployment, instance, incident and cloud target events as signed HTTP POSTs. Endpoints, events, payload, the OrkStage-Signature header, verification in Node.js, Python and Go, retries and redelivery.
+---
+
+OrkStage sends events to your HTTPS endpoints as JSON `POST` requests signed with HMAC-SHA256. Use
+them to post to chat, open tickets, trigger pipelines or feed your incident tooling.
+
+## Events
+
+| Event | When |
+|---|---|
+| `deployment.started` | The worker picked up a deployment. |
+| `deployment.succeeded` | A deployment (apply or destroy) finished. |
+| `deployment.failed` | A deployment ended in failure. |
+| `deployment.awaiting_approval` | A high-risk production deployment waits for approval. |
+| `instance.degraded` | An instance's health dropped. |
+| `instance.drift_detected` | The drift scan found changes made outside OrkStage. |
+| `incident.opened`, `incident.updated`, `incident.resolved` | Incident lifecycle. |
+| `cloud_target.unhealthy` | A cloud target failed its checks. Subscribable, but not emitted by the current release. |
+| `ping` | Sent by **Send test**; not subscribable. |
+
+## Creating an endpoint
+
+In the console: **Integrations → Webhooks → New webhook**. Through the API (session, or a key with
+`webhooks:manage`):
+
+```http
+POST /api/v1/webhooks
+Content-Type: application/json
+
+{
+  "url": "https://hooks.example.com/orkstage",
+  "description": "deployments to #platform",
+  "events": ["deployment.failed", "deployment.awaiting_approval", "incident.opened"],
+  "tenantId": "8a1c…"
+}
+```
+
+The response contains `{ webhook, secret }`. The signing secret `whsec_…` is shown **once**; it is
+stored encrypted (`ENCRYPTION_KEY`). Rotate it with `POST /webhooks/:id/rotate-secret`.
+
+URL rules, checked at creation and again before every delivery:
+
+- `https://` only, no credentials in the URL;
+- the host must not resolve to private, loopback, link-local or multicast addresses;
+- redirects are not followed; the timeout is 10 seconds.
+
+`WEBHOOK_ALLOW_PRIVATE=true` relaxes the first two rules for local development and is refused in
+production.
+
+## The request
+
+```http
+POST /orkstage HTTP/1.1
+Content-Type: application/json
+User-Agent: OrkStage-Webhooks/1.0
+OrkStage-Event: deployment.failed
+OrkStage-Delivery: 0f8b6c1e-…
+OrkStage-Signature: t=1791234567,v1=5f2b…c9
+
+{
+  "id": "0f8b6c1e-…",
+  "type": "deployment.failed",
+  "createdAt": "2026-10-05T14:21:07.000Z",
+  "tenantId": "8a1c…",
+  "data": {
+    "title": "Deployment failed",
+    "body": "The deployment did not complete (AUTHORIZATION_ERROR). Open the deployment for details and safe retry options.",
+    "link": "/deployments/9b07…",
+    "deploymentId": "9b07…",
+    "instanceId": "41de…",
+    "kind": "APPLY"
+  }
+}
+```
+
+`OrkStage-Delivery` is unique per delivery and stays the same across retries: use it to deduplicate.
+
+## Verifying the signature
+
+```text
+OrkStage-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>
+```
+
+1. Read the **raw** request body, before any JSON parsing.
+2. Split the header on `,` and `=` to get `t` and `v1`.
+3. Reject the request if `t` is more than **300 seconds** away from your clock (replay protection).
+4. Compute `HMAC-SHA256(secret, t + "." + rawBody)` as lowercase hex and compare it with `v1` in
+   constant time.
+5. Answer `2xx` quickly; do the work asynchronously.
+
+<Tabs items={['Node.js', 'Python', 'Go']}>
+<Tab value="Node.js">
+
+```ts title="verify.ts"
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verifyOrkStage(secret: string, header: string, rawBody: string, toleranceS = 300): boolean {
+  const parts = Object.fromEntries(header.split(',').map((p) => p.split('=', 2) as [string, string]));
+  const t = Number(parts.t);
+  if (!Number.isFinite(t) || Math.abs(Math.floor(Date.now() / 1000) - t) > toleranceS || !parts.v1) return false;
+  const expected = Buffer.from(createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex'));
+  const given = Buffer.from(parts.v1);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
+// Express: keep the raw body for this route.
+// app.post('/orkstage', express.raw({ type: 'application/json' }), (req, res) => {
+//   const ok = verifyOrkStage(process.env.ORKSTAGE_WEBHOOK_SECRET!, req.get('OrkStage-Signature') ?? '', req.body.toString('utf8'));
+//   if (!ok) return res.sendStatus(400);
+//   res.sendStatus(204);
+//   handle(JSON.parse(req.body.toString('utf8')));
+// });
+```
+
+This is the same algorithm as `verifyWebhook` in the platform's `packages/runtime/src/webhooks.ts`.
+
+</Tab>
+<Tab value="Python">
+
+```python title="verify.py"
+import hashlib
+import hmac
+import time
+
+
+def verify_orkstage(secret: str, header: str, raw_body: bytes, tolerance_s: int = 300) -> bool:
+    try:
+        parts = dict(item.split("=", 1) for item in header.split(","))
+        t = int(parts["t"])
+        given = parts["v1"]
+    except (KeyError, ValueError):
+        return False
+    if abs(int(time.time()) - t) > tolerance_s:
+        return False
+    signed = f"{t}.".encode() + raw_body
+    expected = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, given)
+
+
+# Flask:
+# @app.post("/orkstage")
+# def orkstage():
+#     if not verify_orkstage(SECRET, request.headers.get("OrkStage-Signature", ""), request.get_data()):
+#         abort(400)
+#     queue.enqueue(request.get_json())
+#     return "", 204
+```
+
+</Tab>
+<Tab value="Go">
+
+```go title="verify.go"
+package webhooks
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func VerifyOrkStage(secret, header string, rawBody []byte, tolerance time.Duration) bool {
+	var ts, v1 string
+	for _, part := range strings.Split(header, ",") {
+		k, v, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		switch k {
+		case "t":
+			ts = v
+		case "v1":
+			v1 = v
+		}
+	}
+	t, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil || v1 == "" {
+		return false
+	}
+	if math.Abs(float64(time.Now().Unix()-t)) > tolerance.Seconds() {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(ts + "."))
+	mac.Write(rawBody)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(v1))
+}
+
+// http.HandleFunc("/orkstage", func(w http.ResponseWriter, r *http.Request) {
+// 	body, _ := io.ReadAll(r.Body)
+// 	if !VerifyOrkStage(secret, r.Header.Get("OrkStage-Signature"), body, 300*time.Second) {
+// 		http.Error(w, "bad signature", http.StatusBadRequest)
+// 		return
+// 	}
+// 	w.WriteHeader(http.StatusNoContent)
+// })
+```
+
+</Tab>
+</Tabs>
+
+## Retries and failures
+
+| | |
+|---|---|
+| Success | Any `2xx` response within 10 seconds. The response body is ignored. |
+| Retry schedule | After a non-`2xx` or network error: 1 min, 5 min, 30 min, 2 h, 6 h, then `FAILED`. |
+| Auto-disable | After 20 consecutive failed deliveries the endpoint is disabled with a reason. Re-enable it with `PATCH /webhooks/:id { "enabled": true }`. |
+
+## Testing and redelivery
+
+| Endpoint | Does |
+|---|---|
+| `POST /webhooks/:id/test` | Sends a `ping` immediately and returns the delivery result. |
+| `GET /webhooks/:id/deliveries` | The last 50 deliveries with status, attempts, response status and error. |
+| `POST /webhooks/:id/deliveries/:deliveryId/redeliver` | Queues the same payload again. |
+| `PATCH /webhooks/:id` | Change `url`, `description`, `events` or `enabled`. |
+| `DELETE /webhooks/:id` | Remove the endpoint. |
+
+In the console, **Integrations → Webhooks** shows recent deliveries per endpoint with a redeliver
+action.

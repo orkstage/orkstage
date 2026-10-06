@@ -1,0 +1,54 @@
+---
+title: Templates and the visual builder
+description: Browse, create, clone, validate and publish OrkStage templates in the console, with the YAML editor or the drag-and-drop visual builder that edits the same document.
+---
+
+Templates are managed by platform staff (owners and admins publish; operators can read). Tenants use
+published versions when they create instances.
+
+## Versions and lifecycle
+
+```text
+DRAFT ──validate──▶ DRAFT (with report) ──publish──▶ PUBLISHED (immutable)
+```
+
+- **New template** creates the first version as a draft.
+- **New version** adds a draft version; published versions are never edited.
+- **Publish** runs the full validation and refuses unsafe templates.
+- **Clone** copies a template under a new name, for example to start from a built-in one.
+- Instances keep their version until someone runs **Upgrade template** on them.
+
+## Validation
+
+Validation runs in stages and reports every issue with its stage, severity, code and path:
+
+| Stage | Checks |
+|---|---|
+| `schema` | YAML syntax and the `platform/v1` schema (types, ranges, required fields). |
+| `semantic` | Unique ids, valid references (`dependsOn`, routes, DNS target, variables), slots exist, no cycles. |
+| `plan` | The template fits the plans it lists (entitlements). |
+| `capability` | Every resource can be implemented by the providers its slot allows, with suggestions. |
+| `policy` | Governance policies that can be checked without an instance. |
+| `quota` | Limits such as replicas and storage against entitlements. |
+
+The same validation is available statelessly to CI: `POST /templates/validate` (see
+[CI/CD intake](/docs/developer/ci-cd/)).
+
+## The visual builder
+
+**Templates → New → Builder**, or **Builder** on a template, opens a drag-and-drop canvas:
+
+- drag resource types from the palette onto the canvas;
+- placement slots are lanes: drop a resource into a lane to place it, add or remove lanes;
+- connect nodes to add dependencies and connectivity requirements (with protocol, port and mode);
+- edit each resource's fields in the side panel, with the same constraints as the schema.
+
+The builder edits **the same YAML document** you see in the source view, with live validation, so
+you can switch between the two at any time.
+
+## Source of truth
+
+The full format is in the [template reference](/docs/developer/template-reference/). If you keep
+templates in a repository, the `ork` CLI pushes them as new versions (<Badge>Preview</Badge>), and
+[IaC import](/docs/user-guide/import/) can draft one from existing Terraform, CloudFormation,
+Kubernetes or Compose files.

@@ -1,0 +1,138 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-openapi/css/preset.css';
+
+/*
+ * OrkStage tokens. Dark "Deep Obsidian" is the default; the docs also offer a light theme whose
+ * accent is the darker mint #00805A (AA contrast on white). Acid Mint #00F29B is reserved for
+ * primary actions, focus and a few highlights; War Forge Orange #FF6B00 only signals alerts.
+ */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Light (docs) */
+  --color-fd-background: #ffffff;
+  --color-fd-foreground: #0d0e12;
+  --color-fd-muted: #eef1f4;
+  --color-fd-muted-foreground: #444b59;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0d0e12;
+  --color-fd-card: #f7f8fa;
+  --color-fd-card-foreground: #0d0e12;
+  --color-fd-border: #dde2e8;
+  --color-fd-primary: #00805a;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #eef1f4;
+  --color-fd-secondary-foreground: #0d0e12;
+  --color-fd-accent: #e6f4ee;
+  --color-fd-accent-foreground: #00573d;
+  --color-fd-ring: #00805a;
+  --color-fd-overlay: rgb(5 6 8 / 0.35);
+
+  /* Brand palette as utilities (landing) */
+  --color-obsidian: #0d0e12;
+  --color-slate-1: #14161d;
+  --color-slate-2: #1a1d26;
+  --color-hairline: #262a35;
+  --color-hairline-strong: #343a48;
+  --color-ink: #e8eaf0;
+  --color-ink-muted: #a3a9b8;
+  --color-ink-subtle: #858c9c;
+  --color-mint: #00f29b;
+  --color-mint-deep: #00805a;
+  --color-forge: #ff6b00;
+  --color-danger: #ff4d5e;
+  --color-info: #5aa9ff;
+}
+
+.dark {
+  --color-fd-background: #0d0e12;
+  --color-fd-foreground: #e8eaf0;
+  --color-fd-muted: #1a1d26;
+  --color-fd-muted-foreground: #a3a9b8;
+  --color-fd-popover: #14161d;
+  --color-fd-popover-foreground: #e8eaf0;
+  --color-fd-card: #14161d;
+  --color-fd-card-foreground: #e8eaf0;
+  --color-fd-border: #262a35;
+  --color-fd-primary: #00f29b;
+  --color-fd-primary-foreground: #04140e;
+  --color-fd-secondary: #1a1d26;
+  --color-fd-secondary-foreground: #e8eaf0;
+  --color-fd-accent: #1a1d26;
+  --color-fd-accent-foreground: #e8eaf0;
+  --color-fd-ring: #00f29b;
+  --color-fd-overlay: rgb(5 6 8 / 0.65);
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #1a1d26;
+  --color-fd-secondary: #1a1d26;
+  --color-fd-muted-foreground: #a3a9b8;
+}
+
+html {
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+/* Docs headings in the display face. */
+.prose :where(h1, h2, h3):not(:where(.not-prose *)),
+#nd-page h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Brand artwork: themed variants, sized by width/height attributes, never stretched. */
+.brand-on-light {
+  display: none;
+}
+.light .brand-on-dark {
+  display: none;
+}
+.light .brand-on-light {
+  display: inline-block;
+}
+.brand-on-dark,
+.brand-on-light {
+  max-width: none;
+  object-fit: contain;
+}
+
+/* Hairline engineering grid: the only texture used on the landing page. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(232 234 240 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(232 234 240 / 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

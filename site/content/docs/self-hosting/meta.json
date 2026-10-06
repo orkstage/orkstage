@@ -1,0 +1,18 @@
+{
+  "title": "DevOps & self-hosting",
+  "description": "Run, configure, secure and operate the platform",
+  "root": true,
+  "pages": [
+    "architecture",
+    "docker-compose",
+    "configuration",
+    "connect-aws",
+    "secrets",
+    "opentofu",
+    "security",
+    "upgrades",
+    "backups",
+    "observability",
+    "troubleshooting"
+  ]
+}

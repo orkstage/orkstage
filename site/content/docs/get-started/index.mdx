@@ -1,0 +1,55 @@
+---
+title: Introduction
+description: OrkStage is an open-source multi-cloud control plane. Define an environment once, place each resource on the cloud that fits it, review the plan, deploy with OpenTofu and operate it.
+---
+
+OrkStage provisions and operates **isolated environments**, called *instances* (or *stages*), across
+one or several clouds. An instance is a logical environment: services, a Postgres database, a cache,
+a queue, object storage, ingress and DNS. **Each resource is placed independently**, so one instance
+can run its API on AWS, its database on Azure and its storage on OCI.
+
+The flow is always the same:
+
+1. A provider-neutral **template** describes what the environment needs. Forged once, deployed many times.
+2. An **instance** binds the template's placement slots to cloud targets and regions.
+3. The **plan** resolves every resource, evaluates policies, estimates the monthly cost and chooses a
+   connectivity strategy for links that cross clouds. Nothing touches a cloud yet.
+4. A **deployment** applies the plan asynchronously as a dependency graph, with OpenTofu.
+5. **Health checks** roll up to the instance, open **incidents**, feed a private **status page** and
+   send **notifications**. Every change lands in an append-only **audit log**.
+
+<Callout title="What is real today" type="warn">
+  AWS resources are provisioned for real with OpenTofu, verified locally against
+  [MiniStack](https://ministack.org) and usable against a real account through a cross-account role.
+  **Azure and OCI are simulated** by a deterministic provider and labelled as simulated everywhere;
+  their adapters are on the roadmap. The `ork` CLI is a <Badge>Preview</Badge>: it works against the
+  API, but signed binaries are not released yet.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Card title="Quickstart" href="/docs/get-started/quickstart/" description="Run the whole platform with Docker Compose, sign in and deploy your first instance." />
+  <Card title="Local AWS with MiniStack" href="/docs/get-started/local-aws/" description="Provision real AWS resources against a local emulator, without an AWS account." />
+  <Card title="Core concepts" href="/docs/get-started/core-concepts/" description="Instances, templates, placement slots, plans, deployments, health and audit." />
+  <Card title="User guide" href="/docs/user-guide/console/" description="For console users and engineering managers: create, review, deploy and watch instances." />
+  <Card title="Developer guide" href="/docs/developer/template-reference/" description="Template reference, REST API, API keys, webhooks, CI/CD intake, the ork CLI and IaC import." />
+  <Card title="DevOps & self-hosting" href="/docs/self-hosting/architecture/" description="Architecture, configuration, connecting AWS, secrets, OpenTofu state, security and operations." />
+  <Card title="Enterprise" href="/docs/enterprise/" description="Community and Enterprise editions, licensing and how to reach us." />
+  <Card title="Contributing" href="/docs/contributing/development-setup/" description="Development setup, repository map, architecture decisions and releases." />
+</Cards>
+
+## Who it is for
+
+- **Platform and DevOps teams** who run the same environment shape for many customers or teams, and
+  want one reviewed, policy-checked path from template to cloud.
+- **SREs** who need health, incidents, status and an audit trail tied to the infrastructure that was
+  actually deployed.
+- **Engineering managers** who approve production changes and want to see the plan, the risk and an
+  approximate cost before anything is created.
+
+## Open source
+
+The core is licensed under the GNU **AGPL-3.0** and is complete on its own: you can self-host it and
+run production workloads on AWS. Directories named `ee/` hold Enterprise features under a commercial
+license, activated by an offline license key. See [Community vs Enterprise](/docs/enterprise/editions/).

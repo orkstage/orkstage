@@ -1,0 +1,15 @@
+{
+  "title": "Developer guide",
+  "description": "Templates, REST API, keys, webhooks, CLI, import",
+  "root": true,
+  "pages": [
+    "template-reference",
+    "api-overview",
+    "api-keys",
+    "webhooks",
+    "ci-cd",
+    "cli",
+    "import",
+    "api-reference"
+  ]
+}

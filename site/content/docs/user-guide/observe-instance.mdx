@@ -1,0 +1,54 @@
+---
+title: Topology, logs and metrics
+description: Inspect a running OrkStage instance. The topology diagram with placement and health, resource outputs, Copy as Mermaid, recent logs and metrics per resource.
+---
+
+## Topology
+
+The **Overview** tab of an instance draws its topology: every resource as a node, grouped by
+provider, target and region, with dependency edges and connectivity links labelled with their
+strategy (for example `public-tls-allowlist` between AWS and Azure). Node colours follow health.
+Simulated resources carry a *simulated* label.
+
+**Copy as Mermaid** copies the same diagram as a Mermaid flowchart, ready for a design document or a
+pull request description.
+
+Below the diagram, the resource table shows for each resource: type, capability, physical name,
+target and region, knowledge state (`DESIRED`, `KNOWN`, `ACTUAL`, `UNKNOWN`), drift and health.
+
+## Drift
+
+On real providers the worker runs a scheduled **drift scan** (every `DRIFT_CHECK_INTERVAL_MINUTES`,
+default 360; `0` turns it off). Each applied resource is planned again with OpenTofu from the snapshot
+it was deployed with; a non-empty plan means something changed outside OrkStage. The resource is
+marked `DRIFT_DETECTED` with the planned actions, an audit event is written, and owners are notified
+(`instance.drift_detected`). Resources with a pending change are skipped: that is a deployment, not
+drift. **Deploy** restores the template's configuration. Simulated targets report drift on every
+health check.
+
+## Outputs
+
+Each provisioned resource exposes the outputs its module produced, for example the database `host`
+and `port`, the ingress `url`, the queue `queue_url` or the bucket `endpoint`. Secrets are never
+outputs: the database password lives in AWS Secrets Manager and services receive its ARN.
+
+## Logs
+
+The **Logs** tab shows recent log lines for a resource (`GET /instances/:id/logs?resourceId=&limit=`).
+On AWS they come from the service's CloudWatch log group; on simulated targets they are generated.
+
+## Metrics
+
+The **Metrics** tab charts CPU, memory, requests per minute, p95 latency and errors per minute for the
+last hour (`GET /instances/:id/metrics?resourceId=&metric=cpu&minutes=60`).
+
+<Callout type="warn" title="Today">
+  Metrics for real AWS resources (CloudWatch `GetMetricData`) and traces are on the roadmap; the
+  charts are populated for simulated targets.
+</Callout>
+
+## Simulation controls
+
+On simulated targets, platform staff and tenant users who can deploy see **Simulation controls**:
+**Mark healthy**, **Mark degraded**, **Mark unhealthy** and **Clear health override**. They drive the
+health → incident → notification loop without breaking anything real.

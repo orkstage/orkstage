@@ -1,0 +1,52 @@
+---
+title: Security hardening
+description: The security controls built into OrkStage (sessions, CSRF, OIDC, tenant isolation, secrets, logging, rate limits, audit, headers, supply chain), a hardening checklist for self-hosters, known gaps and how to report vulnerabilities.
+---
+
+## Built-in controls
+
+| Area | Control |
+|---|---|
+| Sessions | 32-byte random opaque token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production); only its SHA-256 is stored; 12-hour expiry; revoked on logout. |
+| CSRF | Every state-changing request with a session must send `x-co-csrf: 1`. The API grants no cross-origin CORS, so browsers cannot send it cross-site. Bearer API key requests are exempt. |
+| OIDC | Authorization code with PKCE (S256); `state` and `nonce` verified; the flow lives in a signed short-lived cookie; `returnTo` restricted to relative paths; provider tokens are discarded. |
+| Account linking | Only by provider-verified email (`email_verified`, or Entra `xms_edov`). `preferred_username` is never trusted, which prevents "nOAuth"-style takeover. Unknown users get no account unless a tenant allow-lists their domain. |
+| Dev login | Off unless `AUTH_DEV_LOGIN_ENABLED=true`; startup fails if it is on with `NODE_ENV=production`. |
+| API keys | Only SHA-256 of the token stored; scopes narrow a role and never exceed it; keys cannot manage keys; expiry, revocation, last use; every action audited with the key's name and prefix. |
+| Authorization | CASL abilities per request; tenant-owned queries scoped to memberships and records re-checked after loading. Foreign records return 404, not 403. |
+| Secrets | Target configuration is rejected if it contains secret-like keys; credentials are `env://` or `aws-sm://` references; services receive secret references, not values. |
+| Cloud credentials | AssumeRole with an external id, short-lived, in memory, passed only to the runner container that needs them. |
+| Webhooks | HMAC-SHA256 signatures with a timestamp; https only; SSRF protection (no private, loopback, link-local or multicast targets, checked at registration and before each delivery); no redirects; 10 s timeout; signing secrets encrypted at rest. |
+| Logging | Pino with redaction of tokens, secrets, cookies and authorization headers. Errors return a code and a correlation id, never stack traces. |
+| Rate limits | 600 requests per minute per client globally; stricter limits on login, deploy, destroy, target validation, template publish, API key creation, imports and webhook tests. |
+| Audit | Append-only: a Postgres trigger rejects `UPDATE` and `DELETE` on the audit table. |
+| Headers | Helmet with a restrictive Content Security Policy. |
+| Supply chain | pnpm build scripts are allow-listed; install-time telemetry denied; very recent releases avoided (minimum release age); container images pinned by digest where it matters (MiniStack, OpenTofu). |
+
+## Hardening checklist
+
+- [ ] `NODE_ENV=production`, dev login off, an OIDC provider configured.
+- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated randomly and injected from a secret store.
+- [ ] TLS in front of the console and the API; `WEB_PUBLIC_URL`/`API_PUBLIC_URL` use `https://`.
+- [ ] Postgres and Redis on private networks, with authentication and encryption in transit.
+- [ ] The worker on a dedicated host (it has the Docker socket) and with an IAM identity limited to
+      `sts:AssumeRole` on your `co-deploy` roles and `secretsmanager:GetSecretValue` on referenced
+      secrets.
+- [ ] One AWS account per environment; deployment roles created from the provided CloudFormation
+      template with a unique external id each.
+- [ ] State buckets versioned, encrypted and private.
+- [ ] `WEBHOOK_ALLOW_PRIVATE=false` (enforced in production).
+- [ ] API keys per integration, with the smallest preset, and an expiry.
+- [ ] Backups of Postgres tested by restoring them (see [Backups](/docs/self-hosting/backups/)).
+
+## Known gaps
+
+- MFA policy, session listing and revocation UI, invitation acceptance flow.
+- Dependency and container image scanning in CI.
+- Postgres row-level security as an additional isolation layer.
+- Running the OpenTofu runner without the Docker socket (ECS RunTask / Kubernetes Job).
+
+## Reporting a vulnerability
+
+Email **security@orkstage.io** with the details and, if you can, a proof of concept. Please do not
+open public issues for security problems. We acknowledge reports and coordinate disclosure with you.

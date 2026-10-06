@@ -1,0 +1,34 @@
+---
+title: Community vs Enterprise
+description: Feature-by-feature comparison of the OrkStage Community edition (AGPL-3.0) and the Enterprise edition (commercial, ee/), with the status of every Enterprise item.
+---
+
+**Community** is complete: templates, multi-cloud placement, plans, policies and cost, deployments,
+health, incidents, status pages, notifications, audit log, API keys, webhooks, CI intake, IaC import
+and the CLI. **Enterprise** adds organizational scale and compliance.
+
+Enterprise items marked <Badge tone="planned">planned</Badge> are on the plan but not built yet.
+
+| Area | Community (AGPL-3.0) | Enterprise (`ee/`) |
+|---|---|---|
+| Provisioning | Templates and the visual builder; AWS via OpenTofu; simulated Azure and OCI; DAG with retries; provider plans before apply; drift scans | Policy packs (CIS / SOC 2-style rule sets) <Badge tone="planned">planned</Badge>; custom policy authoring <Badge tone="planned">planned</Badge>; cost budgets per team <Badge tone="planned">planned</Badge> |
+| Multi-cloud | Per-resource placement; cross-cloud connectivity strategy | Private connectivity provisioning (VPN, interconnect) <Badge tone="planned">planned</Badge> |
+| Governance | 7 built-in roles; approvals for high-risk production changes; append-only audit log | **Audit log export** (NDJSON, CSV); custom roles and fine-grained permissions <Badge tone="planned">planned</Badge>; multi-step approvals and change windows <Badge tone="planned">planned</Badge>; audit retention policies and SIEM streaming <Badge tone="planned">planned</Badge> |
+| Identity | Dev login (local), OIDC: Microsoft Entra ID, Google and GitLab by configuration | SAML 2.0 SSO <Badge tone="planned">planned</Badge>; SCIM provisioning <Badge tone="planned">planned</Badge>; enforced SSO / MFA and session policies <Badge tone="planned">planned</Badge> |
+| Organizations | One organization, many tenants | Multiple organizations, delegated administration <Badge tone="planned">planned</Badge>; white-label status pages and custom status domains <Badge tone="planned">planned</Badge> |
+| Integrations | API keys, webhooks, CI intake, IaC import, `ork` CLI (Preview) | ServiceNow / Jira change management <Badge tone="planned">planned</Badge>; PagerDuty / Opsgenie <Badge tone="planned">planned</Badge> |
+| Observability | Health, incidents, private status pages, logs and metrics via adapters | Long-term metrics retention, SLO management, incident analytics <Badge tone="planned">planned</Badge> |
+| Support | Community (GitHub Discussions) | SLA-backed support, security advisories ahead of disclosure <Badge tone="planned">planned</Badge> |
+
+Not decided yet: whether future Azure, OCI and GCP adapters are Community or Enterprise. The current
+recommendation is Community, to keep multi-cloud in the open core.
+
+## Editions
+
+| Edition | For | Model |
+|---|---|---|
+| Community | Self-hosted, any size | Free, AGPL-3.0 |
+| Enterprise (self-hosted) | Regulated or larger organizations | Annual subscription, includes support |
+| OrkStage Cloud | Teams that want it hosted | Planned |
+
+Pricing is not published yet. [Contact us](/docs/enterprise/contact/).

@@ -1,0 +1,57 @@
+---
+title: Status page and incidents
+description: How OrkStage derives instance health, maps it to a private status page per tenant, opens incidents automatically with deduplication and cooldown, and how to post incident updates.
+---
+
+## From resource health to instance health
+
+The worker's health monitor checks every active resource through its provider adapter on a fixed
+interval (`HEALTH_CHECK_INTERVAL_SECONDS`, default 30). Instance health is a policy over its
+components:
+
+| Components | Instance |
+|---|---|
+| A **critical** component is `UNHEALTHY` | `UNHEALTHY` |
+| Any component `UNHEALTHY` or `DEGRADED` | `DEGRADED` |
+| Some components `UNKNOWN` | `DEGRADED` (all unknown: `UNKNOWN`) |
+| All components in `MAINTENANCE` | `MAINTENANCE` |
+| Otherwise | `HEALTHY` |
+
+Services and databases are critical by default; caches, queues and storage are not. Templates can
+change this per resource with `critical`.
+
+## The status page
+
+Each tenant has a **private status page** (`/status/<tenantId>` in the console). Resources map to
+customer-facing components (API, Workers, Database, …); the headline is the worst component state.
+
+| Health | Status component |
+|---|---|
+| `HEALTHY` | `OPERATIONAL` |
+| `DEGRADED` | `DEGRADED` |
+| `UNHEALTHY` (critical) | `MAJOR_OUTAGE` |
+| `UNHEALTHY` (non-critical) | `PARTIAL_OUTAGE` |
+| `MAINTENANCE` | `MAINTENANCE` |
+| anything else | `UNKNOWN` |
+
+Members of the tenant and platform staff can read it. Public pages and status subscriptions are on
+the roadmap.
+
+## Automated incidents
+
+Alert rules are stored as data. The seeded rules open an incident when a critical resource is
+unhealthy and when a non-critical resource is unhealthy. Incidents are:
+
+- **deduplicated** per resource: a flapping resource updates one incident instead of opening many;
+- subject to a **cooldown** before a new incident opens for the same resource;
+- **resolved automatically** when health returns, with a final update.
+
+## Manual incidents and updates
+
+Platform staff (owners, admins and operators) can open an incident manually and post updates with a
+status, a message and an optional impact; tenant members read them. Updates appear on the incident
+page in order. Through the API this needs the `incidents:write` scope.
+
+## Maintenance windows
+
+The data model has maintenance windows, but there is no screen to schedule them yet.

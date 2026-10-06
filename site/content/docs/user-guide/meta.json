@@ -1,0 +1,17 @@
+{
+  "title": "User guide",
+  "description": "Use the console: instances, plans, deployments, status",
+  "root": true,
+  "pages": [
+    "console",
+    "create-instance",
+    "plan-and-cost",
+    "deploy",
+    "observe-instance",
+    "status-and-incidents",
+    "notifications",
+    "templates",
+    "import",
+    "roles"
+  ]
+}

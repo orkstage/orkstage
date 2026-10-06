@@ -1,0 +1,95 @@
+---
+title: Creating an instance
+description: Use the six-step wizard to create an OrkStage instance. Choose the tenant and template, bind each placement slot to a cloud target and region, set variables and the environment.
+---
+
+An instance is created as a `DRAFT`. Nothing is provisioned until you [deploy](/docs/user-guide/deploy/).
+Open **Instances → New instance**. You need a role that can create instances: platform owner or
+admin, or customer owner or admin in the tenant.
+
+<Steps>
+<Step>
+
+### Tenant
+
+Choose the customer the instance belongs to. The tenant's plan decides which templates and placements
+are allowed, and the instance's cost is attributed to it.
+
+</Step>
+<Step>
+
+### Template
+
+Pick a template and a **published** version. Published versions are immutable; drafts cannot be used.
+Templates marked non-production show a warning, and the `non-production-template` policy fails if you
+use one for a `production` instance.
+
+| Built-in template | Profile | Plans |
+|---|---|---|
+| `free-validation` | shared sandbox, non-production | FREE, SANDBOX |
+| `sandbox-min-cost` | dedicated sandbox, non-production | SANDBOX, STARTER |
+| `starter-standard` | starter | STARTER, GROWTH |
+| `growth-standard` | growth | GROWTH, SCALE |
+| `scale-custom` | scale | SCALE |
+| `multicloud-reference` | growth | GROWTH, SCALE |
+
+</Step>
+<Step>
+
+### Placement
+
+Bind every **placement slot** of the template to a **cloud target** and a **region**. Slots can use
+different clouds: for `multicloud-reference`, `primary` on AWS, `data` on Azure and `storage` on OCI.
+The list only offers targets whose provider the slot accepts and regions the target allows.
+
+<Callout>
+  Simulated targets (the mock provider) are labelled as simulated. Use them to rehearse a topology
+  before you connect real accounts.
+</Callout>
+
+</Step>
+<Step>
+
+### Variables
+
+Templates expose a few typed variables (for example `apiReplicas` or `databaseSize`). Defaults are
+pre-filled; ranges and allowed values are validated in the browser and again by the API.
+
+</Step>
+<Step>
+
+### Name and environment
+
+Give the instance a name and a slug (lowercase, used in physical resource names such as
+`co-acme-staging-api`), and choose the environment: `production`, `staging`, `development` or
+`sandbox`. Production instances get stricter policies (backups) and an approval step for high-risk
+changes.
+
+</Step>
+<Step>
+
+### Review and create
+
+Check the summary and create the draft. You land on the instance page, where the
+[Plan & cost](/docs/user-guide/plan-and-cost/) tab previews what a deployment would do.
+
+</Step>
+</Steps>
+
+## Doing the same through the API
+
+```bash
+curl -X POST http://localhost:4000/api/v1/instances \
+  -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "tenantId": "<tenant uuid>",
+    "name": "Shop staging",
+    "slug": "shop-staging",
+    "environment": "staging",
+    "templateVersionId": "<published version uuid>",
+    "variables": { "apiReplicas": 2 },
+    "bindings": { "primary": { "targetId": "<target uuid>", "region": "us-east-1" } }
+  }'
+```
+
+The key needs the `instances:write` scope. See [API keys](/docs/developer/api-keys/).

@@ -1,0 +1,94 @@
+---
+title: Reviewing plan & cost
+description: Read an OrkStage plan before deploying. Resolved resources per provider, policy results, cross-cloud connectivity, the approximate monthly cost, the change diff and its risk.
+---
+
+The **Plan & cost** tab of an instance runs a preview (`POST /instances/:id/preview`). It compiles
+the template with the instance's variables and placements and compares the result with what
+OrkStage already knows about the instance. Nothing touches a cloud and nothing is saved.
+
+## Placement
+
+Every resource with the target, region and concrete capability it resolved to, for example
+`database → Azure Database for PostgreSQL Flexible Server (eastus)`. When a capability is not
+available in a region, the preview fails and suggests alternatives.
+
+## Policies
+
+Every policy reports a result, so you see what was checked, not only what failed:
+
+| Policy | Checks |
+|---|---|
+| `no-public-database` | No database has `publicAccess: true`. |
+| `no-public-storage` | Object storage blocks public access. |
+| `production-backups` | Production databases have backups enabled. |
+| `non-production-template` | Sandbox templates are not used for production (warning otherwise). |
+| `encryption-required` | Every chosen capability supports encryption at rest. |
+| `allowed-regions` | Regions are allowed by the target and by the platform. |
+| `max-replicas` | Replica counts stay under the platform limit (when configured). |
+| `max-monthly-cost` | The estimate stays under the monthly budget (when configured). |
+| `multi-cloud-entitlement` | The tenant's plan allows multi-cloud and multi-region placements used. |
+| `cross-cloud-connectivity` | Cross-cloud links are satisfiable; warns about latency and egress. |
+
+A `fail` blocks the deployment. Custom templates go through the same policies.
+
+## Connectivity
+
+For each connectivity requirement in the template, the compiler chooses a strategy:
+
+| Strategy | When |
+|---|---|
+| `private-network` | Both resources are in the same target and region. |
+| `private-peering` | Same provider, different account or region (peering cost and setup apply). |
+| `public-tls` | The requirement's mode is `secure`: TLS over the provider or public network. |
+| `public-tls-allowlist` | Across clouds with `private-preferred`: TLS on a public endpoint with source allowlisting. |
+| `unsatisfiable` | Across clouds with `private-required`. Change the mode or the placement. |
+
+OrkStage never creates VPNs or interconnects silently. Cross-cloud links add latency and may incur
+egress charges; the preview says so.
+
+<Callout type="warn" title="Today">
+  The strategy is chosen and shown, but allowlist rules across clouds (for example an Azure Postgres
+  firewall rule for AWS NAT addresses) are not provisioned yet.
+</Callout>
+
+## Cost estimate
+
+The estimate uses static list prices from each capability catalog (on-demand, monthly, USD) and is
+always labelled **approximate**; it is not an invoice. Confidence is `approximate` when every
+resource has a price, `partial` when some do not, `unavailable` when none do. Lines are grouped by
+category: compute, database, cache, storage, network, messaging.
+
+## The plan and its risk
+
+The diff against known resources lists each resource as `CREATE`, `UPDATE`, `DELETE` or `NOOP`,
+grouped by provider, target and region. A change of target, region or capability is a replacement.
+The same plan in plain text (used in approval requests and logs):
+
+```text
+Deployment Plan
+
+Instance: Acme Production
+
+AWS / aws-prod / us-east-1
+  CREATE Amazon VPC network
+  CREATE Amazon ECS on Fargate api
+  CREATE Application Load Balancer ingress
+
+AZURE / azure-data / eastus
+  CREATE Azure Database for PostgreSQL Flexible Server database
+
+Cross-cloud
+  CONFIGURE api → database (public-tls-allowlist)
+
+Risk: low
+```
+
+| Risk | When |
+|---|---|
+| `high` | Anything is deleted or replaced, or an existing database changes. |
+| `medium` | Existing resources are updated. |
+| `low` | Only creations or no changes. |
+
+The preview is the platform's view. During the deployment the worker also runs the real provider
+plan for resources that change; see [Deploying](/docs/user-guide/deploy/#approvals).

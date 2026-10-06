@@ -1,0 +1,6 @@
+{
+  "title": "Enterprise",
+  "description": "Editions, license and contact",
+  "root": true,
+  "pages": ["index", "editions", "license", "contact"]
+}

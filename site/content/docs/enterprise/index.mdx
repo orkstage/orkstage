@@ -1,0 +1,43 @@
+---
+title: Enterprise overview
+description: OrkStage Enterprise adds organizational scale and compliance on top of the complete open-source core. Same codebase and images, activated by an offline license key.
+---
+
+OrkStage is **open core**. The Community edition, under the GNU AGPL-3.0, is the complete control
+plane: you can self-host it and run production workloads on AWS without paying anyone. Enterprise
+adds what larger and regulated organizations need around it: identity integration, finer governance,
+compliance exports, several organizations and support with an SLA.
+
+## How it works
+
+- **One codebase, one build.** Enterprise code lives in directories named `ee/` and ships in the same
+  images. There is no separate fork.
+- **A license key turns it on.** Set `ORKSTAGE_LICENSE_KEY` to the key you receive. The key is a
+  signed token (Ed25519) verified **offline**: no phone-home, no usage reporting required.
+- **No lock-in through data.** A missing or invalid key means Community. An expired key gives a
+  14-day grace period with a banner, then Enterprise features switch off. Data is never deleted or
+  locked.
+- **Clear boundary.** Core code never imports from `ee/`; Enterprise features plug into extension
+  points. Gated endpoints answer `402 ENTERPRISE_REQUIRED` without a license that covers them.
+- `GET /api/v1/license` reports the active edition and features; the console shows an edition badge.
+
+## Available today
+
+| Feature | Status |
+|---|---|
+| Audit log export: `GET /api/v1/audit/export?format=ndjson\|csv&from=&to=&tenantId=` (scope `audit:read`) | Available |
+| SAML 2.0 SSO, SCIM provisioning | Planned |
+| Custom roles and fine-grained permissions | Planned |
+| Multi-step approval workflows, change windows | Planned |
+| Policy packs and custom policy authoring | Planned |
+| Multiple organizations, white-label status pages | Planned |
+| Audit retention policies, SIEM streaming | Planned |
+| SLA-backed priority support | Planned |
+
+The full comparison is on [Community vs Enterprise](/docs/enterprise/editions/).
+
+<Cards>
+  <Card title="Community vs Enterprise" href="/docs/enterprise/editions/" description="Feature split by area." />
+  <Card title="License" href="/docs/enterprise/license/" description="AGPL-3.0 core and the commercial license for ee/, in plain words." />
+  <Card title="Contact" href="/docs/enterprise/contact/" description="Talk to us about Enterprise." />
+</Cards>

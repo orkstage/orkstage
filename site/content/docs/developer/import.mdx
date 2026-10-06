@@ -1,0 +1,151 @@
+---
+title: Importing Terraform, CloudFormation, Kubernetes and Compose
+description: Turn existing infrastructure code into a draft OrkStage template with the IaC import API. Supported sources, the ScanReport format, mapping rules, confidence, unmapped items and the API flow.
+---
+
+The import turns infrastructure code into a reviewed **draft template**. One engine,
+`orkstage-scan` (Rust), does detection and mapping everywhere: in the `ork` CLI, and in the platform
+compiled to WebAssembly (`@orkstage/scan`).
+
+| Path | Status |
+|---|---|
+| `POST /imports { report }`: send a ScanReport produced by `ork import` or `ork scan` | Available |
+| `POST /imports { files }`: upload files, the server scans them | Available: the API ships with the scan engine (`@orkstage/scan`, WebAssembly). A build without it answers `501 SCANNER_UNAVAILABLE` |
+| `ork import` / `ork scan` on your machine | <Badge>Preview</Badge> |
+
+## Supported sources
+
+| Source kind | Examples of what is read |
+|---|---|
+| `terraform` | `.tf` and `.tf.json`; variables, locals, local modules, resource references |
+| `cloudformation`, `sam`, `cdk` | Templates in YAML or JSON with short-form tags; synthesized CDK output |
+| `kubernetes`, `helm` | Deployments, Services, Ingresses, StatefulSets; `Chart.yaml` |
+| `compose` | `docker-compose.yml` / `compose.yaml` services, ports, images, dependencies |
+| `dockerfile` | Base images and exposed ports |
+| `package` | `package.json`, `go.mod`, `requirements.txt`, … as hints (for example a Postgres driver) |
+| `pulumi`, `serverless`, `bicep`, `arm` | Detected and reported |
+
+Detected resources map to the nine OrkStage types: `network`, `compute.container-service`,
+`container-registry`, `database.postgresql`, `cache.redis`, `queue`, `object-storage`, `ingress`,
+`dns`. Anything else is listed as **unmapped** with a reason, never dropped silently.
+
+## Mapping rules in short
+
+- The same component found in several sources becomes **one** resource that keeps every source:
+  Compose `postgres` + `pg` in `package.json` + `aws_db_instance` is one `database.postgresql` on AWS.
+- Evidence strength: IaC > Kubernetes > Compose, Dockerfiles and package hints.
+- References become **connections**, for example a task definition that reads
+  `aws_db_instance.main.address`.
+- A network is inferred when services or data stores need one; an ingress and DNS when a public HTTP
+  service runs on a cloud provider.
+- Placement slots are chosen per provider (`primary` for the compute provider; `data`, `storage`,
+  `messaging`, … for others) and the smallest plan whose default entitlements fit.
+- Each resource has a **confidence**: `high`, `medium` or `low`.
+
+## API flow
+
+<Steps>
+<Step>
+
+### Create the import
+
+```http
+POST /api/v1/imports
+Authorization: Bearer ork_live_…          # scope imports:write
+Content-Type: application/json
+
+{ "tenantId": "8a1c…", "report": { "version": 1, "generator": "orkstage-scan/0.1.0", … } }
+```
+
+or, with server-side scanning:
+
+```json
+{ "tenantId": "8a1c…", "files": [ { "path": "infra/main.tf", "content": "resource \"aws_db_instance\" \"main\" { … }" } ] }
+```
+
+Send **either** `files` (text only, at most 2000 files and 5 MB in total) **or** `report`. The
+response is an `ImportDto`:
+
+```ts
+interface ImportDto {
+  id: string;
+  tenantId: string | null;
+  createdAt: string;
+  sourceKinds: string[];        // e.g. ["terraform", "compose"]
+  report: ScanReport;
+  validation: { valid: boolean; issues: { stage: string; severity: string; code: string; message: string; path?: string }[] };
+  templateId: string | null;    // set once a template was created from it
+}
+```
+
+</Step>
+<Step>
+
+### Review
+
+`GET /api/v1/imports/:id`, or open `https://<console>/templates/import?importId=<id>`. Check
+`report.resources` (with sources and confidence), `report.unmapped`, `report.connections`,
+`report.warnings` and `validation.issues`.
+
+</Step>
+<Step>
+
+### Create the draft template
+
+```http
+POST /api/v1/imports/:id/template          # scope templates:write
+Content-Type: application/json
+
+{ "name": "shop", "displayName": "Shop" }
+```
+
+Returns `{ templateId, name, version: "0.1.0", status: "DRAFT" }`. The YAML is renamed in place, so
+formatting and comments from the report's template survive. Errors: `409 ALREADY_CONVERTED` (one
+template per import), `409 TEMPLATE_EXISTS`, `422 TEMPLATE_INVALID` with the issues.
+
+</Step>
+</Steps>
+
+Then edit the draft in the builder, validate and publish. The import and the template creation are
+audited.
+
+## ScanReport (version 1)
+
+```ts
+interface ScanReport {
+  version: 1;
+  generator: string;                 // "orkstage-scan/0.1.0"
+  detectors: { kind: SourceKind; files: number }[];
+  resources: DetectedResource[];     // mapped to OrkStage logical types
+  unmapped: { source: SourceRef; type: string; reason: string }[];
+  connections: { from: string; to: string; protocol: string; port?: number; evidence: string }[];
+  template: string;                  // generated platform/v1 EnvironmentTemplate YAML
+  warnings: string[];
+}
+type SourceKind = 'terraform' | 'cloudformation' | 'sam' | 'cdk' | 'serverless' | 'pulumi'
+  | 'kubernetes' | 'helm' | 'compose' | 'dockerfile' | 'package' | 'bicep' | 'arm';
+interface SourceRef { kind: SourceKind; file: string; line?: number; address: string } // e.g. aws_db_instance.main
+interface DetectedResource {
+  id: string;                        // template resource id, e.g. "database"
+  type: 'network' | 'compute.container-service' | 'container-registry' | 'database.postgresql'
+      | 'cache.redis' | 'queue' | 'object-storage' | 'ingress' | 'dns';
+  provider: 'aws' | 'azure' | 'gcp' | 'oci' | null;   // null = provider-neutral evidence
+  implementation?: string;           // capability id when evident, e.g. "ecs-fargate", "rds-postgres"
+  properties: Record<string, unknown>; // mapped template fields (replicas, cpu, memoryMiB, port, …)
+  sources: SourceRef[];
+  confidence: 'high' | 'medium' | 'low';
+}
+```
+
+## Using the engine in Node.js
+
+The WebAssembly build is packaged as `@orkstage/scan` (built from the `cli/` folder with
+`scripts/build-wasm.sh`; not published to a registry yet).
+
+```js
+const { scanFiles, version } = require('@orkstage/scan');
+const report = scanFiles([{ path: 'main.tf', content }], { templateName: 'shop' });
+```
+
+`scanFiles(files, options?)` is synchronous and does no I/O. Options: `templateName`, `displayName`,
+`templateVersion`, `maxFileBytes`.
