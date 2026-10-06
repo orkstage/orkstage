@@ -1,0 +1,48 @@
+[package]
+name = "ork-cli"
+description = "ork: the OrkStage command line"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "ork"
+path = "src/main.rs"
+
+[dependencies]
+orkstage-scan.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+regex.workspace = true
+clap = { version = "4.6", features = ["derive", "env", "wrap_help"] }
+clap_complete = "4.6"
+tokio = { version = "1.48", features = ["rt-multi-thread", "macros", "time", "signal"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "http2", "charset", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter", "fmt"] }
+indicatif = "0.18"
+comfy-table = "8.0"
+directories = "6.0"
+# Default "v1" feature: Keychain (macOS), Credential Manager (Windows), Secret Service via
+# pure-Rust zbus (Linux/BSD). Falls back to a 0600 file when no store is reachable.
+keyring = "4.2"
+miette = { version = "7.6", features = ["fancy"] }
+thiserror = "2.0"
+ignore = "0.4.24"
+dialoguer = { version = "0.12", default-features = false, features = ["password"] }
+similar = "2.7"
+url = "2.5"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.20"
+serde_json.workspace = true
+
+[lints]
+workspace = true

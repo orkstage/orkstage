@@ -1,0 +1,19 @@
+{
+  "Resources": {
+    "OrdersDbCluster1A2B3C": {
+      "Type": "AWS::RDS::DBCluster",
+      "Properties": { "Engine": "aurora-postgresql", "EngineVersion": "16.4", "DatabaseName": "orders" }
+    },
+    "OrdersDbClusterWriter4D5E6F": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": { "DBClusterIdentifier": { "Ref": "OrdersDbCluster1A2B3C" }, "DBInstanceClass": "db.r7g.large", "Engine": "aurora-postgresql" }
+    },
+    "OrdersDbClusterReader7G8H9I": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": { "DBClusterIdentifier": { "Ref": "OrdersDbCluster1A2B3C" }, "DBInstanceClass": "db.r7g.large", "Engine": "aurora-postgresql" }
+    },
+    "OrdersQueue0A1B2C": { "Type": "AWS::SQS::Queue" },
+    "CDKMetadata": { "Type": "AWS::CDK::Metadata", "Properties": { "Analytics": "v2:deflate64:abc" } },
+    "CustomS3AutoDeleteObjects": { "Type": "Custom::S3AutoDeleteObjects", "Properties": {} }
+  }
+}

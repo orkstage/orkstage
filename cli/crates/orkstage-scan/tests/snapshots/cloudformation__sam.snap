@@ -1,0 +1,61 @@
+---
+source: crates/orkstage-scan/tests/fixtures.rs
+---
+version: 1
+generator: orkstage-scan/0.1.0
+detectors:
+  - kind: sam
+    files: 1
+resources:
+  - id: messaging
+    type: queue
+    provider: aws
+    implementation: sqs
+    properties:
+      fifo: true
+      deadLetter: false
+    sources:
+      - kind: sam
+        file: template.yaml
+        line: 12
+        address: Jobs
+    confidence: high
+  - id: storage
+    type: object-storage
+    provider: aws
+    implementation: s3
+    properties:
+      versioning: true
+      retentionDays: 90
+      publicAccess: false
+    sources:
+      - kind: sam
+        file: template.yaml
+        line: 4
+        address: Uploads
+    confidence: high
+unmapped:
+  - source:
+      kind: sam
+      file: template.yaml
+      line: 17
+      address: Resize
+    type: "AWS::Serverless::Function"
+    reason: functions are not supported yet
+  - source:
+      kind: sam
+      file: template.yaml
+      line: 26
+      address: Table
+    type: "AWS::Serverless::SimpleTable"
+    reason: NoSQL databases have no OrkStage logical type yet
+  - source:
+      kind: sam
+      file: template.yaml
+      line: 28
+      address: HttpApi
+    type: "AWS::Serverless::HttpApi"
+    reason: API gateways are not supported yet; use an ingress
+connections: []
+template: "<see the __template snapshot>"
+warnings: []

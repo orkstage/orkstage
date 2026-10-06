@@ -1,0 +1,5 @@
+# deps
+asyncpg>=0.30
+celery[redis,sqs]==5.5.3
+-r base.txt
+minio

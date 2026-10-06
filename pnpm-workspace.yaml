@@ -1,6 +1,8 @@
 packages:
   - apps/*
   - packages/*
+  # @orkstage/scan: the Rust scan engine built to WebAssembly (committed; see cli/README.md).
+  - cli/dist/scan-wasm
 allowBuilds:
   '@prisma/engines': true
   prisma: true

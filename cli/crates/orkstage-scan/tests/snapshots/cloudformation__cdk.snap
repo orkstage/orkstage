@@ -1,0 +1,57 @@
+---
+source: crates/orkstage-scan/tests/fixtures.rs
+---
+version: 1
+generator: orkstage-scan/0.1.0
+detectors:
+  - kind: cdk
+    files: 1
+resources:
+  - id: network
+    type: network
+    provider: aws
+    implementation: vpc
+    properties:
+      availabilityZones: 2
+      natGateway: false
+      inferred: true
+    sources: []
+    confidence: low
+  - id: database
+    type: database.postgresql
+    provider: aws
+    implementation: rds-postgres
+    properties:
+      version: "16"
+      storageGiB: 20
+      highAvailability: zone-redundant
+      size: large
+    sources:
+      - kind: cdk
+        file: cdk.out/OrdersStack.template.json
+        address: OrdersDbCluster1A2B3C
+      - kind: cdk
+        file: cdk.out/OrdersStack.template.json
+        address: OrdersDbClusterReader7G8H9I
+      - kind: cdk
+        file: cdk.out/OrdersStack.template.json
+        address: OrdersDbClusterWriter4D5E6F
+    confidence: high
+  - id: messaging
+    type: queue
+    provider: aws
+    implementation: sqs
+    properties:
+      fifo: false
+      deadLetter: false
+    sources:
+      - kind: cdk
+        file: cdk.out/OrdersStack.template.json
+        address: OrdersQueue0A1B2C
+    confidence: high
+unmapped: []
+connections: []
+template: "<see the __template snapshot>"
+warnings:
+  - "cdk.out/OrdersStack.template.json: 2 supporting CloudFormation resource(s) (IAM, security groups, logs, ...) are created by OrkStage implementations and were not mapped individually"
+  - "network inferred: no network was declared but services and data stores need one"

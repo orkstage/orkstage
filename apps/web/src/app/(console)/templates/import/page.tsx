@@ -1,10 +1,10 @@
 'use client';
 
 import type { ImportDto, ScanReport } from '@co/contracts';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileUp, Import } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useId, useState, type ChangeEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useId, useState, type ChangeEvent } from 'react';
 import { YamlViewer } from '@/components/yaml-viewer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,8 @@ import { Field, Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { apiSend } from '@/lib/api';
+import { PageSpinner } from '@/components/ui/spinner';
+import { apiGet, apiSend } from '@/lib/api';
 import { useCan } from '@/lib/ability';
 import { slugify } from '@/lib/utils';
 
@@ -27,6 +28,14 @@ const MAX_TOTAL = 5 * 1024 * 1024;
 const confidenceTone = { high: 'ok', medium: 'info', low: 'neutral' } as const;
 
 export default function ImportPage() {
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      <ImportView />
+    </Suspense>
+  );
+}
+
+function ImportView() {
   const id = useId();
   const router = useRouter();
   const can = useCan();
@@ -37,15 +46,22 @@ export default function ImportPage() {
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState('');
 
+  const show = (r: ImportDto) => {
+    setResult(r);
+    const base = r.report.template.match(/name:\s*([a-z0-9-]+)/)?.[1] ?? 'imported';
+    setName(slugify(`${base}-imported`));
+    setDisplayName('Imported template');
+  };
   const run = useMutation({
     mutationFn: (body: unknown) => apiSend<ImportDto>('POST', '/imports', body),
-    onSuccess: (r) => {
-      setResult(r);
-      const base = r.report.template.match(/name:\s*([a-z0-9-]+)/)?.[1] ?? 'imported';
-      setName(slugify(`${base}-imported`));
-      setDisplayName('Imported template');
-    },
+    onSuccess: show,
   });
+  // `ork import` links here with ?importId=… so a scan made locally opens straight in review.
+  const importId = useSearchParams().get('importId');
+  const linked = useQuery({ queryKey: ['import', importId], queryFn: () => apiGet<ImportDto>(`/imports/${importId}`), enabled: Boolean(importId) });
+  useEffect(() => {
+    if (linked.data) show(linked.data);
+  }, [linked.data]);
   const toTemplate = useMutation({
     mutationFn: () => apiSend<{ templateId: string }>('POST', `/imports/${result!.id}/template`, { name, displayName }),
     onSuccess: (r) => router.push(`/templates/${r.templateId}/builder`),
@@ -125,6 +141,7 @@ export default function ImportPage() {
             </Button>
           </Card>
           {run.error ? <ErrorNotice error={run.error} className="lg:col-span-2" /> : null}
+          {linked.error ? <ErrorNotice error={linked.error} className="lg:col-span-2" /> : null}
         </div>
       ) : (
         <div className="space-y-4">

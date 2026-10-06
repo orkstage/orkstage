@@ -1,0 +1,93 @@
+---
+source: crates/orkstage-scan/tests/fixtures.rs
+---
+version: 1
+generator: orkstage-scan/0.1.0
+detectors:
+  - kind: terraform
+    files: 4
+resources:
+  - id: network
+    type: network
+    provider: aws
+    implementation: vpc
+    properties:
+      availabilityZones: 3
+      natGateway: true
+    sources:
+      - kind: terraform
+        file: modules/network/main.tf
+        line: 5
+        address: aws_vpc.this
+    confidence: high
+  - id: api
+    type: compute.container-service
+    provider: aws
+    implementation: ecs-fargate
+    properties:
+      cpu: 1
+      memoryMiB: 2048
+      sourceImage: "ghcr.io/acme/orders-api:2.1.0"
+      port: 3000
+      replicas: 3
+    sources:
+      - kind: terraform
+        file: modules/service/main.tf
+        line: 9
+        address: aws_ecs_task_definition.this
+      - kind: terraform
+        file: modules/service/main.tf
+        line: 22
+        address: aws_ecs_service.this
+    confidence: high
+  - id: worker
+    type: compute.container-service
+    provider: aws
+    implementation: ecs-fargate
+    properties:
+      cpu: 0.25
+      memoryMiB: 512
+      sourceImage: "ghcr.io/acme/orders-worker:2.1.0"
+      replicas: 2
+    sources:
+      - kind: terraform
+        file: modules/service/main.tf
+        line: 9
+        address: aws_ecs_task_definition.this
+      - kind: terraform
+        file: modules/service/main.tf
+        line: 22
+        address: aws_ecs_service.this
+    confidence: high
+  - id: database
+    type: database.postgresql
+    provider: aws
+    implementation: rds-postgres
+    properties:
+      version: "16"
+      storageGiB: 100
+      highAvailability: zone-redundant
+      size: large
+      backup:
+        enabled: true
+        retentionDays: 14
+    sources:
+      - kind: terraform
+        file: modules/db/main.tf
+        line: 5
+        address: aws_db_instance.this
+    confidence: high
+unmapped: []
+connections:
+  - from: api
+    to: database
+    protocol: postgres
+    port: 5432
+    evidence: aws_ecs_task_definition.this environment → aws_db_instance.this
+  - from: worker
+    to: database
+    protocol: postgres
+    port: 5432
+    evidence: aws_ecs_task_definition.this environment → aws_db_instance.this
+template: "<see the __template snapshot>"
+warnings: []

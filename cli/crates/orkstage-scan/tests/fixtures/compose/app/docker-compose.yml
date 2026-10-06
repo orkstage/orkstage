@@ -1,0 +1,40 @@
+x-env: &common
+  LOG_LEVEL: info
+
+services:
+  api:
+    build: ./api
+    ports: ["8080:8080"]
+    environment:
+      <<: *common
+      DATABASE_URL: postgres://app:app@db:5432/app
+      REDIS_URL: redis://cache:6379
+      AMQP_URL: amqp://guest:guest@queue:5672
+    depends_on: [db, cache, queue]
+    deploy:
+      replicas: 2
+      resources:
+        limits: { cpus: "0.5", memory: 1g }
+  worker:
+    build:
+      context: ./worker
+    environment:
+      DATABASE_URL: postgres://app:app@db:5432/app
+      S3_ENDPOINT: http://storage:9000
+    depends_on:
+      db: { condition: service_healthy }
+      queue: { condition: service_started }
+  db:
+    image: postgres:17-alpine
+    environment: { POSTGRES_PASSWORD: app }
+  cache:
+    image: valkey/valkey:8
+  queue:
+    image: rabbitmq:4-management
+  storage:
+    image: quay.io/minio/minio:latest
+    command: server /data
+  mailpit:
+    image: axllent/mailpit:latest
+  legacy-db:
+    image: mysql:8.4

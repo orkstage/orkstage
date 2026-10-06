@@ -1,0 +1,72 @@
+---
+source: crates/orkstage-scan/tests/fixtures.rs
+---
+version: 1
+generator: orkstage-scan/0.1.0
+detectors:
+  - kind: helm
+    files: 4
+resources:
+  - id: network
+    type: network
+    provider: ~
+    properties:
+      availabilityZones: 1
+      natGateway: false
+      inferred: true
+    sources: []
+    confidence: low
+  - id: shop
+    type: compute.container-service
+    provider: ~
+    properties:
+      sourceImage: "helm-value:helm-value"
+      port: 3000
+      healthCheckPath: /healthz
+      public: true
+    sources:
+      - kind: helm
+        file: chart/templates/deployment.yaml
+        line: 2
+        address: Deployment/shop
+    confidence: medium
+  - id: database
+    type: database.postgresql
+    provider: ~
+    properties: {}
+    sources:
+      - kind: helm
+        file: chart/Chart.yaml
+        line: 4
+        address: dependency/postgresql
+    confidence: medium
+  - id: cache
+    type: cache.redis
+    provider: ~
+    properties: {}
+    sources:
+      - kind: helm
+        file: chart/Chart.yaml
+        line: 4
+        address: dependency/redis
+    confidence: medium
+  - id: ingress
+    type: ingress
+    provider: ~
+    properties:
+      tls: true
+      routes:
+        - service: shop
+          pathPrefix: /
+    sources:
+      - kind: helm
+        file: chart/templates/service.yaml
+        line: 2
+        address: Service/shop
+    confidence: medium
+unmapped: []
+connections: []
+template: "<see the __template snapshot>"
+warnings:
+  - "chart/templates/broken.yaml: Helm template could not be parsed after removing template actions; skipped"
+  - "network inferred: no network was declared but services and data stores need one"

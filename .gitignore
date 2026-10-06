@@ -3,6 +3,8 @@
 
 node_modules/
 dist/
+# The scan engine's WebAssembly package is committed: the API depends on it (see cli/README.md).
+!cli/dist/
 # Rust build output (cli/) and generated site output
 target/
 site/out/

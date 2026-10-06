@@ -1,0 +1,13 @@
+service: notifier
+provider:
+  name: aws
+  runtime: nodejs22.x
+functions:
+  send:
+    handler: handler.send
+resources:
+  Resources:
+    NotificationsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: notifications

@@ -1,0 +1,123 @@
+---
+source: crates/orkstage-scan/tests/fixtures.rs
+---
+version: 1
+generator: orkstage-scan/0.1.0
+detectors:
+  - kind: terraform
+    files: 3
+resources:
+  - id: network
+    type: network
+    provider: aws
+    implementation: vpc
+    properties:
+      availabilityZones: 1
+      natGateway: false
+    sources:
+      - kind: terraform
+        file: aws.tf
+        line: 1
+        address: aws_vpc.main
+    confidence: high
+  - id: registry
+    type: container-registry
+    provider: aws
+    implementation: ecr
+    properties:
+      scanOnPush: false
+      immutableTags: false
+    sources:
+      - kind: terraform
+        file: aws.tf
+        line: 5
+        address: aws_ecr_repository.apps
+    confidence: high
+  - id: api
+    type: compute.container-service
+    provider: aws
+    implementation: ecs-fargate
+    properties:
+      cpu: 0.5
+      memoryMiB: 1024
+      sourceImage: "acme/api:1"
+      port: 8080
+      replicas: 2
+      public: true
+    sources:
+      - kind: terraform
+        file: aws.tf
+        line: 9
+        address: aws_ecs_task_definition.api
+      - kind: terraform
+        file: aws.tf
+        line: 25
+        address: aws_ecs_service.api
+    confidence: high
+  - id: database
+    type: database.postgresql
+    provider: azure
+    implementation: flexible-server
+    properties:
+      version: "17"
+      size: medium
+      storageGiB: 50
+      highAvailability: zone-redundant
+      placement: data
+    sources:
+      - kind: terraform
+        file: azure.tf
+        line: 1
+        address: azurerm_postgresql_flexible_server.data
+    confidence: high
+  - id: storage
+    type: object-storage
+    provider: oci
+    implementation: object-storage
+    properties:
+      versioning: true
+      tier: standard
+      placement: storage
+    sources:
+      - kind: terraform
+        file: oci.tf
+        line: 1
+        address: oci_objectstorage_bucket.files
+    confidence: high
+  - id: ingress
+    type: ingress
+    provider: aws
+    implementation: alb
+    properties:
+      tls: true
+      routes:
+        - service: api
+          pathPrefix: /
+      inferred: true
+    sources: []
+    confidence: low
+  - id: dns
+    type: dns
+    provider: aws
+    implementation: route53
+    properties:
+      customDomain: disabled
+      target: ingress
+      inferred: true
+    sources: []
+    confidence: low
+unmapped: []
+connections:
+  - from: api
+    to: database
+    protocol: postgres
+    port: 5432
+    evidence: aws_ecs_task_definition.api DB_HOST = azurerm_postgresql_flexible_server.data.fqdn
+  - from: api
+    to: storage
+    protocol: https
+    evidence: aws_ecs_task_definition.api BUCKET = oci_objectstorage_bucket.files.name
+template: "<see the __template snapshot>"
+warnings:
+  - "ingress inferred: public HTTP services exist but no load balancer was declared"
+  - "dns inferred: an ingress exists; a platform subdomain points to it"
