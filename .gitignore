@@ -1,6 +1,10 @@
 # Personal Claude Code settings (project settings.json is shared)
 .claude/settings.local.json
 
+# Private working material: never committed or pushed (raw brand kit sources, original spec).
+assets-files/
+cloud_instance_management_platform_superprompt_v2_multicloud.md
+
 node_modules/
 dist/
 # The scan engine's WebAssembly package is committed: the API depends on it (see cli/README.md).

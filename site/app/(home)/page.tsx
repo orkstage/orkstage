@@ -85,7 +85,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-40 border-b border-hairline bg-obsidian/90 backdrop-blur supports-[backdrop-filter]:bg-obsidian/75">
         <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" aria-label="OrkStage home" className="rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mint">
-            <Logo height={30} forceDark />
+            <Logo height={32} forceDark />
           </Link>
           <ul className="flex items-center gap-1 text-[14px] sm:gap-2">
             <li className="hidden sm:block">
@@ -433,7 +433,7 @@ export default function HomePage() {
       <footer className="border-t border-hairline">
         <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-12">
           <div className="md:col-span-5">
-            <Logo height={30} forceDark />
+            <Logo height={32} forceDark />
             <p className="mt-4 max-w-sm text-[14px] text-ink-muted">Command every stage of your cloud. Raw scale. Precise control.</p>
           </div>
           <nav aria-label="Footer" className="grid grid-cols-2 gap-8 text-[14px] sm:grid-cols-3 md:col-span-7">

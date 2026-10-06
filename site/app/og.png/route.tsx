@@ -6,7 +6,7 @@ import { ImageResponse } from 'next/og';
 export const dynamic = 'force-static';
 
 export function GET() {
-  const logo = `data:image/png;base64,${readFileSync(join(process.cwd(), 'assets/brand/logo-dark-1315.png')).toString('base64')}`;
+  const logo = `data:image/png;base64,${readFileSync(join(process.cwd(), 'assets/brand/logo-dark.png')).toString('base64')}`;
   return new ImageResponse(
     (
       <div
@@ -25,7 +25,7 @@ export function GET() {
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} width={430} height={160} alt="OrkStage" />
+        <img src={logo} width={462} height={130} alt="OrkStage" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div style={{ fontSize: 68, fontWeight: 700, letterSpacing: -2, lineHeight: 1.05 }}>Command every stage of your cloud.</div>
           <div style={{ fontSize: 30, color: '#a3a9b8' }}>Open-source multi-cloud control plane. Template, plan, deploy, operate.</div>

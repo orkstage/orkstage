@@ -16,6 +16,9 @@ export GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-$(git config user.name)} GIT_AUTHOR_EM
 
 log() { printf '\n==> %s\n' "$*"; }
 
+# Never published: raw brand-kit sources and the original specification (see .gitignore).
+PRIVATE_PATHS="assets-files cloud_instance_management_platform_superprompt_v2_multicloud.md"
+
 # Rename the internal @co/* scope to the published @orkstage/* scope inside one repository.
 rename_scope() {
   local dir=$1
@@ -47,6 +50,11 @@ rm -rf "${OUT_DIR:?}/orkstage"
 git clone -q "$ROOT" "$OUT_DIR/orkstage"
 (cd "$OUT_DIR/orkstage"
   git remote remove origin
+  # Private material must not exist anywhere in the published history, not just at HEAD.
+  FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --prune-empty --index-filter \
+    "git rm -r -q --cached --ignore-unmatch $PRIVATE_PATHS" -- --all >/dev/null
+  git for-each-ref --format='%(refname)' refs/original/ | xargs -r -n1 git update-ref -d
+  git reflog expire --expire=now --all && git gc -q --prune=now
   git rm -r -q --ignore-unmatch apps/web cli site infra/tofu infra/docker/tofu-runner.Dockerfile
   git commit -q -m "chore: split console, cli, site and modules into their own repositories (from $HEAD_SHA)")
 rename_scope "$OUT_DIR/orkstage"

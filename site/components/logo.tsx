@@ -1,21 +1,21 @@
 /* eslint-disable @next/next/no-img-element -- static brand assets, pre-sized in /public/brand */
 
 /**
- * Official OrkStage brand kit v3 (copied into /public/brand). Same usage as the console
- * (apps/web/src/components/brand/logo.tsx): the complete logo in navigation and headers, the
- * mark alone in compact spots; never recolored, stretched or given effects. The dark-surface
- * artwork is the default; the light variant shows when the docs run in the light theme.
+ * Official OrkStage brand kit v4 (flat vector SVGs in /public/brand, tightly cropped). Same usage
+ * as the console (apps/web/src/components/brand/logo.tsx): the complete logo in navigation and
+ * headers, the mark alone in compact spots; never recolored, stretched or given effects. The
+ * dark-surface artwork is the default; the light variant shows when the docs run in light theme.
  */
-const LOGO_RATIO = 323 / 120;
-const MARK_RATIO = 100 / 96;
+const LOGO_RATIO = 1181.85 / 333;
+const MARK_RATIO = 338 / 333;
 
 function Themed({ base, height, ratio, alt, forceDark }: { base: 'logo' | 'mark'; height: number; ratio: number; alt: string; forceDark?: boolean }) {
   const width = Math.round(height * ratio);
-  if (forceDark) return <img src={`/brand/${base}-dark.png`} alt={alt} width={width} height={height} decoding="async" className="max-w-none" />;
+  if (forceDark) return <img src={`/brand/${base}-dark.svg`} alt={alt} width={width} height={height} decoding="async" className="max-w-none" />;
   return (
     <>
-      <img src={`/brand/${base}-dark.png`} alt={alt} width={width} height={height} className="brand-on-dark" decoding="async" />
-      <img src={`/brand/${base}-light.png`} alt={alt} width={width} height={height} className="brand-on-light" decoding="async" />
+      <img src={`/brand/${base}-dark.svg`} alt={alt} width={width} height={height} className="brand-on-dark" decoding="async" />
+      <img src={`/brand/${base}-light.svg`} alt={alt} width={width} height={height} className="brand-on-light" decoding="async" />
     </>
   );
 }

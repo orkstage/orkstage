@@ -5,7 +5,7 @@ import { links } from './shared';
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: <Logo height={28} />,
+      title: <Logo height={26} />,
       url: '/',
     },
     githubUrl: links.github,
