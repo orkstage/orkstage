@@ -9,6 +9,8 @@ import {
   diffPlan,
   executeApply,
   executeDestroy,
+  idempotencyKeyFor,
+  previewProviderPlans,
   renderPlan,
   type CompileInput,
   type ExecutionHooks,
@@ -236,5 +238,50 @@ describe('executor', () => {
     expect(order.indexOf('api')).toBeLessThan(order.indexOf('ingress'));
     expect(order.indexOf('api')).toBeLessThan(order.indexOf('database'));
     expect(order.indexOf('api')).toBeLessThan(order.indexOf('network'));
+  });
+});
+
+describe('provider plans', () => {
+  const ids = { tenantId: 'tenant-1', instanceId: 'inst-1', correlationId: 'c1' };
+
+  async function applied(extra: MockTargetConfig = {}) {
+    const reg = registry();
+    const data = mockTarget('azure-b', 'azure', 'eastus', extra);
+    const resolved = compileInfrastructure(input(templates['multicloud-reference']!, { ...multiCloudBindings, data: { target: data, region: 'eastus' } }), reg);
+    const existing: Record<string, { idempotencyKey: string; outputs: Record<string, string> }> = {};
+    await executeApply({
+      resolved,
+      registry: reg,
+      ...ids,
+      hooks: { ...recordingHooks().hooks, onSuccess: async (id, r) => void (existing[id] = { idempotencyKey: '', outputs: r.outputs as Record<string, string> }) },
+    });
+    for (const r of resolved.resources) existing[r.id]!.idempotencyKey = idempotencyKeyFor(ids.tenantId, ids.instanceId, r);
+    // Change the database spec, as a new template version or variable would.
+    const changed = { ...resolved, resources: resolved.resources.map((r) => (r.id === 'database' ? { ...r, spec: { ...r.spec, storageGb: 500 }, specHash: `${r.specHash}-v2` } : r)) };
+    return { reg, changed, existing };
+  }
+
+  it('plans only changed existing resources, as in-place updates', async () => {
+    const { reg, changed, existing } = await applied();
+    const summary = await previewProviderPlans({ resolved: changed, registry: reg, ...ids, existing });
+    expect(summary.entries).toEqual([{ resourceId: 'database', status: 'planned', plan: expect.objectContaining({ destructive: false, changes: { add: 0, change: 1, remove: 0 } }) }]);
+    expect(summary.destructive).toBe(false);
+  });
+
+  it('flags replacements as destructive', async () => {
+    const { reg, changed, existing } = await applied({ destructivePlans: ['database'] });
+    const summary = await previewProviderPlans({ resolved: changed, registry: reg, ...ids, existing });
+    expect(summary.destructive).toBe(true);
+    expect(summary.entries[0]).toMatchObject({ resourceId: 'database', status: 'planned', plan: { actions: [{ action: 'replace' }] } });
+  });
+
+  it('skips resources whose dependencies do not exist yet', async () => {
+    const { reg, changed, existing } = await applied();
+    const api = changed.resources.find((r) => r.id === 'api')!;
+    expect(api.dependsOn.length).toBeGreaterThan(0);
+    const withApi = { ...changed, resources: changed.resources.map((r) => (r.id === 'api' ? { ...r, specHash: `${r.specHash}-v2` } : r)) };
+    delete existing[api.dependsOn[0]!];
+    const summary = await previewProviderPlans({ resolved: withApi, registry: reg, ...ids, existing });
+    expect(summary.entries.find((e) => e.resourceId === 'api')).toMatchObject({ status: 'skipped' });
   });
 });

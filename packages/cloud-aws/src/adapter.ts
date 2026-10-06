@@ -17,6 +17,7 @@ import {
   type LogLine,
   type ProviderContext,
   type ResourceIdentifier,
+  type ResourcePlan,
   type ResourceRequest,
   type ResourceResult,
   type ResourceState,
@@ -27,7 +28,7 @@ import { TofuError, type TofuRunner, type TofuStack } from '@co/iac';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
-import { checkAwsHealth, readAwsLogs } from './health.js';
+import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
 import { flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 
 export interface AwsAdapterOptions {
@@ -141,6 +142,17 @@ export class AwsAdapter implements CloudProviderAdapter {
     }
   }
 
+  async planResource(rawCtx: ProviderContext, req: ResourceRequest): Promise<ResourcePlan> {
+    const ctx = this.effective(rawCtx);
+    const runner = this.requireRunner();
+    try {
+      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req)));
+      return { ...plan, destructive: isDestructivePlan(plan.actions) };
+    } catch (err) {
+      throw toProviderError(err);
+    }
+  }
+
   async deleteResource(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<void> {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
@@ -173,6 +185,13 @@ export class AwsAdapter implements CloudProviderAdapter {
     } catch (err) {
       return { state: 'UNHEALTHY', message: safeAwsMessage(err), checkedAt: new Date().toISOString() };
     }
+  }
+
+  async probeExists(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<boolean | undefined> {
+    const ctx = this.effective(rawCtx);
+    const state = await this.getResource(ctx, res);
+    if (!state.exists) return false;
+    return probeAwsExists(res.serviceKind, state.outputs, await this.creds.clientConfig(ctx), ctx.signal);
   }
 
   async getLogs(rawCtx: ProviderContext, res: ResourceIdentifier, limit: number): Promise<LogLine[]> {
@@ -285,6 +304,17 @@ function toProviderError(err: unknown): ProviderError {
 }
 
 /** AWS error messages can echo ARNs and request ids; keep only the error name and a short message. */
+/**
+ * Replacements that are how AWS rolls changes out, not losses: a task definition is immutable,
+ * so every image or size change registers a new revision while the service keeps running.
+ */
+const ROUTINE_REPLACEMENTS = /(^|\.)aws_ecs_task_definition\.[^.]+$/;
+
+/** A plan needs production approval when it deletes or replaces something that matters. */
+export function isDestructivePlan(actions: { address: string; action: string }[]): boolean {
+  return actions.some((a) => a.action === 'delete' || (a.action === 'replace' && !ROUTINE_REPLACEMENTS.test(a.address)));
+}
+
 export function safeAwsMessage(err: unknown): string {
   const e = err as { name?: string; message?: string };
   const name = e.name ?? 'Error';

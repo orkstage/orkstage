@@ -49,6 +49,12 @@ export interface ApplyResult {
   changes: { add: number; change: number; remove: number };
 }
 
+export interface PlanResult {
+  changes: { add: number; change: number; remove: number };
+  /** Per address; action is OpenTofu's: create | update | delete | replace | read | noop. */
+  actions: { address: string; action: string }[];
+}
+
 export class TofuError extends Error {
   constructor(
     message: string,
@@ -65,6 +71,7 @@ interface JsonLine {
   '@message'?: string;
   type?: string;
   changes?: { add: number; change: number; remove: number; operation?: string };
+  change?: { resource?: { addr: string }; action?: string };
   diagnostic?: { severity: string; summary: string; detail?: string };
 }
 
@@ -88,6 +95,21 @@ export class TofuRunner {
     const lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
     const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
     return { outputs: await this.outputs(stack, dir), changes: { add: summary.add, change: summary.change, remove: summary.remove } };
+  }
+
+  /**
+   * Speculative plan (no lock, no apply): what OpenTofu would change, per resource address.
+   * Used to show real changes before approval and to flag destructive actions.
+   */
+  async plan(stack: TofuStack): Promise<PlanResult> {
+    const dir = await this.prepare(stack);
+    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
+    const lines = await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false'], true);
+    const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
+    const actions = lines
+      .filter((l) => l.type === 'planned_change' && l.change?.resource?.addr)
+      .map((l) => ({ address: l.change!.resource!.addr, action: l.change!.action ?? 'unknown' }));
+    return { changes: { add: summary.add, change: summary.change, remove: summary.remove }, actions };
   }
 
   /** Exit-code plan: true when the real infrastructure differs from the configuration. */

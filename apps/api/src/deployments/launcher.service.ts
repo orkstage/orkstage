@@ -142,7 +142,9 @@ export class LauncherService {
     },
   ): Promise<Deployment> {
     const nextStatus: InstanceStatus = kind === 'APPLY' ? 'VALIDATING' : 'DESTROYING';
-    const steps = workflowSteps(kind, resolved, o.approvalRequired);
+    // Production applies always carry an approval step: the worker may escalate to it when the
+    // provider plan turns out destructive, or marks it skipped with the reason.
+    const steps = workflowSteps(kind, resolved, o.approvalRequired || (kind === 'APPLY' && instance.environment === 'production'));
     const deployment = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.instance.updateMany({
         where: { id: instance.id, status: { in: o.deployable } },

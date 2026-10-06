@@ -1,12 +1,14 @@
-import type { ResourceResult } from '@co/cloud-core';
+import type { ResourceOutputs, ResourceResult } from '@co/cloud-core';
 import type { Deployment, InstanceStatus, StepStatus } from '@co/database';
 import { assertInstanceTransition, summarizeSteps, type FailureClass } from '@co/domain';
 import {
+  describeProviderPlan,
   diffPlan,
   executeApply,
   executeDestroy,
   idempotencyKeyFor,
   PHASE,
+  previewProviderPlans,
   renderPlan,
   toFailure,
   type CompletedResources,
@@ -138,12 +140,36 @@ export class DeploymentRunner {
     await this.phase(d, PHASE.plan, async () => {
       const plan = diffPlan(resolved, await this.known(d.instanceId));
       const text = renderPlan((await prisma.instance.findUniqueOrThrow({ where: { id: d.instanceId } })).name, plan);
-      await prisma.deployment.update({ where: { id: d.id }, data: { plan: { ...plan, text } as object } });
-      return `Plan: ${plan.counts.CREATE} to create, ${plan.counts.UPDATE} to update, ${plan.counts.DELETE} to delete, ${plan.counts.NOOP} unchanged (risk ${plan.risk}).`;
+      // Real provider plans for existing resources that change: catches deletions/replacements
+      // the platform-level diff cannot see (e.g. an immutable attribute forcing replacement).
+      const rows = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, status: 'ACTIVE' } });
+      const provider = await previewProviderPlans({
+        resolved,
+        registry: this.ctx.registry,
+        tenantId: d.tenantId,
+        instanceId: d.instanceId,
+        correlationId: d.correlationId,
+        existing: Object.fromEntries(rows.map((r) => [r.resourceId, { idempotencyKey: r.idempotencyKey, outputs: r.outputs as ResourceOutputs }])),
+      });
+      for (const e of provider.entries) {
+        await this.event(d.id, e.status === 'planned' && e.plan.destructive ? 'warn' : 'info', PHASE.plan, describeProviderPlan(e));
+      }
+      const escalate = provider.destructive && resolved.environment === 'production' && !d.approvalRequired;
+      await prisma.deployment.update({
+        where: { id: d.id },
+        data: { plan: { ...plan, text, providerPlans: provider.entries } as object, ...(escalate ? { approvalRequired: true } : {}) },
+      });
+      if (escalate) await this.event(d.id, 'warn', PHASE.plan, 'The provider plan deletes or replaces existing resources: production approval required.');
+      return `Plan: ${plan.counts.CREATE} to create, ${plan.counts.UPDATE} to update, ${plan.counts.DELETE} to delete, ${plan.counts.NOOP} unchanged (risk ${provider.destructive ? 'high' : plan.risk}).`;
     });
 
-    if (d.approvalRequired) {
-      const current = await prisma.deployment.findUniqueOrThrow({ where: { id: d.id } });
+    const current = await prisma.deployment.findUniqueOrThrow({ where: { id: d.id } });
+    const approvalStep = await prisma.deploymentStep.findUnique({ where: { deploymentId_key: { deploymentId: d.id, key: PHASE.approval } } });
+    if (!current.approvalRequired && approvalStep?.status === 'PENDING') {
+      await this.step(d.id, PHASE.approval, 'SKIPPED', { errorMessage: 'Not needed: no high-risk or destructive changes planned.' });
+      await this.event(d.id, 'info', PHASE.approval, 'Approval not needed: no high-risk or destructive changes planned.');
+    }
+    if (current.approvalRequired) {
       if (!current.approvedAt) {
         await this.moveInstance(d, 'AWAITING_APPROVAL');
         await prisma.deployment.update({ where: { id: d.id }, data: { status: 'AWAITING_APPROVAL' } });
@@ -330,14 +356,20 @@ export class DeploymentRunner {
     const prisma = this.ctx.prisma;
     let unhealthyCritical = 0;
     let unhealthyOther = 0;
+    // Real resources settle after apply (tasks start, targets pass health checks): poll a while,
+    // within one settle window for the whole deployment, not one per resource.
+    const deadline = Date.now() + VERIFY_SETTLE_MS;
     for (const r of resolved.resources) {
       const adapter = this.ctx.registry.get(r.provider);
       const ident = { resourceId: r.id, serviceKind: r.type, capability: r.capability, name: r.name };
       const pctx = this.providerCtx(resolved, r.targetId, r.region, d.correlationId);
-      // Real resources settle after apply (tasks start, targets pass health checks): poll a while.
-      const deadline = Date.now() + (adapter.simulated ? 0 : VERIFY_SETTLE_MS);
       let health = await adapter.checkHealth(pctx, ident);
-      while (health.state !== 'HEALTHY' && Date.now() < deadline) {
+      while (health.state !== 'HEALTHY' && !adapter.simulated && Date.now() < deadline) {
+        // Gone is not "settling": a resource deleted out of band will not come back by waiting.
+        if ((await adapter.probeExists?.(pctx, ident)) === false) {
+          health = { ...health, state: 'UNHEALTHY', message: 'Resource no longer exists at the provider. Redeploy to re-create it.' };
+          break;
+        }
         await this.event(d.id, 'info', PHASE.verify, `${r.id}: ${health.message ?? health.state}; waiting for it to settle…`);
         await new Promise((resolve) => setTimeout(resolve, VERIFY_POLL_MS));
         health = await adapter.checkHealth(pctx, ident);

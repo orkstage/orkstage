@@ -232,11 +232,12 @@ export async function executeDestroy(opts: DestroyOptions): Promise<ExecutionOut
 
 async function stillExists(registry: AdapterRegistry, resolved: ResolvedInfrastructure, r: ResolvedResource, correlationId: string): Promise<boolean> {
   try {
-    const state = await registry.get(r.provider).getResource(
-      { target: resolved.targets[r.targetId]!, region: r.region, correlationId },
-      { resourceId: r.id, serviceKind: r.type, capability: r.capability, name: r.name },
-    );
-    return state.exists;
+    const adapter = registry.get(r.provider);
+    const ctx = { target: resolved.targets[r.targetId]!, region: r.region, correlationId };
+    const id = { resourceId: r.id, serviceKind: r.type, capability: r.capability, name: r.name };
+    if (!(await adapter.getResource(ctx, id)).exists) return false;
+    // Recorded state can outlive the resource (deleted out of band): ask the provider when it can.
+    return (await adapter.probeExists?.(ctx, id)) !== false;
   } catch {
     return false; // unknown → converge again; ensureResource is idempotent
   }

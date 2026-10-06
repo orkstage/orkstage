@@ -1,7 +1,8 @@
 import { AssumeRoleCommand } from '@aws-sdk/client-sts';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@co/cloud-core';
 import { describe, expect, it, vi } from 'vitest';
-import { AwsAdapter } from './adapter.js';
+import { AwsAdapter, isDestructivePlan } from './adapter.js';
+import { isAwsNotFound } from './health.js';
 import { moduleInputs, rootConfig } from './stacks.js';
 
 const target: CloudTarget = {
@@ -111,5 +112,27 @@ describe('OpenTofu stack rendering', () => {
 
   it('rejects implementations without a module', () => {
     expect(() => moduleInputs(ctx, request({ capability: 'ecs-managed-instances' }))).toThrow(/not implemented/);
+  });
+});
+
+describe('isAwsNotFound', () => {
+  it('recognises not-found errors across services', () => {
+    for (const name of ['InvalidVpcID.NotFound', 'DBInstanceNotFoundFault', 'RepositoryNotFoundException', 'ClusterNotFoundException', 'NoSuchHostedZone', 'AWS.SimpleQueueService.NonExistentQueue']) {
+      expect(isAwsNotFound({ name })).toBe(true);
+    }
+    expect(isAwsNotFound({ name: 'NotFound', $metadata: { httpStatusCode: 404 } })).toBe(true);
+  });
+
+  it('treats throttling and auth failures as unknown, not missing', () => {
+    expect(isAwsNotFound({ name: 'ThrottlingException', $metadata: { httpStatusCode: 400 } })).toBe(false);
+    expect(isAwsNotFound({ name: 'AccessDeniedException', $metadata: { httpStatusCode: 403 } })).toBe(false);
+  });
+});
+
+describe('isDestructivePlan', () => {
+  it('treats task definition revisions as routine, other replacements and deletes as destructive', () => {
+    expect(isDestructivePlan([{ address: 'module.resource.aws_ecs_task_definition.this', action: 'replace' }, { address: 'module.resource.aws_ecs_service.this', action: 'update' }])).toBe(false);
+    expect(isDestructivePlan([{ address: 'module.resource.aws_security_group.service', action: 'replace' }])).toBe(true);
+    expect(isDestructivePlan([{ address: 'module.resource.aws_db_instance.this', action: 'delete' }])).toBe(true);
   });
 });

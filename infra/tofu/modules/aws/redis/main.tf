@@ -13,7 +13,10 @@ resource "aws_elasticache_subnet_group" "this" {
 }
 
 resource "aws_security_group" "cache" {
-  name        = "${var.name}-cache"
+  # A prefix plus create-before-destroy lets a replacement (e.g. a new VPC) attach the new
+  # group before the old one is deleted; a fixed name would collide, and deleting first fails
+  # while network interfaces still use the group.
+  name_prefix = "${var.name}-cache-"
   description = "Cache ${var.name}"
   vpc_id      = var.vpc_id
   ingress {
@@ -21,6 +24,9 @@ resource "aws_security_group" "cache" {
     to_port     = 6379
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
+  }
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

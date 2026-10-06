@@ -9,6 +9,7 @@ import {
   type ProviderContext,
   type ResourceIdentifier,
   type ResourceOutputs,
+  type ResourcePlan,
   type ResourceRequest,
   type ResourceResult,
   type ResourceState,
@@ -40,6 +41,8 @@ export interface MockTargetConfig {
   unhealthy?: string[];
   /** Fail target validation, to exercise the connection-health flow. */
   invalidCredentials?: boolean;
+  /** Resource ids whose changes plan as replacements (to exercise destructive-change approval). */
+  destructivePlans?: string[];
 }
 
 interface StoredResource {
@@ -131,6 +134,17 @@ export class MockAdapter implements CloudProviderAdapter {
     };
     await this.store.set(key, JSON.stringify(stored));
     return { providerResourceId, outputs: stored.outputs, unchanged: false };
+  }
+
+  async planResource(ctx: ProviderContext, req: ResourceRequest): Promise<ResourcePlan> {
+    const existing = await this.read(this.key(ctx, req.name));
+    const address = `mock_${req.serviceKind.replace(/\W/g, '_')}.${req.resourceId}`;
+    if (!existing) return { changes: { add: 1, change: 0, remove: 0 }, actions: [{ address, action: 'create' }], destructive: false };
+    if (existing.idempotencyKey === req.idempotencyKey) return { changes: { add: 0, change: 0, remove: 0 }, actions: [], destructive: false };
+    const replace = config(ctx.target).destructivePlans?.includes(req.resourceId) ?? false;
+    return replace
+      ? { changes: { add: 1, change: 0, remove: 1 }, actions: [{ address, action: 'replace' }], destructive: true }
+      : { changes: { add: 0, change: 1, remove: 0 }, actions: [{ address, action: 'update' }], destructive: false };
   }
 
   async deleteResource(ctx: ProviderContext, res: ResourceIdentifier): Promise<void> {

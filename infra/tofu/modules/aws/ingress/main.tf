@@ -19,7 +19,10 @@ variable "emulator_base_url" {
 }
 
 resource "aws_security_group" "lb" {
-  name        = "${var.name}-lb"
+  # A prefix plus create-before-destroy lets a replacement (e.g. a new VPC) attach the new
+  # group before the old one is deleted; a fixed name would collide, and deleting first fails
+  # while network interfaces still use the group.
+  name_prefix = "${var.name}-lb-"
   description = "Public HTTP/HTTPS for ${var.name}"
   vpc_id      = var.vpc_id
   ingress {
@@ -39,6 +42,9 @@ resource "aws_security_group" "lb" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

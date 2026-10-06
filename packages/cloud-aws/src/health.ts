@@ -95,6 +95,33 @@ export async function checkAwsHealth(kind: string, out: ResourceOutputs, cfg: Cl
   }
 }
 
+const NOT_FOUND = /NotFound|NoSuch|DoesNotExist|NonExistent|NotExist/i;
+
+/** True when an AWS SDK error means "this resource does not exist". */
+export function isAwsNotFound(err: unknown): boolean {
+  const e = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
+  return NOT_FOUND.test(e.name ?? '') || NOT_FOUND.test(e.Code ?? '') || e.$metadata?.httpStatusCode === 404;
+}
+
+/**
+ * Live existence check. Reuses the health probes (which describe the resource by the ids in its
+ * outputs) and maps a not-found answer to `false`; any other failure is `undefined` (unknown).
+ */
+export async function probeAwsExists(kind: string, out: ResourceOutputs, cfg: ClientConfig, signal?: AbortSignal): Promise<boolean | undefined> {
+  try {
+    if (kind === 'compute.container-service') {
+      // DescribeServices reports missing services as `failures`, not as an error.
+      const r = await new ECSClient(cfg).send(new DescribeServicesCommand({ cluster: String(out.cluster_name), services: [String(out.service_name)] }), { abortSignal: signal });
+      const svc = r.services?.[0];
+      return Boolean(svc && svc.status !== 'INACTIVE');
+    }
+    const h = await checkAwsHealth(kind, out, cfg, signal);
+    return h.state === 'UNKNOWN' ? undefined : true;
+  } catch (err) {
+    return isAwsNotFound(err) ? false : undefined;
+  }
+}
+
 export async function readAwsLogs(out: ResourceOutputs, cfg: ClientConfig, limit: number, signal?: AbortSignal): Promise<LogLine[]> {
   if (!out.log_group) return [];
   const r = await new CloudWatchLogsClient(cfg).send(

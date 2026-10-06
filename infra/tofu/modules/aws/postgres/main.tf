@@ -32,7 +32,10 @@ resource "aws_db_subnet_group" "this" {
 }
 
 resource "aws_security_group" "db" {
-  name        = "${var.name}-db"
+  # A prefix plus create-before-destroy lets a replacement (e.g. a new VPC) attach the new
+  # group before the old one is deleted; a fixed name would collide, and deleting first fails
+  # while network interfaces still use the group.
+  name_prefix = "${var.name}-db-"
   description = "Postgres ${var.name}"
   vpc_id      = var.vpc_id
   ingress {
@@ -40,6 +43,9 @@ resource "aws_security_group" "db" {
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
+  }
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

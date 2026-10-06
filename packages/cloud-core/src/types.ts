@@ -103,6 +103,13 @@ export interface ResourceState {
   observedSpecHash?: string;
 }
 
+export interface ResourcePlan {
+  changes: { add: number; change: number; remove: number };
+  actions: { address: string; action: string }[];
+  /** True when any action deletes or replaces something (data loss / downtime risk). */
+  destructive: boolean;
+}
+
 export interface HealthResult {
   state: HealthState;
   message?: string;
@@ -155,6 +162,19 @@ export interface CloudProviderAdapter {
   deleteResource(ctx: ProviderContext, resource: ResourceIdentifier): Promise<void>;
   getResource(ctx: ProviderContext, resource: ResourceIdentifier): Promise<ResourceState>;
   checkHealth(ctx: ProviderContext, resource: ResourceIdentifier): Promise<HealthResult>;
+  /**
+   * Asks the provider API whether the resource is really there. `false` only when the provider
+   * positively reports it gone (deleted out of band); `undefined` when it cannot tell. Lets a
+   * resumed or repeated apply re-create it instead of trusting recorded state.
+   */
+  probeExists?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<boolean | undefined>;
+
+  /**
+   * Optional speculative plan for an existing resource: the provider-level changes an
+   * ensureResource call would make. Lets the platform show real diffs and catch destructive
+   * actions (delete/replace) before approval.
+   */
+  planResource?(ctx: ProviderContext, request: ResourceRequest): Promise<ResourcePlan>;
 
   getLogs?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<LogLine[]>;
   getMetric?(ctx: ProviderContext, resource: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]>;
