@@ -3,6 +3,7 @@ import type { CloudTarget, ProviderContext, ResourceRequest } from '@co/cloud-co
 import { describe, expect, it, vi } from 'vitest';
 import { AwsAdapter, isDestructivePlan } from './adapter.js';
 import { isAwsNotFound } from './health.js';
+import { probePermissions, REQUIRED_ACTIONS } from './permissions.js';
 import { moduleInputs, rootConfig } from './stacks.js';
 
 const target: CloudTarget = {
@@ -134,5 +135,56 @@ describe('isDestructivePlan', () => {
     expect(isDestructivePlan([{ address: 'module.resource.aws_ecs_task_definition.this', action: 'replace' }, { address: 'module.resource.aws_ecs_service.this', action: 'update' }])).toBe(false);
     expect(isDestructivePlan([{ address: 'module.resource.aws_security_group.service', action: 'replace' }])).toBe(true);
     expect(isDestructivePlan([{ address: 'module.resource.aws_db_instance.this', action: 'delete' }])).toBe(true);
+  });
+});
+
+describe('probePermissions', () => {
+  const iamDenying = (denied: string[], calls: string[][] = []) => ({
+    send: (async (cmd: { input: { ActionNames: string[] } }) => {
+      calls.push(cmd.input.ActionNames);
+      return { EvaluationResults: cmd.input.ActionNames.map((a) => ({ EvalActionName: a, EvalDecision: denied.includes(a) ? 'implicitDeny' : 'allowed' })) };
+    }) as never,
+  });
+  const base = { roleArn: 'arn:aws:iam::123456789012:role/co-deploy', stateBucket: 'orkstage-state' };
+
+  it('fails a deployment that needs a denied action, naming the service and actions', async () => {
+    const checks = await probePermissions({ ...base, iam: iamDenying(['rds:CreateDBInstance']), serviceKinds: ['database.postgresql', 'queue'] });
+    expect(checks).toEqual([{ name: 'Permissions: database.postgresql', status: 'missing', message: expect.stringContaining('rds:CreateDBInstance') }]);
+  });
+
+  it('only warns about unused services when validating a target without a deployment', async () => {
+    const checks = await probePermissions({ ...base, iam: iamDenying(['elasticache:CreateReplicationGroup']) });
+    expect(checks).toEqual([expect.objectContaining({ name: 'Permissions: cache.redis', status: 'warn' })]);
+  });
+
+  it('always requires the state bucket actions, in batches of at most 50', async () => {
+    const calls: string[][] = [];
+    const checks = await probePermissions({ ...base, iam: iamDenying(['s3:PutObject'], calls) });
+    expect(checks[0]).toMatchObject({ name: 'Permissions: state', status: 'missing' });
+    expect(calls.every((c) => c.length <= 50)).toBe(true);
+    expect(new Set(calls.flat()).size).toBe(new Set(['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket', ...Object.values(REQUIRED_ACTIONS).flat()]).size);
+  });
+
+  it('skips with guidance when the role may not simulate itself', async () => {
+    const iam = { send: (async () => { throw Object.assign(new Error('denied'), { name: 'AccessDenied' }); }) as never };
+    const checks = await probePermissions({ ...base, iam, serviceKinds: ['queue'] });
+    expect(checks).toEqual([{ name: 'Permissions', status: 'skipped', message: expect.stringContaining('iam:SimulatePrincipalPolicy') }]);
+  });
+
+  it('reports ok when everything is allowed', async () => {
+    const checks = await probePermissions({ ...base, iam: iamDenying([]), serviceKinds: ['queue'] });
+    expect(checks).toEqual([{ name: 'Permissions', status: 'ok', message: expect.stringContaining('queue') }]);
+  });
+});
+
+describe('deployment role template (infra/aws/orkstage-deployment-role.yaml)', () => {
+  it('grants every action the permission probe requires', async () => {
+    const { readFileSync } = await import('node:fs');
+    const text = readFileSync(new URL('../../../infra/aws/orkstage-deployment-role.yaml', import.meta.url), 'utf8');
+    // Action entries: `- svc:Action`, `Action: svc:*` or inline lists `[svc:A, svc:B]`.
+    const granted = [...text.matchAll(/(?:^\s*-\s*|Action:\s*\[?\s*|,\s*)([a-z0-9-]+:[A-Za-z*]+)(?=[\s,\]]|$)/gm)].map((m) => m[1]!);
+    const patterns = granted.map((g) => new RegExp(`^${g.replace(/\*/g, '.*')}$`));
+    const required = [...new Set([...Object.values(REQUIRED_ACTIONS).flat(), 's3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket', 'iam:SimulatePrincipalPolicy'])];
+    expect(required.filter((a) => !patterns.some((p) => p.test(a)))).toEqual([]);
   });
 });

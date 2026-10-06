@@ -97,6 +97,17 @@ MiniStack and keep Azure/OCI simulated.
 
 Opt-in adapter contract test against the emulator: `MINISTACK_E2E=1 pnpm --filter @co/cloud-aws test`.
 
+## Connecting a real AWS account
+
+Launch [`infra/aws/orkstage-deployment-role.yaml`](infra/aws/orkstage-deployment-role.yaml)
+(CloudFormation) in the account: it creates the deployment role OrkStage assumes with an external
+id, scoped to `co-*` names where AWS allows it. Store the external id in your secret manager and
+reference it from the cloud target as `env://NAME` or `aws-sm://<name-or-arn>`. Validating the
+target assumes the role, checks the state bucket and simulates the role against the actions each
+service needs (`iam:SimulatePrincipalPolicy`), so missing permissions show up before a deployment.
+Before applying changes to existing resources the worker runs a real `tofu plan`; deletions or
+replacements in production wait for approval.
+
 ## Repository layout
 
 ```text
@@ -117,6 +128,7 @@ packages/
   runtime/        config validation, logging, secrets, adapter registry wiring
   database/       Prisma schema, migrations, seed
 infra/local/      docker compose for local development (+ MiniStack profile)
+infra/aws/        CloudFormation for the customer-side deployment role
 infra/tofu/       OpenTofu modules per logical resource kind (aws/*)
 docs/             architecture, API map, ADRs
 ```

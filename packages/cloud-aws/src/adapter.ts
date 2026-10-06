@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { IAMClient } from '@aws-sdk/client-iam';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import {
   ProviderError,
@@ -23,12 +24,14 @@ import {
   type ResourceState,
   type TargetValidationCheck,
   type TargetValidationResult,
+  type ValidateTargetOptions,
 } from '@co/cloud-core';
 import { TofuError, type TofuRunner, type TofuStack } from '@co/iac';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
+import { probePermissions } from './permissions.js';
 import { flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 
 export interface AwsAdapterOptions {
@@ -78,7 +81,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     return AWS_CAPABILITIES;
   }
 
-  async validateTarget(rawCtx: ProviderContext): Promise<TargetValidationResult> {
+  async validateTarget(rawCtx: ProviderContext, opts: ValidateTargetOptions = {}): Promise<TargetValidationResult> {
     const ctx = this.effective(rawCtx);
     const checks: TargetValidationCheck[] = [];
     const validatedAt = new Date().toISOString();
@@ -112,6 +115,18 @@ export class AwsAdapter implements CloudProviderAdapter {
           : { name: 'Account access', status: 'error', message: `Credentials resolved to account ${who.Account}, expected ${cfg.accountId}.` },
       );
       checks.push(await this.stateBucketCheck(ctx));
+      // Emulators allow everything; on real AWS, simulate the role against what its modules call.
+      if (!emulator && cfg.roleArn) {
+        checks.push(
+          ...(await probePermissions({
+            iam: new IAMClient(clientCfg),
+            roleArn: cfg.roleArn,
+            stateBucket: stateBucketFor(cfg, ctx.region),
+            serviceKinds: opts.serviceKinds,
+            signal: ctx.signal,
+          })),
+        );
+      }
     } catch (err) {
       checks.push({ name: emulator ? 'Emulator reachable' : 'Assume deployment role', status: 'error', message: safeAwsMessage(err) });
     }
@@ -121,7 +136,7 @@ export class AwsAdapter implements CloudProviderAdapter {
         ? { name: 'Provisioning runner', status: 'ok', message: 'OpenTofu runner configured.' }
         : { name: 'Provisioning runner', status: 'skipped', message: 'No OpenTofu runner in this process (validation only).' },
     );
-    return { ok: checks.every((c) => c.status === 'ok' || c.status === 'skipped'), checks, validatedAt, identity };
+    return { ok: checks.every((c) => c.status !== 'error' && c.status !== 'missing'), checks, validatedAt, identity };
   }
 
   async ensureResource(rawCtx: ProviderContext, req: ResourceRequest): Promise<ResourceResult> {

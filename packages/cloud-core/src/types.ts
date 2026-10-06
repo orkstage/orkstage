@@ -117,7 +117,13 @@ export interface HealthResult {
   checkedAt: string;
 }
 
-export type ValidationCheckStatus = 'ok' | 'missing' | 'error' | 'skipped';
+/** `warn` reports a limitation that does not block deploying (e.g. a service the target is not scoped for). */
+export type ValidationCheckStatus = 'ok' | 'missing' | 'error' | 'skipped' | 'warn';
+
+export interface ValidateTargetOptions {
+  /** Service kinds about to be deployed: permission gaps for these fail validation. */
+  serviceKinds?: string[];
+}
 
 export interface TargetValidationCheck {
   name: string;
@@ -155,7 +161,7 @@ export interface CloudProviderAdapter {
   /** True for simulation adapters. The UI labels simulated deployments explicitly. */
   readonly simulated: boolean;
 
-  validateTarget(ctx: ProviderContext): Promise<TargetValidationResult>;
+  validateTarget(ctx: ProviderContext, opts?: ValidateTargetOptions): Promise<TargetValidationResult>;
   capabilities(target: CloudTarget): CloudCapability[];
 
   ensureResource(ctx: ProviderContext, request: ResourceRequest): Promise<ResourceResult>;

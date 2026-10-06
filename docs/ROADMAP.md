@@ -9,14 +9,14 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 | 1 | Sign in with SSO | 🟡 | OIDC (Entra) implemented, untested without an app registration. Google/GitLab = config; **GitHub needs an OAuth (non-OIDC) adapter**. |
 | 2 | Create/manage a tenant | ✅ | Member invitations: model only, **no invite/accept flow or team UI**. |
 | 3 | Assign a plan | ✅ | Plan editing UI (entitlements) missing. |
-| 4 | Connect an AWS account safely | ✅ | AssumeRole + external id. **Secret-manager resolver** (only `env://` today). |
-| 5 | Validate AWS access | 🟡 | Identity + state bucket. **Per-service permission probing** (IAM simulate) missing. |
+| 4 | Connect an AWS account safely | ✅ | AssumeRole + external id; secret references `env://` and `aws-sm://` (Secrets Manager). |
+| 5 | Validate AWS access | ✅ | Identity, state bucket and per-service permission simulation (`iam:SimulatePrincipalPolicy`); deployment-role CloudFormation in `infra/aws/`. |
 | 6 | Choose a region | ✅ | |
 | 7 | Choose a default template | ✅ | |
 | 8 | Create a logical instance | ✅ | |
 | 9 | Configure application images | 🟡 | Catalog with digests (seeded). **Catalog CRUD UI/API, registry sync, CI hook** missing. |
 | 10 | Review resolved infrastructure | ✅ | |
-| 11 | Run a plan | 🟡 | Platform plan diff ✅. **Showing the real `tofu plan` diff before approval** missing (plan runs inside apply today). |
+| 11 | Run a plan | ✅ | Platform plan diff + real per-resource `tofu plan` in the plan phase; destructive changes escalate production deployments to approval. **Plan diff view in the console** still text-only. |
 | 12 | Deploy asynchronously | ✅ | Real on MiniStack/AWS via OpenTofu, or simulated. |
 | 13 | Watch progress | ✅ | Live steps, Gantt timeline, event log. |
 | 14 | See created resources | ✅ | Topology diagram + list. |
@@ -54,7 +54,6 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 - AWS: ECS autoscaling (`aws_appautoscaling_*` from template `autoscaling`), custom domains (verification + ACM for customer domains), WAF option, ECS Managed Instances.
 
 **Provisioning**
-- Show `tofu plan` output before apply and feed it into the approval gate.
 - Production runner isolation: run the OpenTofu container as an ECS RunTask / Kubernetes Job with a scoped role instead of the worker's Docker socket.
 - Drift job (scheduled refresh-only plans) + remediation flow.
 - Backups API: last successful backup, restore to a new instance.
@@ -81,8 +80,9 @@ Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not starte
 
 ## Suggested order
 
-1. **Real AWS hardening:** tofu plan before apply + approval, permission probing, secret-manager
-   resolver, autoscaling, runner as ECS task. Then test against a real sandbox account.
+1. **Real AWS hardening:** ~~tofu plan before apply + approval~~, ~~permission probing~~,
+   ~~secret-manager resolver~~, autoscaling, runner as ECS task, drift job. Then test against a
+   real sandbox account.
 2. **Azure adapter** (the spec's second provider) incl. cross-cloud allowlisting.
 3. **Product completeness:** teams/invitations, catalog + CI intake, preferences.
 4. **Platform ops:** OTel, E2E/isolation/load tests in CI, control-plane deployment.

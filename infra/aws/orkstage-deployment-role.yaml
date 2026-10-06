@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  OrkStage deployment role. OrkStage assumes this role (with an external id) to provision and
+  operate the resources its templates describe. Launch it once per AWS account you connect.
+  Prefer a dedicated account per environment: the role can create and delete infrastructure.
+
+# Kept in sync with packages/cloud-aws/src/permissions.ts (a unit test fails when a module needs
+# an action this policy does not grant). Physical names created by OrkStage start with `co-`.
+
+Parameters:
+  ControlPlanePrincipalArn:
+    Type: String
+    Description: >-
+      ARN of the identity the OrkStage control plane runs as (its worker task role or IAM user),
+      e.g. arn:aws:iam::111122223333:role/orkstage-worker.
+    AllowedPattern: '^arn:aws[a-z-]*:iam::\d{12}:(role|user)/.+$'
+  ExternalId:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: >-
+      Shared secret OrkStage presents when assuming the role. Generate a random value, store it in
+      your secret manager and reference it from the cloud target (env:// or aws-sm://).
+  RoleName:
+    Type: String
+    Default: co-deploy
+    AllowedPattern: '^[\w+=,.@-]{1,64}$'
+
+Resources:
+  DeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Assumed by OrkStage to provision infrastructure (external id required).
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { AWS: !Ref ControlPlanePrincipalArn }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { 'sts:ExternalId': !Ref ExternalId }
+      Policies:
+        - PolicyName: orkstage-provisioning
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Services whose resources OrkStage names but whose ARNs are not practical to scope.
+              - Sid: Infrastructure
+                Effect: Allow
+                Action:
+                  - ec2:*
+                  - ecs:*
+                  - rds:*
+                  - elasticache:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - application-autoscaling:*
+                  - route53:*
+                  - acm:*
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                Resource: '*'
+              - Sid: ReadOnlyLookups
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:DescribeRepositories
+                  - logs:DescribeLogGroups
+                  - sqs:ListQueues
+                  - s3:ListAllMyBuckets
+                  - secretsmanager:ListSecrets
+                  - iam:ListRoles
+                  - iam:ListInstanceProfiles
+                Resource: '*'
+              - Sid: AmiLookups
+                Effect: Allow
+                Action: [ssm:GetParameter, ssm:GetParameters]
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:*::parameter/aws/service/*'
+              - Sid: ContainerRegistries
+                Effect: Allow
+                Action: ecr:*
+                Resource: !Sub 'arn:${AWS::Partition}:ecr:*:${AWS::AccountId}:repository/co-*'
+              - Sid: Queues
+                Effect: Allow
+                Action: sqs:*
+                Resource: !Sub 'arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:co-*'
+              - Sid: LogGroups
+                Effect: Allow
+                Action: logs:*
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/orkstage/*'
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/orkstage/*:*'
+              - Sid: DatabaseCredentials
+                Effect: Allow
+                Action: secretsmanager:*
+                Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:co-*'
+              - Sid: Buckets
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::co-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::co-*/*'
+              - Sid: StateBucket
+                Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:PutBucketVersioning
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketVersioning
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::orkstage-tfstate-${AWS::AccountId}-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::orkstage-tfstate-${AWS::AccountId}-*/*'
+              # Task execution and EC2 instance roles for services, limited to OrkStage names.
+              - Sid: ServiceRoles
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListInstanceProfilesForRole
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:TagInstanceProfile
+                  - iam:AddRoleToInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/co-*'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/co-*'
+              - Sid: PassServiceRoles
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/co-*'
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService': [ecs-tasks.amazonaws.com, ec2.amazonaws.com]
+              - Sid: ServiceLinkedRoles
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:AWSServiceName':
+                      - ecs.amazonaws.com
+                      - rds.amazonaws.com
+                      - elasticache.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - autoscaling.amazonaws.com
+                      - ecs.application-autoscaling.amazonaws.com
+              # Lets OrkStage check these permissions before deploying (target validation).
+              - Sid: SelfPermissionCheck
+                Effect: Allow
+                Action: iam:SimulatePrincipalPolicy
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${RoleName}'
+
+Outputs:
+  RoleArn:
+    Description: Paste into the OrkStage cloud target (roleArn).
+    Value: !GetAtt DeploymentRole.Arn
+  AccountId:
+    Description: Paste into the OrkStage cloud target (accountId).
+    Value: !Ref AWS::AccountId

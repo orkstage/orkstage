@@ -125,12 +125,15 @@ export class DeploymentRunner {
         const row = await prisma.cloudTarget.findUniqueOrThrow({ where: { id: targetId } });
         if (row.status !== 'ACTIVE') throw new PhaseFailure('VALIDATION_ERROR', `Cloud target ${row.name} is disabled.`);
         for (const region of rs) {
-          const result = await this.ctx.registry.get(row.provider).validateTarget({ target: toCloudTarget(row), region, correlationId: d.correlationId });
+          const serviceKinds = [...new Set(resolved.resources.filter((r) => r.targetId === targetId && r.region === region).map((r) => r.type))];
+          const result = await this.ctx.registry.get(row.provider).validateTarget({ target: toCloudTarget(row), region, correlationId: d.correlationId }, { serviceKinds });
           await prisma.cloudTarget.update({ where: { id: targetId }, data: { lastValidation: result as object, lastValidatedAt: new Date(), health: result.ok ? 'HEALTHY' : 'UNHEALTHY' } });
           if (!result.ok) {
             const failed = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').map((c) => `${c.name}: ${c.message}`);
-            throw new PhaseFailure('AUTHENTICATION_ERROR', `Cloud target ${row.name} (${region}) failed validation — ${failed.join('; ')}`);
+            const onlyPermissions = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').every((c) => c.name.startsWith('Permissions'));
+            throw new PhaseFailure(onlyPermissions ? 'AUTHORIZATION_ERROR' : 'AUTHENTICATION_ERROR', `Cloud target ${row.name} (${region}) failed validation — ${failed.join('; ')}`);
           }
+          for (const c of result.checks.filter((c) => c.status === 'warn' || c.status === 'skipped')) await this.event(d.id, 'warn', PHASE.targets, `${row.name} / ${region} — ${c.name}: ${c.message}`);
           await this.event(d.id, 'info', PHASE.targets, `${row.name} / ${region}: ${result.checks.filter((c) => c.status === 'ok').length} checks passed.`);
         }
       }
