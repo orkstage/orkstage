@@ -53,7 +53,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
       - run: sh scripts/build-wasm.sh
-      - name: dist/scan-wasm is up to date
+      - name: The committed WebAssembly package is up to date
         run: git diff --exit-code -- dist/scan-wasm
       - uses: actions/setup-node@v5
         with:
@@ -76,7 +76,7 @@ jobs:
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, musl: true }
           - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm, musl: true }
-          - { target: x86_64-apple-darwin, os: macos-13 }
+          - { target: x86_64-apple-darwin, os: macos-15-intel }
           - { target: aarch64-apple-darwin, os: macos-latest }
           - { target: x86_64-pc-windows-msvc, os: windows-latest }
           - { target: aarch64-pc-windows-msvc, os: windows-latest }
@@ -95,11 +95,11 @@ jobs:
       - run: cargo build --release --locked -p ork-cli --target ${{ matrix.target }}
 
       # Code signing. Unsigned binaries are blocked by application control on many Windows
-      # machines and by Gatekeeper on macOS, so releases must be signed:
-      #  - Windows: Authenticode, e.g. Azure Trusted Signing (azure/trusted-signing-action) or
-      #    signtool with an EV certificate; timestamp every signature.
-      #  - macOS: codesign with a Developer ID Application certificate and the hardened runtime,
-      #    then notarize with `xcrun notarytool submit --wait` (zip the binary first).
+      # machines and by Gatekeeper on macOS, so releases must be signed.
+      # Windows: Authenticode, for example Azure Trusted Signing (the `azure/trusted-signing-action`
+      # action) or signtool with an EV certificate; timestamp every signature.
+      # macOS: codesign with a Developer ID Application certificate and the hardened runtime,
+      # then notarize with `xcrun notarytool submit --wait` (zip the binary first).
       - name: Sign (Windows, Authenticode)
         if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/') && env.SIGN_WINDOWS == 'true'
         uses: azure/trusted-signing-action@v0

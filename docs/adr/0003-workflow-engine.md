@@ -1,23 +1,24 @@
-# ADR 0003 — Deployment workflow on BullMQ with persisted steps
+# ADR 0003: Deployment workflow on BullMQ with persisted steps
 
-**Status:** accepted (2026-10-04)
+**Status:** accepted on October 4, 2026
 
 ## Options
 
-1. Temporal — durable workflows out of the box; adds a cluster to operate (heavy for the
-   low-cost validation profile, spec §94).
-2. BullMQ + workflow state persisted in Postgres — reuses Redis/Postgres already required.
+1. Temporal: durable workflows out of the box, but it adds a cluster to operate, which is heavy
+   for the low cost validation profile (spec §94).
+2. BullMQ, with the workflow state persisted in Postgres: it reuses the Redis and Postgres the
+   platform already requires.
 
 ## Decision
 
-Option 2. Jobs carry only the deployment id. Steps (phases and resources) are rows created at
-request time; the worker updates them before/after each action. Resume = re-run the job:
-finished phases are skipped and resources with a matching idempotency key are not re-applied.
-BullMQ stalled-job detection re-delivers work from crashed workers. Approval parks the
-deployment; approving re-enqueues it.
+Option 2. Jobs carry only the deployment id. Steps (phases and resources) are rows created when
+the deployment is requested, and the worker updates them before and after each action. Resuming
+means running the job again: finished phases are skipped, and resources with a matching
+idempotency key are not applied again. BullMQ's stalled job detection redelivers work from
+crashed workers. Approval parks the deployment; approving it puts it back in the queue.
 
 ## Consequences
 
-Good enough for minutes-long infrastructure workflows with modest fan-out. If long-running
-human-in-the-loop flows or very large fan-out appear, revisit Temporal; the step model maps
-onto it directly.
+This is good enough for infrastructure workflows that take minutes and fan out moderately. If
+long running flows with people in the loop or very large fan out appear, revisit Temporal; the
+step model maps onto it directly.

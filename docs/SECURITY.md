@@ -1,30 +1,38 @@
 # Security
 
+This page describes the security controls in the platform. To report a vulnerability, see
+[Reporting a vulnerability](#reporting-a-vulnerability).
+
 ## Implemented
 
 | Area | Control |
 |---|---|
-| Sessions | 32-byte random opaque token in an httpOnly `SameSite=Lax` cookie (`Secure` in production); only its SHA-256 is stored; 12 h expiry; revocation on logout. |
-| CSRF | All state-changing requests require `x-co-csrf: 1`; the API grants no cross-origin CORS, so browsers cannot send it cross-site. |
-| OIDC | Authorization code + PKCE (S256), `state` and `nonce` verified, flow kept in a signed short-lived cookie, `returnTo` restricted to relative paths. Provider tokens are discarded. |
-| Account linking | Only by provider-verified email (`email_verified`, or Entra `xms_edov`); `preferred_username` is never trusted (prevents "nOAuth" takeover). Unknown users get no account unless a tenant allow-lists their domain. |
-| Dev login | Disabled unless `AUTH_DEV_LOGIN_ENABLED=true`; startup fails if enabled with `NODE_ENV=production`. |
-| Authorization | CASL abilities per request; tenant-owned queries are scoped to memberships and records are re-checked after loading. Foreign records return 404, not 403. |
-| Secrets | Cloud target config is rejected if it contains secret-like keys; credentials are references (`env://NAME`, `aws-sm://<name-or-arn>`), resolved at use and never stored. Services receive secret *references*. Webhook signing secrets are encrypted at rest (AES-256-GCM, `ENCRYPTION_KEY`). |
-| Cloud access | AWS: AssumeRole with an external id into a customer-created role (`infra/aws/orkstage-deployment-role.yaml`), scoped to OrkStage names; validation simulates the role's permissions before deploying. OpenTofu state holds no secret values (write-only attributes); runs happen in throwaway containers. |
-| Change safety | Real provider plans before applying changes; deletions/replacements in production need approval. Drift scans report out-of-band changes (attribute names only). |
-| API keys & webhooks | Keys are scoped, hashed (SHA-256), expirable and revocable; a key can never mint keys. Outbound webhooks are HMAC-SHA256 signed with a timestamp (5-minute replay window) and blocked from private networks (SSRF guard). |
-| Logging | Pino with redaction of tokens, secrets, cookies, authorization headers. Errors return a code and correlation id, never stack traces. |
-| Rate limits | Global per-client ceiling; stricter limits on login, deploy, destroy, target validation, template publish. |
-| Audit | Append-only: a Postgres trigger rejects `UPDATE`/`DELETE` on `AuditEvent`. |
-| Headers | Helmet with a restrictive CSP. |
-| Supply chain | pnpm build scripts are allow-listed (`pnpm-workspace.yaml`); install-time telemetry denied; very recent releases avoided (minimum release age). |
+| Sessions | A 32 byte random opaque token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production). Only its SHA-256 hash is stored. Sessions expire after 12 hours and are revoked on logout. |
+| CSRF | Every state changing request needs the `x-co-csrf: 1` header. The API grants no cross origin CORS, so browsers cannot send it from another site. |
+| OIDC | Authorization code flow with PKCE (S256); `state` and `nonce` are verified; the flow state lives in a signed cookie with a short lifetime; `returnTo` accepts relative paths only. Provider tokens are discarded. |
+| Account linking | Only by an email the provider verified (`email_verified`, or `xms_edov` for Entra). `preferred_username` is never trusted, which prevents "nOAuth" account takeover. Unknown users get no account unless a tenant allows their email domain. |
+| Development login | Disabled unless `AUTH_DEV_LOGIN_ENABLED=true`. Startup fails if it is enabled with `NODE_ENV=production`. |
+| Authorization | CASL abilities per request. Queries for tenant owned data are scoped to the caller's memberships, and records are checked again after loading. Foreign records return 404, not 403. |
+| Secrets | Cloud target configuration is rejected if it contains keys that look like secrets. Credentials are references (`env://NAME`, `aws-sm://<name-or-arn>`), resolved when used and never stored. Services receive secret references. Webhook signing secrets are encrypted at rest (AES-256-GCM, `ENCRYPTION_KEY`). |
+| Cloud access | AWS: AssumeRole with an external id into a role the customer creates ([`infra/aws/orkstage-deployment-role.yaml`](../infra/aws/orkstage-deployment-role.yaml)), scoped to OrkStage resource names. Target validation simulates the role's permissions before any deployment. OpenTofu state holds no secret values (write only attributes), and every run happens in a throwaway container. |
+| Change safety | Real provider plans run before changes are applied; deletions and replacements in production need approval. Drift scans report changes made outside OrkStage (attribute names only, never values). |
+| API keys and webhooks | Keys are scoped, hashed (SHA-256), can expire and can be revoked; a key can never create keys. Outbound webhooks are signed with HMAC-SHA256 and a timestamp (5 minute replay window) and cannot target private networks (SSRF guard). |
+| Logging | Pino redacts tokens, secrets, cookies and authorization headers. Errors return a code and a correlation id, never a stack trace. |
+| Rate limits | A global ceiling per client, with stricter limits on login, deploy, destroy, target validation and template publishing. |
+| Audit | Append only: a Postgres trigger rejects `UPDATE` and `DELETE` on `AuditEvent`. |
+| Headers | Helmet with a restrictive Content Security Policy. |
+| Supply chain | pnpm build scripts are allow listed (`pnpm-workspace.yaml`), install time telemetry is denied, and very recent releases are avoided (minimum release age). |
 
 ## Not yet (tracked)
 
-- MFA policy, session listing/revocation UI, invitation acceptance flow.
+- MFA policy, a UI to list and revoke sessions, and the invitation acceptance flow.
 - Container image scanning in CI (dependencies are audited with `pnpm audit`).
-- Runner isolation without the Docker socket (ECS RunTask / Kubernetes Job with a scoped role).
-- OIDC providers beyond Entra are read from `OIDC_<KEY>_*` without startup validation.
+- Runner isolation without the Docker socket (ECS RunTask or a Kubernetes Job with a scoped role).
+- OIDC providers other than Entra are read from `OIDC_<KEY>_*` without validation at startup.
 
-Report vulnerabilities privately to the platform team; do not open public issues.
+## Reporting a vulnerability
+
+Do not open a public issue. Report it privately through
+[GitHub Security Advisories](https://github.com/orkstage/orkstage/security/advisories/new) or by
+email to security@orkstage.io. The full policy, including response times, is in the
+[organization security policy](https://github.com/orkstage/.github/blob/main/SECURITY.md).

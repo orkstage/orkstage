@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  TOFU_VERSION: 1.12.7
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+      - run: tofu fmt -check -recursive -diff modules
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+      - name: Cache provider plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: tofu-plugins-${{ hashFiles('modules/**/versions.tf') }}
+      # Every module must initialize and validate on its own (no backend, no credentials).
+      - name: Validate each module
+        env:
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          status=0
+          for dir in modules/*/*/; do
+            echo "::group::$dir"
+            if tofu -chdir="$dir" init -backend=false -input=false -no-color \
+              && tofu -chdir="$dir" validate -no-color; then
+              echo "ok: $dir"
+            else
+              echo "::error::validation failed in $dir"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
+
+  runner-image:
+    # The runner image bakes the modules in at /modules; make sure it still builds.
+    # `scripts/polyrepo/split.sh` adds `docker/tofu-runner.Dockerfile` to this repository.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -f docker/tofu-runner.Dockerfile -t orkstage/tofu-runner:ci .
+      - run: docker run --rm orkstage/tofu-runner:ci version

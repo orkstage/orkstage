@@ -1,0 +1,84 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search the existing issues first.
+        **Security issues do not belong here:** report them privately as described in the security policy.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Control API or worker (orkstage)
+        - Console (orkstage-console)
+        - CLI or scan engine (orkstage-cli)
+        - OpenTofu modules or runner image (orkstage-modules)
+        - Website or documentation (orkstage-site)
+        - Local stack (orkstage-dev, Docker Compose)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the stack with the Docker Compose quickstart
+        2. Deploy the instance Acme Staging (local AWS)
+        3. See the error in the deployment timeline
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag, image tag or commit SHA you run.
+      placeholder: main at 70d951d
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run OrkStage
+      options:
+        - Docker Compose quickstart
+        - From source (pnpm, cargo or tofu)
+        - Another setup on my own infrastructure
+        - Not applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Cloud provider involved
+      multiple: true
+      options:
+        - AWS (real account)
+        - MiniStack (local AWS emulator)
+        - Simulated provider (Azure, OCI or mock)
+        - None
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and correlation ids
+      description: Relevant log lines and the correlation id shown with API errors. Remove secrets, tokens and account ids first.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues and discussions.
+          required: true
+        - label: The logs and screenshots above contain no secrets or credentials.
+          required: true

@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # pnpm workspace (root lockfile covers apps/* and packages/*).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      nestjs:
+        patterns: ['@nestjs/*']
+      prisma:
+        patterns: ['prisma', '@prisma/*']
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Base images of the platform image.
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+
+  # Images pinned in the local Compose stack (Postgres, Redis, MiniStack).
+  - package-ecosystem: docker-compose
+    directory: /infra/local
+    schedule:
+      interval: weekly

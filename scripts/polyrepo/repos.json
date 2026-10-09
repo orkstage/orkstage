@@ -1,0 +1,175 @@
+{
+  "$comment": "Repository metadata for scripts/polyrepo/publish.sh. Order matters: orkstage-dev is pushed last because its submodules must already exist. 'dir' is the folder name in the split output; 'openSource' records the intent to make the repository public later. publish.sh always creates repositories as private and never changes the visibility of an existing one.",
+  "org": "orkstage",
+  "homepage": "https://orkstage.io",
+  "repos": [
+    {
+      "name": "orkstage",
+      "dir": "orkstage",
+      "description": "Open source multicloud control plane. Describe an environment once, place each resource on the cloud, account and region that fits it, review plan and cost, and deploy with OpenTofu. AGPL core with Enterprise features in ee/.",
+      "homepage": "https://orkstage.io",
+      "topics": [
+        "platform-engineering",
+        "multicloud",
+        "control-plane",
+        "internal-developer-platform",
+        "opentofu",
+        "terraform",
+        "iac",
+        "aws",
+        "devops",
+        "infrastructure-as-code",
+        "nestjs",
+        "typescript",
+        "bullmq",
+        "prisma",
+        "postgresql",
+        "self-hosted"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": true,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": "orkstage-console",
+      "dir": "orkstage-console",
+      "description": "Web console for OrkStage: template builder, multicloud placement, plan and cost preview, deployments, topology, health and incidents. Next.js, AGPL.",
+      "homepage": "https://orkstage.io/docs/user-guide/console",
+      "topics": [
+        "platform-engineering",
+        "multicloud",
+        "control-plane",
+        "internal-developer-platform",
+        "nextjs",
+        "react",
+        "typescript",
+        "react-flow",
+        "echarts",
+        "devops",
+        "dashboard"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": "orkstage-cli",
+      "dir": "orkstage-cli",
+      "description": "The ork CLI and the OrkStage scan engine. Turns Terraform, CloudFormation, Kubernetes, Helm and Compose projects into OrkStage templates, then pushes and deploys them. Rust, also compiled to WebAssembly. Preview.",
+      "homepage": "https://orkstage.io/docs/developer/cli",
+      "topics": [
+        "cli",
+        "rust",
+        "webassembly",
+        "wasm",
+        "iac",
+        "terraform",
+        "opentofu",
+        "cloudformation",
+        "kubernetes",
+        "docker-compose",
+        "platform-engineering",
+        "devops",
+        "static-analysis"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": "orkstage-modules",
+      "dir": "orkstage-modules",
+      "description": "OpenTofu modules behind every OrkStage resource on AWS: VPC, ECR, ECS, RDS Postgres, ElastiCache Valkey, SQS, S3, ALB and Route 53. No secrets in state. Usable on their own. Apache-2.0.",
+      "homepage": "https://orkstage.io/docs/self-hosting/opentofu",
+      "topics": [
+        "opentofu",
+        "terraform",
+        "terraform-modules",
+        "iac",
+        "infrastructure-as-code",
+        "aws",
+        "ecs",
+        "rds",
+        "elasticache",
+        "platform-engineering",
+        "devops"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": "orkstage-site",
+      "dir": "orkstage-site",
+      "description": "Source of orkstage.io: the OrkStage landing page and documentation. Next.js static export with Fumadocs, hosted on S3 and CloudFront.",
+      "homepage": "https://orkstage.io",
+      "topics": [
+        "documentation",
+        "nextjs",
+        "fumadocs",
+        "mdx",
+        "static-site",
+        "orkstage"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": ".github",
+      "dir": ".github",
+      "description": "Organization profile and default community health files for OrkStage: contributing guide, code of conduct, security policy, issue forms.",
+      "homepage": "https://orkstage.io",
+      "topics": [
+        "community",
+        "orkstage"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": false,
+      "hasDiscussions": false,
+      "socialPreview": null
+    },
+    {
+      "name": "orkstage-dev",
+      "dir": "orkstage-dev",
+      "description": "Meta repository for OrkStage development: every repository as a pinned git submodule, plus the Docker Compose stack (Postgres, Redis, Mailpit, MiniStack) to run them together locally.",
+      "homepage": "https://orkstage.io/docs/contributing/development-setup",
+      "topics": [
+        "platform-engineering",
+        "docker-compose",
+        "git-submodules",
+        "developer-environment",
+        "devops",
+        "orkstage"
+      ],
+      "visibility": "private",
+      "openSource": true,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": ".github/assets/social-preview.png"
+    },
+    {
+      "name": "orkstage-licensing",
+      "dir": null,
+      "description": "Private: OrkStage Enterprise license signing service and keys.",
+      "homepage": "https://orkstage.io",
+      "topics": [],
+      "visibility": "private",
+      "openSource": false,
+      "hasIssues": true,
+      "hasDiscussions": false,
+      "socialPreview": null
+    }
+  ]
+}

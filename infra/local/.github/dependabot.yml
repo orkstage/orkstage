@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Proposes new pins for the submodules; review the combination before merging.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Images pinned in `docker-compose.yml` (Postgres, Redis, Mailpit, MiniStack, collector).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

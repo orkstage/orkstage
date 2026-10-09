@@ -1,0 +1,26 @@
+version: 2
+registries:
+  # The @orkstage/* packages come from GitHub Packages.
+  github-packages:
+    type: npm-registry
+    url: https://npm.pkg.github.com
+    token: ${{ secrets.DEPENDABOT_PACKAGES_TOKEN }}
+updates:
+  - package-ecosystem: npm
+    directory: /
+    registries: [github-packages]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      orkstage:
+        patterns: ['@orkstage/*']
+      react-next:
+        patterns: ['next', 'react', 'react-dom', '@types/react', '@types/react-dom']
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

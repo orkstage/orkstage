@@ -1,88 +1,103 @@
 # Roadmap and gap analysis
 
-Status against the spec. ✅ done and verified · 🟡 partial · ⬜ not started.
+Status against the specification. **Done** means implemented and verified, **Partial** means
+implemented with gaps, **Not started** means nothing exists yet.
 
 ## Acceptance criteria (spec §96)
 
 | # | Criterion | Status | Gap |
 |---|---|---|---|
-| 1 | Sign in with SSO | 🟡 | OIDC (Entra) implemented, untested without an app registration. Google/GitLab = config; **GitHub needs an OAuth (non-OIDC) adapter**. |
-| 2 | Create/manage a tenant | ✅ | Member invitations: model only, **no invite/accept flow or team UI**. |
-| 3 | Assign a plan | ✅ | Plan editing UI (entitlements) missing. |
-| 4 | Connect an AWS account safely | ✅ | AssumeRole + external id; secret references `env://` and `aws-sm://` (Secrets Manager). |
-| 5 | Validate AWS access | ✅ | Identity, state bucket and per-service permission simulation (`iam:SimulatePrincipalPolicy`); deployment-role CloudFormation in `infra/aws/`. |
-| 6 | Choose a region | ✅ | |
-| 7 | Choose a default template | ✅ | |
-| 8 | Create a logical instance | ✅ | |
-| 9 | Configure application images | 🟡 | Catalog with digests (seeded). **Catalog CRUD UI/API, registry sync, CI hook** missing. |
-| 10 | Review resolved infrastructure | ✅ | |
-| 11 | Run a plan | ✅ | Platform plan diff + real per-resource `tofu plan` in the plan phase; destructive changes escalate production deployments to approval. **Plan diff view in the console** still text-only. |
-| 12 | Deploy asynchronously | ✅ | Real on MiniStack/AWS via OpenTofu, or simulated. |
-| 13 | Watch progress | ✅ | Live steps, Gantt timeline, event log. |
-| 14 | See created resources | ✅ | Topology diagram + list. |
-| 15 | See service health | ✅ | SDK-based on AWS, simulated elsewhere. |
-| 16 | Logs/metrics/traces | 🟡 | AWS logs via CloudWatch; **metrics (CloudWatch GetMetricData) and traces (OTel) missing** for real targets. |
-| 17 | Customer status page | ✅ | Public/subscription visibility modes missing. |
-| 18 | Deployment/incident notifications | ✅ | In-app + email. Webhook/Slack/Teams channels missing; preferences UI missing. |
-| 19 | Create/update incidents | ✅ | Maintenance windows: model only. |
-| 20 | Destroy safely | ✅ | Backup verification is informational, not enforced. |
-| 21 | Audit everything | ✅ | DB-enforced append-only. Export/retention policy missing. |
-| 22 | Modify/clone/create templates | ✅ | Visual builder + YAML. |
-| 23 | Explicit template upgrade | 🟡 | Version switch + plan ✅; **side-by-side template diff** in UI missing. |
-| 24 | Run locally without credentials | ✅ | |
-| 25 | Deterministic mock deployment | ✅ | |
+| 1 | Sign in with SSO | Partial | OIDC (Entra) is implemented but untested without an app registration. Google and GitLab are configuration only. **GitHub needs an OAuth adapter (it is not OIDC).** |
+| 2 | Create and manage a tenant | Done | Member invitations exist in the model only: **no invite and accept flow, no team UI**. |
+| 3 | Assign a plan | Done | No UI to edit plans (entitlements). |
+| 4 | Connect an AWS account safely | Done | AssumeRole with an external id; secret references `env://` and `aws-sm://` (Secrets Manager). |
+| 5 | Validate AWS access | Done | Identity, state bucket and permission simulation per service (`iam:SimulatePrincipalPolicy`); deployment role CloudFormation in `infra/aws/`. |
+| 6 | Choose a region | Done | |
+| 7 | Choose a default template | Done | |
+| 8 | Create a logical instance | Done | |
+| 9 | Configure application images | Partial | Catalog with digests (seeded). **Catalog management UI and API, registry sync and a CI hook** are missing. |
+| 10 | Review resolved infrastructure | Done | |
+| 11 | Run a plan | Done | Platform plan diff plus a real `tofu plan` per resource in the plan phase; destructive changes send production deployments to approval. **The plan diff view in the console** is still text only. |
+| 12 | Deploy asynchronously | Done | Real on MiniStack and AWS through OpenTofu, or simulated. |
+| 13 | Watch progress | Done | Live steps, Gantt timeline, event log. |
+| 14 | See created resources | Done | Topology diagram and list. |
+| 15 | See service health | Done | Through the AWS SDK on AWS, simulated elsewhere. |
+| 16 | Logs, metrics, traces | Partial | AWS logs through CloudWatch. **Metrics (CloudWatch GetMetricData) and traces (OTel)** are missing for real targets. |
+| 17 | Customer status page | Done | Public and subscription visibility modes are missing. |
+| 18 | Deployment and incident notifications | Done | Console and email. Webhook, Slack and Teams channels are missing, and so is a preferences UI. |
+| 19 | Create and update incidents | Done | Maintenance windows exist in the model only. |
+| 20 | Destroy safely | Done | Backup verification is informational, not enforced. |
+| 21 | Audit everything | Done | Append only, enforced by the database. Retention policy missing; export is an Enterprise feature. |
+| 22 | Modify, clone and create templates | Done | Visual builder and YAML. |
+| 23 | Explicit template upgrade | Partial | Version switch and plan work; a **side by side template diff** in the UI is missing. |
+| 24 | Run locally without credentials | Done | |
+| 25 | Deterministic mock deployment | Done | |
 
-## True multi-cloud acceptance (spec §43)
+## Multicloud acceptance (spec §43)
 
 | Item | Status | Gap |
 |---|---|---|
-| Register AWS / Azure / OCI targets | 🟡 | AWS real; **Azure and OCI adapters do not exist** (simulated only). |
-| Validate all three | 🟡 | Same. |
-| Template with ECS + Azure PG + OCI storage | ✅ | `multicloud-reference`. |
-| Cross-cloud connectivity | 🟡 | Strategy chosen + surfaced; **no VPN/interconnect or allowlist provisioning** (e.g. Azure PG firewall rule from AWS NAT IPs). |
-| Topology and cost preview | ✅ | Static pricing; **pricing API adapters** missing. |
-| Retry only failed resources | ✅ | |
-| Detect drift | ✅ | Mock per health check; AWS via scheduled refresh-only plans (attribute-level, emulator noise filtered); redeploy restores drifted resources. |
-| Incident on unhealthy managed dependency | ✅ | |
-| Dependency-aware destroy | ✅ | |
+| Register AWS, Azure and OCI targets | Partial | AWS is real; **Azure and OCI adapters do not exist** (simulated only). |
+| Validate all three | Partial | Same. |
+| Template with ECS, Azure Postgres and OCI storage | Done | `multicloud-reference`. |
+| Cross cloud connectivity | Partial | The strategy is chosen and shown; **no VPN, interconnect or allowlist provisioning** (for example an Azure Postgres firewall rule for the AWS NAT addresses). |
+| Topology and cost preview | Done | Static pricing; **pricing API adapters** are missing. |
+| Retry only failed resources | Done | |
+| Detect drift | Done | Mock: on every health check. AWS: scheduled refresh only plans (attribute level, emulator noise filtered). A redeploy restores drifted resources. |
+| Incident on an unhealthy managed dependency | Done | |
+| Dependency aware destroy | Done | |
 
 ## Platform capabilities still missing
 
 **Cloud providers**
-- Azure adapter (Container Apps, PostgreSQL Flexible Server, Blob, Service Bus, App Gateway, DNS) + OpenTofu `azurerm` modules + workload-identity auth.
-- OCI adapter (Object Storage first) + modules; GCP adapter later.
-- AWS: custom domains (verification + ACM for customer domains), WAF option, ECS Managed Instances.
+
+- Azure adapter (Container Apps, PostgreSQL Flexible Server, Blob, Service Bus, App Gateway, DNS)
+  with OpenTofu `azurerm` modules and workload identity authentication.
+- OCI adapter (Object Storage first) and modules; a GCP adapter later.
+- AWS: custom domains (verification and ACM for customer domains), a WAF option, ECS Managed
+  Instances.
 
 **Provisioning**
-- Production runner isolation: run the OpenTofu container as an ECS RunTask / Kubernetes Job with a scoped role instead of the worker's Docker socket.
+
+- Production runner isolation: run the OpenTofu container as an ECS RunTask or a Kubernetes Job
+  with a scoped role instead of using the worker's Docker socket.
 - Backups API: last successful backup, restore to a new instance.
-- Brownfield import/adoption (spec §89).
+- Import and adoption of existing resources (spec §89).
 
 **Product**
+
 - Team management: invitations, roles per tenant, member removal.
-- Application catalog management + CI/CD intake endpoint (`application + version + digest`, signed webhook).
-- Plan/entitlement admin UI, feature-flag admin, platform settings UI, policy configuration UI.
-- Notification preferences UI; webhook/Slack/Teams channels.
+- Application catalog management and the CI/CD intake endpoint (application, version and digest,
+  signed webhook).
+- Admin UIs for plans and entitlements, feature flags, platform settings and policies.
+- Notification preferences UI; webhook, Slack and Teams channels.
 - Public status pages and status subscriptions.
-- Cost: pricing adapters (AWS Price List API), actual-spend (Cost Explorer) vs estimate.
+- Cost: pricing adapters (AWS Price List API), actual spend (Cost Explorer) compared with the
+  estimate.
 
 **Observability of the platform itself**
-- OpenTelemetry SDK in API/worker (traces + metrics), the §77 metrics, dashboards, SLO alerts.
+
+- OpenTelemetry SDK in the API and the worker (traces and metrics), the §77 metrics, dashboards,
+  SLO alerts.
 
 **Quality and operations**
-- Playwright E2E for the acceptance flow; API integration tests in CI with Postgres/Redis.
-- Tenant-isolation test suite (every endpoint × role × foreign tenant).
-- Load tests (p95 < 300 ms target), dependency/image scanning in CI.
-- Deployment of the control plane itself (container images, IaC for OrkStage on AWS), backups
-  and DR runbooks, `OPERATIONS.md` / `RUNBOOKS.md`.
-- Postgres row-level security as an extra isolation layer.
+
+- Playwright end to end tests for the acceptance flow; API integration tests in CI with Postgres
+  and Redis.
+- A tenant isolation test suite (every endpoint, every role, a foreign tenant).
+- Load tests (p95 under 300 ms as the target), dependency and image scanning in CI.
+- Deployment of the control plane itself (container images, IaC for OrkStage on AWS), backups,
+  disaster recovery runbooks, `OPERATIONS.md` and `RUNBOOKS.md`.
+- Postgres row level security as an extra isolation layer.
 
 ## Suggested order
 
-1. **Real AWS hardening:** ~~tofu plan before apply + approval~~, ~~permission probing~~,
-   ~~secret-manager resolver~~, ~~autoscaling~~, runner as ECS task, ~~drift job~~. Then test against a
-   real sandbox account.
-2. **Azure adapter** (the spec's second provider) incl. cross-cloud allowlisting.
-3. **Product completeness:** teams/invitations, catalog + CI intake, preferences.
-4. **Platform ops:** OTel, E2E/isolation/load tests in CI, control-plane deployment.
-5. OCI/GCP, public status pages, FinOps, import/adoption.
+1. **Real AWS hardening.** Done: `tofu plan` before apply with approval, permission probing, the
+   secret manager resolver, autoscaling, the drift job. Left: the runner as an ECS task, then a
+   test against a real sandbox account.
+2. **Azure adapter** (the second provider in the specification), including cross cloud
+   allowlisting.
+3. **Product completeness:** teams and invitations, catalog and CI intake, preferences.
+4. **Platform operations:** OpenTelemetry, end to end, isolation and load tests in CI,
+   deployment of the control plane.
+5. OCI and GCP, public status pages, FinOps, import and adoption.

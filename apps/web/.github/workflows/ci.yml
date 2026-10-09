@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  # Read access to the @orkstage/* packages in GitHub Packages.
+  packages: read
+
+jobs:
+  typecheck-build:
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@orkstage'
+
+      # The console depends on @orkstage/contracts, /authorization, /templates and /domain,
+      # published by the orkstage repository. Until they are published, there is nothing to
+      # install against: report it and skip the remaining steps instead of failing every run.
+      - name: Check that the shared packages are published
+        id: packages
+        run: |
+          if npm view @orkstage/contracts version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Console build skipped::@orkstage/contracts is not published to GitHub Packages yet, so dependencies cannot be installed."
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.packages.outputs.available == 'true'
+        with:
+          version: 12.5.1
+
+      # No lockfile is committed until the first install against the published packages.
+      - name: Install
+        if: steps.packages.outputs.available == 'true'
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
+
+      - name: Typecheck
+        if: steps.packages.outputs.available == 'true'
+        run: pnpm typecheck
+
+      - name: Build
+        if: steps.packages.outputs.available == 'true'
+        run: pnpm build
+        env:
+          API_INTERNAL_URL: http://localhost:4000
