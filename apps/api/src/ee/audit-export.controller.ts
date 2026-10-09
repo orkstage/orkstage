@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-OrkStage-Enterprise
 // Copyright OrkStage. Licensed under the OrkStage Enterprise License (see ./LICENSE).
-import type { AuditEvent, PrismaClient } from '@co/database';
+import type { AuditEvent, PrismaClient } from '@orkstage/database';
 import { Controller, Get, Inject, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';

@@ -1,8 +1,8 @@
-import { AdapterRegistry, type CloudTarget } from '@co/cloud-core';
-import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@co/cloud-mock';
-import { DEFAULT_ENTITLEMENTS } from '@co/domain';
-import { loadBuiltinTemplates } from '@co/templates/builtin';
-import type { EnvironmentTemplate } from '@co/templates';
+import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
+import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@orkstage/cloud-mock';
+import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';
+import { loadBuiltinTemplates } from '@orkstage/templates/builtin';
+import type { EnvironmentTemplate } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
 import {
   compileInfrastructure,

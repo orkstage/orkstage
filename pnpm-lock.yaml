@@ -181,34 +181,34 @@ importers:
 
   apps/api:
     dependencies:
-      '@co/authorization':
+      '@orkstage/authorization':
         specifier: workspace:*
         version: link:../../packages/authorization
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../../packages/cloud-core
-      '@co/cloud-mock':
+      '@orkstage/cloud-mock':
         specifier: workspace:*
         version: link:../../packages/cloud-mock
-      '@co/contracts':
+      '@orkstage/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@co/database':
+      '@orkstage/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@co/licensing':
+      '@orkstage/licensing':
         specifier: workspace:*
         version: link:../../packages/licensing
-      '@co/provisioning':
+      '@orkstage/provisioning':
         specifier: workspace:*
         version: link:../../packages/provisioning
-      '@co/runtime':
+      '@orkstage/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@co/templates':
+      '@orkstage/templates':
         specifier: workspace:*
         version: link:../../packages/templates
       '@fastify/cookie':
@@ -278,16 +278,16 @@ importers:
 
   apps/web:
     dependencies:
-      '@co/authorization':
+      '@orkstage/authorization':
         specifier: workspace:*
         version: link:../../packages/authorization
-      '@co/contracts':
+      '@orkstage/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@co/templates':
+      '@orkstage/templates':
         specifier: workspace:*
         version: link:../../packages/templates
       '@dagrejs/dagre':
@@ -366,25 +366,25 @@ importers:
 
   apps/worker:
     dependencies:
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../../packages/cloud-core
-      '@co/contracts':
+      '@orkstage/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@co/database':
+      '@orkstage/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@co/provisioning':
+      '@orkstage/provisioning':
         specifier: workspace:*
         version: link:../../packages/provisioning
-      '@co/runtime':
+      '@orkstage/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@co/templates':
+      '@orkstage/templates':
         specifier: workspace:*
         version: link:../../packages/templates
       bullmq:
@@ -450,19 +450,19 @@ importers:
       '@aws-sdk/client-sts':
         specifier: 3.1146.0
         version: 3.1146.0
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../cloud-core
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
-      '@co/iac':
+      '@orkstage/iac':
         specifier: workspace:*
         version: link:../iac
 
   packages/cloud-core:
     dependencies:
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
       vitest:
@@ -471,13 +471,13 @@ importers:
 
   packages/cloud-mock:
     dependencies:
-      '@co/cloud-aws':
+      '@orkstage/cloud-aws':
         specifier: workspace:*
         version: link:../cloud-aws
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../cloud-core
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -489,10 +489,10 @@ importers:
 
   packages/database:
     dependencies:
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
-      '@co/templates':
+      '@orkstage/templates':
         specifier: workspace:*
         version: link:../templates
       '@prisma/adapter-pg':
@@ -520,17 +520,17 @@ importers:
 
   packages/provisioning:
     dependencies:
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../cloud-core
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
-      '@co/templates':
+      '@orkstage/templates':
         specifier: workspace:*
         version: link:../templates
     devDependencies:
-      '@co/cloud-mock':
+      '@orkstage/cloud-mock':
         specifier: workspace:*
         version: link:../cloud-mock
 
@@ -539,19 +539,19 @@ importers:
       '@aws-sdk/client-secrets-manager':
         specifier: 3.1146.0
         version: 3.1146.0
-      '@co/cloud-aws':
+      '@orkstage/cloud-aws':
         specifier: workspace:*
         version: link:../cloud-aws
-      '@co/cloud-core':
+      '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../cloud-core
-      '@co/cloud-mock':
+      '@orkstage/cloud-mock':
         specifier: workspace:*
         version: link:../cloud-mock
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
-      '@co/iac':
+      '@orkstage/iac':
         specifier: workspace:*
         version: link:../iac
       ioredis:
@@ -566,7 +566,7 @@ importers:
 
   packages/templates:
     dependencies:
-      '@co/domain':
+      '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
       yaml:

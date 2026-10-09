@@ -1,5 +1,5 @@
-import { AWS_CAPABILITIES } from '@co/cloud-aws/catalog';
-import type { CloudCapability } from '@co/cloud-core';
+import { AWS_CAPABILITIES } from '@orkstage/cloud-aws/catalog';
+import type { CloudCapability } from '@orkstage/cloud-core';
 
 /**
  * SIMULATION CATALOGS. Azure and OCI adapters are not implemented yet (milestone 1 is AWS

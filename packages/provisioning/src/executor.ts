@@ -1,5 +1,5 @@
-import { ProviderError, type AdapterRegistry, type ProviderContext, type ResourceOutputs, type ResourceResult } from '@co/cloud-core';
-import { DomainError, isRetryable, operationKey, type FailureClass, type StepStatus } from '@co/domain';
+import { ProviderError, type AdapterRegistry, type ProviderContext, type ResourceOutputs, type ResourceResult } from '@orkstage/cloud-core';
+import { DomainError, isRetryable, operationKey, type FailureClass, type StepStatus } from '@orkstage/domain';
 import type { ResolvedInfrastructure, ResolvedResource } from './types.js';
 
 export interface StepFailure {

@@ -1,5 +1,5 @@
 {
-  "name": "@co/provisioning",
+  "name": "@orkstage/provisioning",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,12 +18,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@co/cloud-core": "workspace:*",
-    "@co/domain": "workspace:*",
-    "@co/templates": "workspace:*"
+    "@orkstage/cloud-core": "workspace:*",
+    "@orkstage/domain": "workspace:*",
+    "@orkstage/templates": "workspace:*"
   },
   "devDependencies": {
-    "@co/cloud-mock": "workspace:*"
+    "@orkstage/cloud-mock": "workspace:*"
   },
   "files": [
     "dist"

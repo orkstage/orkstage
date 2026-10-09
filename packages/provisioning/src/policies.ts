@@ -1,6 +1,6 @@
-import type { CloudCapability } from '@co/cloud-core';
-import type { Entitlements } from '@co/domain';
-import type { EnvironmentTemplate, TemplateResource } from '@co/templates';
+import type { CloudCapability } from '@orkstage/cloud-core';
+import type { Entitlements } from '@orkstage/domain';
+import type { EnvironmentTemplate, TemplateResource } from '@orkstage/templates';
 import { effectiveProvider } from './connectivity.js';
 import type {
   CostEstimate,

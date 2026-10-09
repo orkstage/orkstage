@@ -1,4 +1,4 @@
-import type { NotificationJob } from '@co/contracts';
+import type { NotificationJob } from '@orkstage/contracts';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';
 

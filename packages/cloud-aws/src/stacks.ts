@@ -1,5 +1,5 @@
-import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@co/cloud-core';
-import { fitName, sha256 } from '@co/domain';
+import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
+import { fitName, sha256 } from '@orkstage/domain';
 import { awsConfig, EMULATED_SERVICES, isEmulator, stateBucketFor } from './config.js';
 
 const MODULE_BY_CAPABILITY: Record<string, string> = {

@@ -1,4 +1,4 @@
-import { DomainError } from '@co/domain';
+import { DomainError } from '@orkstage/domain';
 import {
   Catch,
   HttpException,

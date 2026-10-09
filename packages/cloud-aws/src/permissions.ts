@@ -1,5 +1,5 @@
 import { IAMClient, SimulatePrincipalPolicyCommand } from '@aws-sdk/client-iam';
-import type { TargetValidationCheck } from '@co/cloud-core';
+import type { TargetValidationCheck } from '@orkstage/cloud-core';
 
 /**
  * The IAM actions each module in infra/tofu/modules/aws needs to create, update and delete its

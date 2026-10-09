@@ -1,6 +1,6 @@
-import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto, type StatusPageDto } from '@co/contracts';
-import type { AuditEvent, PrismaClient } from '@co/database';
-import { worstStatus, type StatusState } from '@co/domain';
+import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto, type StatusPageDto } from '@orkstage/contracts';
+import type { AuditEvent, PrismaClient } from '@orkstage/database';
+import { worstStatus, type StatusState } from '@orkstage/domain';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';

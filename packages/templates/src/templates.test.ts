@@ -1,4 +1,4 @@
-﻿import { DEFAULT_ENTITLEMENTS, type PlanCode } from '@co/domain';
+﻿import { DEFAULT_ENTITLEMENTS, type PlanCode } from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';
 import {
   applyVariables,

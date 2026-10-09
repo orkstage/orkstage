@@ -1,5 +1,5 @@
 {
-  "name": "@co/authorization",
+  "name": "@orkstage/authorization",
   "version": "0.1.0",
   "private": true,
   "type": "module",

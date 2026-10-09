@@ -1,4 +1,4 @@
-import { loggerOptions, type PlatformConfig } from '@co/runtime';
+import { loggerOptions, type PlatformConfig } from '@orkstage/runtime';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';

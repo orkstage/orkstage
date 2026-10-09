@@ -14,8 +14,8 @@ import {
   type ResourceResult,
   type ResourceState,
   type TargetValidationResult,
-} from '@co/cloud-core';
-import { sha256, type FailureClass, type HealthState } from '@co/domain';
+} from '@orkstage/cloud-core';
+import { sha256, type FailureClass, type HealthState } from '@orkstage/domain';
 import { SIMULATED_CATALOGS, type SimulatedProvider } from './catalogs.js';
 import type { MockStateStore } from './store.js';
 

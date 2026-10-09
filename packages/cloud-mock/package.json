@@ -1,5 +1,5 @@
 {
-  "name": "@co/cloud-mock",
+  "name": "@orkstage/cloud-mock",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@co/cloud-aws": "workspace:*",
-    "@co/cloud-core": "workspace:*",
-    "@co/domain": "workspace:*"
+    "@orkstage/cloud-aws": "workspace:*",
+    "@orkstage/cloud-core": "workspace:*",
+    "@orkstage/domain": "workspace:*"
   },
   "files": [
     "dist"

@@ -1,10 +1,10 @@
-import type { NotificationJob } from '@co/contracts';
+import type { NotificationJob } from '@orkstage/contracts';
 import {
   SecretBox,
   sendWebhook,
   WEBHOOK_DISABLE_AFTER_FAILURES,
   WEBHOOK_RETRY_DELAYS_S,
-} from '@co/runtime';
+} from '@orkstage/runtime';
 import { createHash } from 'node:crypto';
 import type { WorkerContext } from './context.js';
 

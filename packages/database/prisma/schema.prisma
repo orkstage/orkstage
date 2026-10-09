@@ -162,7 +162,7 @@ model Plan {
   id           String   @id @default(uuid(7)) @db.Uuid
   code         String   @unique
   name         String
-  /// Entitlements document (see @co/domain Entitlements).
+  /// Entitlements document (see @orkstage/domain Entitlements).
   entitlements Json
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)

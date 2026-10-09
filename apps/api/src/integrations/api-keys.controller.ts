@@ -1,6 +1,6 @@
-import { createApiKeySchema, type ApiKeyDto } from '@co/contracts';
-import type { ApiKey, PrismaClient } from '@co/database';
-import { sha256 } from '@co/domain';
+import { createApiKeySchema, type ApiKeyDto } from '@orkstage/contracts';
+import type { ApiKey, PrismaClient } from '@orkstage/database';
+import { sha256 } from '@orkstage/domain';
 import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';

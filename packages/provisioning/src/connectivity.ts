@@ -1,4 +1,4 @@
-import type { ConnectivityRequirement } from '@co/templates';
+import type { ConnectivityRequirement } from '@orkstage/templates';
 import type { ResolvedConnectivity, ResolvedResource } from './types.js';
 
 /**

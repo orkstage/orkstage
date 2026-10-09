@@ -1,6 +1,6 @@
-import { devLoginSchema, type MeResponse } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
-import type { PlatformConfig } from '@co/runtime';
+import { devLoginSchema, type MeResponse } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
+import type { PlatformConfig } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -48,7 +48,7 @@ export class AuthController {
     return this.oidc.providers.map((p) => ({ key: p.key, name: p.name }));
   }
 
-  /** Local development only. Refused at startup in production (see @co/runtime config). */
+  /** Local development only. Refused at startup in production (see @orkstage/runtime config). */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('auth/dev-login')

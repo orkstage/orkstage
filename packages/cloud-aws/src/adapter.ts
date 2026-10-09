@@ -26,8 +26,8 @@ import {
   type TargetValidationCheck,
   type TargetValidationResult,
   type ValidateTargetOptions,
-} from '@co/cloud-core';
-import { TofuError, type TofuRunner, type TofuStack } from '@co/iac';
+} from '@orkstage/cloud-core';
+import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, type ExternalIdResolver, type StsClientFactory } from './credentials.js';

@@ -1,5 +1,5 @@
 {
-  "name": "@co/licensing",
+  "name": "@orkstage/licensing",
   "version": "0.1.0",
   "private": true,
   "type": "module",

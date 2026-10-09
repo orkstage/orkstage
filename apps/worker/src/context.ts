@@ -1,7 +1,7 @@
-import type { AdapterRegistry } from '@co/cloud-core';
-import type { NotificationJob } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
-import type { PlatformConfig } from '@co/runtime';
+import type { AdapterRegistry } from '@orkstage/cloud-core';
+import type { NotificationJob } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
+import type { PlatformConfig } from '@orkstage/runtime';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';

@@ -1,5 +1,5 @@
-import type { CloudCapability } from '@co/cloud-core';
-import type { TemplateResource } from '@co/templates';
+import type { CloudCapability } from '@orkstage/cloud-core';
+import type { TemplateResource } from '@orkstage/templates';
 import type { CostEstimate, CostLine } from './types.js';
 
 const CATEGORY: Record<string, CostLine['category']> = {

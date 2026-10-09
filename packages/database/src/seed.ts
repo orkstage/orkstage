@@ -1,5 +1,5 @@
-import { DEFAULT_ENTITLEMENTS, PLAN_CODES } from '@co/domain';
-import { loadBuiltinTemplates } from '@co/templates/builtin';
+import { DEFAULT_ENTITLEMENTS, PLAN_CODES } from '@orkstage/domain';
+import { loadBuiltinTemplates } from '@orkstage/templates/builtin';
 import { createPrismaClient } from './index.js';
 
 /**

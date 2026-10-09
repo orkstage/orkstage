@@ -1,5 +1,5 @@
 {
-  "name": "@co/cloud-core",
+  "name": "@orkstage/cloud-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -22,7 +22,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@co/domain": "workspace:*"
+    "@orkstage/domain": "workspace:*"
   },
   "peerDependencies": {
     "vitest": "5.0.3"

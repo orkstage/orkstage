@@ -1,5 +1,5 @@
 {
-  "name": "@co/worker",
+  "name": "@orkstage/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,13 +12,13 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@co/cloud-core": "workspace:*",
-    "@co/contracts": "workspace:*",
-    "@co/database": "workspace:*",
-    "@co/domain": "workspace:*",
-    "@co/provisioning": "workspace:*",
-    "@co/runtime": "workspace:*",
-    "@co/templates": "workspace:*",
+    "@orkstage/cloud-core": "workspace:*",
+    "@orkstage/contracts": "workspace:*",
+    "@orkstage/database": "workspace:*",
+    "@orkstage/domain": "workspace:*",
+    "@orkstage/provisioning": "workspace:*",
+    "@orkstage/runtime": "workspace:*",
+    "@orkstage/templates": "workspace:*",
     "bullmq": "6.3.11",
     "ioredis": "6.0.0",
     "nodemailer": "10.0.13",

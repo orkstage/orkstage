@@ -1,5 +1,5 @@
-import type { CloudTarget, ProviderContext, ResourceRequest } from '@co/cloud-core';
-import { runAdapterContract } from '@co/cloud-core/testing';
+import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
 import { describe, expect, it } from 'vitest';
 import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from './index.js';
 

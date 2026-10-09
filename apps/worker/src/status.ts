@@ -1,5 +1,5 @@
-import type { InstanceResource } from '@co/database';
-import { deriveInstanceHealth, healthToStatus, worstStatus, type HealthState, type StatusState } from '@co/domain';
+import type { InstanceResource } from '@orkstage/database';
+import { deriveInstanceHealth, healthToStatus, worstStatus, type HealthState, type StatusState } from '@orkstage/domain';
 import type { WorkerContext } from './context.js';
 
 /**

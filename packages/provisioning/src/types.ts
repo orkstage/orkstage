@@ -1,6 +1,6 @@
-import type { CloudTarget } from '@co/cloud-core';
-import type { CloudProvider, Entitlements, PlanCode } from '@co/domain';
-import type { ConnectivityRequirement, EnvironmentTemplate, ValidationIssue } from '@co/templates';
+import type { CloudTarget } from '@orkstage/cloud-core';
+import type { CloudProvider, Entitlements, PlanCode } from '@orkstage/domain';
+import type { ConnectivityRequirement, EnvironmentTemplate, ValidationIssue } from '@orkstage/templates';
 
 export type EnvironmentKind = 'production' | 'staging' | 'development' | 'sandbox';
 

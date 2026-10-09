@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Request bodies shared by the API (validation) and the web console (forms). The domain
  * packages stay free of HTTP concerns; this package is the HTTP contract. Kept dependency-free
- * so the browser bundle stays small: enum values are duplicated from @co/domain on purpose and
+ * so the browser bundle stays small: enum values are duplicated from @orkstage/domain on purpose and
  * checked against it in API tests.
  */
 

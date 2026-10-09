@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@co/database';
+import type { PrismaClient } from '@orkstage/database';
 import { Inject, Injectable } from '@nestjs/common';
 import { PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';

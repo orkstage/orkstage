@@ -1,6 +1,6 @@
-import type { CloudTarget, ProviderContext, ResourceRequest } from '@co/cloud-core';
-import { runAdapterContract } from '@co/cloud-core/testing';
-import { TofuRunner } from '@co/iac';
+import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import { TofuRunner } from '@orkstage/iac';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe } from 'vitest';

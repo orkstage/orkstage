@@ -1,6 +1,6 @@
 /**
  * Browser-safe subset of the domain (no Node built-ins). The web console imports this via
- * `@co/domain/core`; server code keeps using `@co/domain`.
+ * `@orkstage/domain/core`; server code keeps using `@orkstage/domain`.
  */
 export * from './providers.js';
 export * from './errors.js';

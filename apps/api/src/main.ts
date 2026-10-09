@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
-import { loadConfig, loadDotEnv } from '@co/runtime';
+import { loadConfig, loadDotEnv } from '@orkstage/runtime';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

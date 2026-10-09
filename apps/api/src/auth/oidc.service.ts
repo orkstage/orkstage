@@ -1,5 +1,5 @@
-import type { PrismaClient } from '@co/database';
-import type { PlatformConfig } from '@co/runtime';
+import type { PrismaClient } from '@orkstage/database';
+import type { PlatformConfig } from '@orkstage/runtime';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as client from 'openid-client';
 import { CONFIG, PRISMA } from '../infra/infra.module.js';

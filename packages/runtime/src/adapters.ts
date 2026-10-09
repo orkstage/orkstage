@@ -1,8 +1,8 @@
-import { AwsAdapter } from '@co/cloud-aws';
-import { AdapterRegistry, type CloudTarget } from '@co/cloud-core';
-import { MockAdapter, type MockStateStore } from '@co/cloud-mock';
-import type { CloudProvider } from '@co/domain';
-import { TofuRunner } from '@co/iac';
+import { AwsAdapter } from '@orkstage/cloud-aws';
+import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
+import { MockAdapter, type MockStateStore } from '@orkstage/cloud-mock';
+import type { CloudProvider } from '@orkstage/domain';
+import { TofuRunner } from '@orkstage/iac';
 import type { Redis } from 'ioredis';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';

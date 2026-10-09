@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@co/database';
-import { sha256 } from '@co/domain';
-import type { PlatformConfig } from '@co/runtime';
+import type { PrismaClient } from '@orkstage/database';
+import { sha256 } from '@orkstage/domain';
+import type { PlatformConfig } from '@orkstage/runtime';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';

@@ -1,6 +1,6 @@
-import { createCloudTargetSchema, validateTargetSchema, type ApplicationDto, type CapabilityDto, type CloudTargetDto } from '@co/contracts';
-import type { CloudTarget as CloudTargetRow, PrismaClient } from '@co/database';
-import { findSecretLikeKeys, toCloudTarget } from '@co/runtime';
+import { createCloudTargetSchema, validateTargetSchema, type ApplicationDto, type CapabilityDto, type CloudTargetDto } from '@orkstage/contracts';
+import type { CloudTarget as CloudTargetRow, PrismaClient } from '@orkstage/database';
+import { findSecretLikeKeys, toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';

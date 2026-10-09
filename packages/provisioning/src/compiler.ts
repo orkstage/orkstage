@@ -1,5 +1,5 @@
-import { resolveCapability, type AdapterRegistry, type CloudCapability, type CloudTarget } from '@co/cloud-core';
-import { desiredStateHash, resourceName, standardTags } from '@co/domain';
+import { resolveCapability, type AdapterRegistry, type CloudCapability, type CloudTarget } from '@orkstage/cloud-core';
+import { desiredStateHash, resourceName, standardTags } from '@orkstage/domain';
 import {
   activeResources,
   buildDependencyGraph,
@@ -8,7 +8,7 @@ import {
   validateSemantics,
   type TemplateResource,
   type ValidationIssue,
-} from '@co/templates';
+} from '@orkstage/templates';
 import { resolveConnectivity } from './connectivity.js';
 import { categoryOf, estimateResourceMonthly, summarizeCost } from './cost.js';
 import { evaluatePolicies } from './policies.js';

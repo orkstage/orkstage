@@ -1,5 +1,5 @@
 {
-  "name": "@co/iac",
+  "name": "@orkstage/iac",
   "version": "0.1.0",
   "private": true,
   "type": "module",

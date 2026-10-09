@@ -1,6 +1,6 @@
-import type { PreviewDto } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
-import type { Entitlements, PlanCode } from '@co/domain';
+import type { PreviewDto } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
+import type { Entitlements, PlanCode } from '@orkstage/domain';
 import {
   compileInfrastructure,
   diffPlan,
@@ -10,9 +10,9 @@ import {
   type PolicyConfig,
   type ResolvedInfrastructure,
   type SlotBinding,
-} from '@co/provisioning';
-import { toCloudTarget } from '@co/runtime';
-import { applyVariables, environmentTemplate, type VariableValues } from '@co/templates';
+} from '@orkstage/provisioning';
+import { toCloudTarget } from '@orkstage/runtime';
+import { applyVariables, environmentTemplate, type VariableValues } from '@orkstage/templates';
 import { Inject, Injectable } from '@nestjs/common';
 import { unprocessable } from '../common/errors.js';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
@@ -30,7 +30,7 @@ export interface CompileRequest {
 /**
  * Loads everything the compiler needs from the database (template version, plan, targets,
  * image catalog, platform policy) and runs it. Pure orchestration: all rules live in
- * @co/templates and @co/provisioning.
+ * @orkstage/templates and @orkstage/provisioning.
  */
 @Injectable()
 export class CompileService {

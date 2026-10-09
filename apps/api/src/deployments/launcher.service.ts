@@ -1,7 +1,7 @@
-import type { DeploymentSummaryDto } from '@co/contracts';
-import type { Deployment, Instance, InstanceStatus, PrismaClient } from '@co/database';
-import { canStartDeployment, canStartDestroy, operationKey } from '@co/domain';
-import { diffPlan, requiresApproval, workflowSteps, type ResolvedInfrastructure, type WorkflowKind } from '@co/provisioning';
+import type { DeploymentSummaryDto } from '@orkstage/contracts';
+import type { Deployment, Instance, InstanceStatus, PrismaClient } from '@orkstage/database';
+import { canStartDeployment, canStartDestroy, operationKey } from '@orkstage/domain';
+import { diffPlan, requiresApproval, workflowSteps, type ResolvedInfrastructure, type WorkflowKind } from '@orkstage/provisioning';
 import { Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../common/audit.service.js';
 import { conflict, unprocessable } from '../common/errors.js';

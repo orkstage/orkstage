@@ -1,5 +1,5 @@
-import { QUEUES, type DeploymentJob, type NotificationJob } from '@co/contracts';
-import { createPrismaClient, type PrismaClient } from '@co/database';
+import { QUEUES, type DeploymentJob, type NotificationJob } from '@orkstage/contracts';
+import { createPrismaClient, type PrismaClient } from '@orkstage/database';
 import {
   createAdapterRegistry,
   createRedis,
@@ -7,9 +7,9 @@ import {
   loadConfig,
   SecretBox,
   type PlatformConfig,
-} from '@co/runtime';
-import type { AdapterRegistry } from '@co/cloud-core';
-import type { MockAdapter } from '@co/cloud-mock';
+} from '@orkstage/runtime';
+import type { AdapterRegistry } from '@orkstage/cloud-core';
+import type { MockAdapter } from '@orkstage/cloud-mock';
 import { Global, Inject, Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';

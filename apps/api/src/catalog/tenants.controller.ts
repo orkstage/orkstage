@@ -1,5 +1,5 @@
-import { createTenantSchema, updateTenantSchema, type PlanDto, type TenantDto } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
+import { createTenantSchema, updateTenantSchema, type PlanDto, type TenantDto } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';

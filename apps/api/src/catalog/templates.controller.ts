@@ -4,10 +4,10 @@ import {
   validateTemplateSchema,
   type TemplateDto,
   type TemplateVersionDto,
-} from '@co/contracts';
-import type { PrismaClient, TemplateVersion } from '@co/database';
-import type { PlanCode } from '@co/domain';
-import { parseTemplate, type EnvironmentTemplate } from '@co/templates';
+} from '@orkstage/contracts';
+import type { PrismaClient, TemplateVersion } from '@orkstage/database';
+import type { PlanCode } from '@orkstage/domain';
+import { parseTemplate, type EnvironmentTemplate } from '@orkstage/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';

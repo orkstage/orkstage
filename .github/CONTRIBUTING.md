@@ -31,7 +31,7 @@ pnpm format:check
 
 CI runs the same steps against Postgres and Redis, applies the migrations and runs the seed twice
 to prove it is idempotent. When you change the AWS adapter or a module, also run the contract
-test against the emulator: `MINISTACK_E2E=1 pnpm --filter @co/cloud-aws test`.
+test against the emulator: `MINISTACK_E2E=1 pnpm --filter @orkstage/cloud-aws test`.
 
 ## Where things go
 

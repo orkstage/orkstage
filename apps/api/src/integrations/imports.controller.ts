@@ -1,6 +1,6 @@
-import { createImportSchema, importToTemplateSchema, type ImportDto, type ScanReport } from '@co/contracts';
-import type { ImportJob, PrismaClient } from '@co/database';
-import { parseTemplate } from '@co/templates';
+import { createImportSchema, importToTemplateSchema, type ImportDto, type ScanReport } from '@orkstage/contracts';
+import type { ImportJob, PrismaClient } from '@orkstage/database';
+import { parseTemplate } from '@orkstage/templates';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';

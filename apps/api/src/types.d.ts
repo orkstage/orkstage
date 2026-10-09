@@ -1,4 +1,4 @@
-import type { AppAbility, Principal } from '@co/authorization';
+import type { AppAbility, Principal } from '@orkstage/authorization';
 
 export interface RequestPrincipal extends Principal {
   email: string;

@@ -1,6 +1,6 @@
-import type { ResourceOutputs, ResourceResult } from '@co/cloud-core';
-import type { Deployment, InstanceStatus, StepStatus } from '@co/database';
-import { assertInstanceTransition, summarizeSteps, type FailureClass } from '@co/domain';
+import type { ResourceOutputs, ResourceResult } from '@orkstage/cloud-core';
+import type { Deployment, InstanceStatus, StepStatus } from '@orkstage/database';
+import { assertInstanceTransition, summarizeSteps, type FailureClass } from '@orkstage/domain';
 import {
   describeProviderPlan,
   diffPlan,
@@ -15,8 +15,8 @@ import {
   type KnownResource,
   type ResolvedInfrastructure,
   type StepFailure,
-} from '@co/provisioning';
-import { toCloudTarget } from '@co/runtime';
+} from '@orkstage/provisioning';
+import { toCloudTarget } from '@orkstage/runtime';
 import type { Logger } from 'pino';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 import type { TargetSlots } from './slots.js';

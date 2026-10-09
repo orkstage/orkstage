@@ -1,6 +1,6 @@
-import { QUEUES, type DeploymentJob, type NotificationJob } from '@co/contracts';
-import { createPrismaClient } from '@co/database';
-import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv } from '@co/runtime';
+import { QUEUES, type DeploymentJob, type NotificationJob } from '@orkstage/contracts';
+import { createPrismaClient } from '@orkstage/database';
+import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv } from '@orkstage/runtime';
 import { DelayedError, Queue, Worker } from 'bullmq';
 import type { WorkerContext } from './context.js';
 import { DriftDetector } from './drift.js';

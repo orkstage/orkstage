@@ -1,5 +1,5 @@
-import { listQuerySchema, type DeploymentDto, type DeploymentEventDto, type ListQuery } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
+import { listQuerySchema, type DeploymentDto, type DeploymentEventDto, type ListQuery } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AuditService } from '../common/audit.service.js';

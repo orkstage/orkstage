@@ -1,5 +1,5 @@
-import { createIncidentSchema, incidentUpdateSchema, listQuerySchema, type IncidentDto, type ListQuery } from '@co/contracts';
-import type { Incident, IncidentUpdate, PrismaClient } from '@co/database';
+import { createIncidentSchema, incidentUpdateSchema, listQuerySchema, type IncidentDto, type ListQuery } from '@orkstage/contracts';
+import type { Incident, IncidentUpdate, PrismaClient } from '@orkstage/database';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';

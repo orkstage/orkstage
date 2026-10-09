@@ -1,7 +1,7 @@
-import type { DriftChange, ResourceOutputs } from '@co/cloud-core';
-import type { InstanceResource } from '@co/database';
-import { idempotencyKeyFor, type ResolvedInfrastructure } from '@co/provisioning';
-import { toCloudTarget } from '@co/runtime';
+import type { DriftChange, ResourceOutputs } from '@orkstage/cloud-core';
+import type { InstanceResource } from '@orkstage/database';
+import { idempotencyKeyFor, type ResolvedInfrastructure } from '@orkstage/provisioning';
+import { toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 

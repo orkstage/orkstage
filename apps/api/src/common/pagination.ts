@@ -1,4 +1,4 @@
-import type { Page } from '@co/contracts';
+import type { Page } from '@orkstage/contracts';
 
 /**
  * Cursor pagination over time-ordered ids (UUIDv7 / bigserial): newest first. Fetch

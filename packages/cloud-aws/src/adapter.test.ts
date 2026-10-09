@@ -1,5 +1,5 @@
 import { AssumeRoleCommand } from '@aws-sdk/client-sts';
-import type { CloudTarget, ProviderContext, ResourceRequest } from '@co/cloud-core';
+import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
 import { describe, expect, it, vi } from 'vitest';
 import { AwsAdapter, isDestructivePlan } from './adapter.js';
 import { isAwsNotFound } from './health.js';

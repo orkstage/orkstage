@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Licensing, type EnterpriseFeature } from '@co/licensing';
-import type { PlatformConfig } from '@co/runtime';
+import { Licensing, type EnterpriseFeature } from '@orkstage/licensing';
+import type { PlatformConfig } from '@orkstage/runtime';
 import { Controller, Get, Global, Inject, Injectable, Logger, Module, SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ApiTags } from '@nestjs/swagger';

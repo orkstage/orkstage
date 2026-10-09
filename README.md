@@ -150,7 +150,7 @@ pnpm dev                       # API on :4000, worker, and the console on :3000 
 
 `pnpm local:aws` adds MiniStack. `pnpm test` and `pnpm typecheck` run across the workspace.
 The optional adapter contract test against the emulator runs with
-`MINISTACK_E2E=1 pnpm --filter @co/cloud-aws test`.
+`MINISTACK_E2E=1 pnpm --filter @orkstage/cloud-aws test`.
 
 ## Repositories
 

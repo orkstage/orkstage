@@ -1,4 +1,4 @@
-import type { CloudProvider } from '@co/domain';
+import type { CloudProvider } from '@orkstage/domain';
 import type { CloudProviderAdapter } from './types.js';
 
 /** Maps providers to their adapter. Adding a provider means registering an adapter here. */

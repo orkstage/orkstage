@@ -1,6 +1,6 @@
-import { APPLICATION_NAME, publishApplicationVersionSchema, upsertApplicationSchema, validateSourceSchema } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
-import type { PlanCode } from '@co/domain';
+import { APPLICATION_NAME, publishApplicationVersionSchema, upsertApplicationSchema, validateSourceSchema } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
+import type { PlanCode } from '@orkstage/domain';
 import { Controller, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';

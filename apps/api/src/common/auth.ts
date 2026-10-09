@@ -6,9 +6,9 @@ import {
   type PlatformRole,
   type SubjectName,
   type TenantRole,
-} from '@co/authorization';
-import type { PrismaClient } from '@co/database';
-import { sha256 } from '@co/domain';
+} from '@orkstage/authorization';
+import type { PrismaClient } from '@orkstage/database';
+import { sha256 } from '@orkstage/domain';
 import {
   createParamDecorator,
   Inject,

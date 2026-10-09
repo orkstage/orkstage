@@ -1,4 +1,4 @@
-import type { Entitlements, PlanCode } from '@co/domain/core';
+import type { Entitlements, PlanCode } from '@orkstage/domain/core';
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';
 import { activeResources, buildDependencyGraph, DependencyCycleError, topologicalLevels } from './graph.js';
@@ -197,7 +197,7 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Runs schema → semantic → plan stages. Capability/policy stages live in @co/provisioning. */
+/** Runs schema → semantic → plan stages. Capability/policy stages live in @orkstage/provisioning. */
 export function validateTemplate(
   input: string | unknown,
   plan?: { code: PlanCode; entitlements: Entitlements },

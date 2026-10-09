@@ -1,4 +1,4 @@
-import type { CloudTarget } from '@co/cloud-core';
+import type { CloudTarget } from '@orkstage/cloud-core';
 
 /** Non-secret AWS target configuration stored on the cloud target. */
 export interface AwsTargetConfig {

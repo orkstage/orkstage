@@ -15,7 +15,7 @@
 - A deterministic `mock` provider simulates AWS, Azure or OCI per target (`config.simulate`),
   with injectable failures, latency, health overrides and drift. Its state lives in Redis.
   Everything simulated is labeled (`simulated: true` on deployments, targets and instances).
-- A shared contract test suite (`@co/cloud-core/testing`) runs against every adapter.
+- A shared contract test suite (`@orkstage/cloud-core/testing`) runs against every adapter.
 - AWS resource operations threw `AWS_PROVISIONING_NOT_IMPLEMENTED` until the OpenTofu runner
   existed, instead of pretending to work (spec §83). They now provision through OpenTofu
   ([ADR 0005](0005-opentofu-state.md)).

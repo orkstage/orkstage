@@ -12,8 +12,8 @@ import { DescribeDBInstancesCommand, RDSClient } from '@aws-sdk/client-rds';
 import { GetHostedZoneCommand, Route53Client } from '@aws-sdk/client-route-53';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { GetQueueAttributesCommand, SQSClient } from '@aws-sdk/client-sqs';
-import type { HealthResult, LogLine, ResourceOutputs } from '@co/cloud-core';
-import type { HealthState } from '@co/domain';
+import type { HealthResult, LogLine, ResourceOutputs } from '@orkstage/cloud-core';
+import type { HealthState } from '@orkstage/domain';
 
 type ClientConfig = Record<string, unknown> & { region: string };
 

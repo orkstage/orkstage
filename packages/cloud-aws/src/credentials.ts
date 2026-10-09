@@ -1,5 +1,5 @@
 import { AssumeRoleCommand, STSClient } from '@aws-sdk/client-sts';
-import { ProviderError, type ProviderContext } from '@co/cloud-core';
+import { ProviderError, type ProviderContext } from '@orkstage/cloud-core';
 import { awsConfig, isEmulator } from './config.js';
 
 export interface AwsCredentials {

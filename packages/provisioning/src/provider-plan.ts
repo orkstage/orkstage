@@ -1,4 +1,4 @@
-import type { AdapterRegistry, ResourceOutputs, ResourcePlan } from '@co/cloud-core';
+import type { AdapterRegistry, ResourceOutputs, ResourcePlan } from '@orkstage/cloud-core';
 import { idempotencyKeyFor } from './executor.js';
 import type { ResolvedInfrastructure } from './types.js';
 

@@ -8,10 +8,10 @@ import {
   type InstanceDto,
   type ListQuery,
   type ResourceDto,
-} from '@co/contracts';
-import type { Instance, InstanceResource, PrismaClient } from '@co/database';
-import { DEFAULT_ENTITLEMENTS, isInstanceBusy, type Entitlements } from '@co/domain';
-import { toCloudTarget } from '@co/runtime';
+} from '@orkstage/contracts';
+import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
+import { DEFAULT_ENTITLEMENTS, isInstanceBusy, type Entitlements } from '@orkstage/domain';
+import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';

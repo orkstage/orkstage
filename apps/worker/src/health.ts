@@ -1,6 +1,6 @@
-import type { AlertRule, InstanceResource } from '@co/database';
-import { healthToStatus, type HealthState } from '@co/domain';
-import { toCloudTarget } from '@co/runtime';
+import type { AlertRule, InstanceResource } from '@orkstage/database';
+import { healthToStatus, type HealthState } from '@orkstage/domain';
+import { toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 import { instanceHealth, syncStatusComponents } from './status.js';

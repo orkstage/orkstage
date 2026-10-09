@@ -1,4 +1,4 @@
-import { CLOUD_PROVIDERS, PLAN_CODES } from '@co/domain/core';
+import { CLOUD_PROVIDERS, PLAN_CODES } from '@orkstage/domain/core';
 import { z } from 'zod';
 
 /**

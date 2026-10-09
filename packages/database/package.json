@@ -1,5 +1,5 @@
 {
-  "name": "@co/database",
+  "name": "@orkstage/database",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,8 +21,8 @@
     "test": "echo \"database: covered by API integration tests\""
   },
   "dependencies": {
-    "@co/domain": "workspace:*",
-    "@co/templates": "workspace:*",
+    "@orkstage/domain": "workspace:*",
+    "@orkstage/templates": "workspace:*",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "pg": "^8.16.0"

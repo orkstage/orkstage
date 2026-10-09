@@ -1,4 +1,4 @@
-import type { CloudCapability } from '@co/cloud-core';
+import type { CloudCapability } from '@orkstage/cloud-core';
 
 const SOURCE = 'Static AWS list prices, us-east-1, on-demand, approximate (2026). Not an invoice.';
 

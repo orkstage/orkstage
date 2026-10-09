@@ -1,8 +1,8 @@
-import * as contracts from '@co/contracts';
-import * as domain from '@co/domain';
+import * as contracts from '@orkstage/contracts';
+import * as domain from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';
 
-/** @co/contracts duplicates a few enums to stay browser-light; they must match the domain. */
+/** @orkstage/contracts duplicates a few enums to stay browser-light; they must match the domain. */
 describe('contract enums match the domain', () => {
   it.each([
     ['providers', contracts.PROVIDERS, domain.CLOUD_PROVIDERS],

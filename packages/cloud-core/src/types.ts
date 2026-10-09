@@ -1,4 +1,4 @@
-import type { CloudProvider, FailureClass, HealthState } from '@co/domain';
+import type { CloudProvider, FailureClass, HealthState } from '@orkstage/domain';
 
 /**
  * A registered cloud target: an AWS account, Azure subscription, GCP project or OCI tenancy

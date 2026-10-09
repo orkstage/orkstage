@@ -1,9 +1,9 @@
-import type { ValidationIssueDto } from '@co/contracts';
-import type { PrismaClient } from '@co/database';
-import type { Entitlements, PlanCode } from '@co/domain';
-import { compileInfrastructure } from '@co/provisioning';
-import { toCloudTarget } from '@co/runtime';
-import { validateTemplate } from '@co/templates';
+import type { ValidationIssueDto } from '@orkstage/contracts';
+import type { PrismaClient } from '@orkstage/database';
+import type { Entitlements, PlanCode } from '@orkstage/domain';
+import { compileInfrastructure } from '@orkstage/provisioning';
+import { toCloudTarget } from '@orkstage/runtime';
+import { validateTemplate } from '@orkstage/templates';
 import { Inject, Injectable } from '@nestjs/common';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
 

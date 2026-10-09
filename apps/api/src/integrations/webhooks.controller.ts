@@ -1,6 +1,6 @@
-import { createWebhookSchema, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@co/contracts';
-import type { PrismaClient, WebhookDelivery, WebhookEndpoint } from '@co/database';
-import { assertSafeWebhookUrl, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError } from '@co/runtime';
+import { createWebhookSchema, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@orkstage/contracts';
+import type { PrismaClient, WebhookDelivery, WebhookEndpoint } from '@orkstage/database';
+import { assertSafeWebhookUrl, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError } from '@orkstage/runtime';
 import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
