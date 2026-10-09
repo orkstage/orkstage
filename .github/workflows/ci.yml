@@ -11,9 +11,11 @@ permissions:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    # Images come from mirror.gcr.io (Google's Docker Hub cache): anonymous pulls from Docker Hub
+    # on shared runners hit its rate limit.
     services:
       postgres:
-        image: postgres:18-alpine
+        image: mirror.gcr.io/library/postgres:18-alpine
         env:
           POSTGRES_USER: platform
           POSTGRES_PASSWORD: platform
@@ -22,7 +24,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U platform" --health-interval 5s --health-timeout 3s --health-retries 20
       redis:
-        image: redis:8-alpine
+        image: mirror.gcr.io/library/redis:8-alpine
         ports: ['6379:6379']
     env:
       DATABASE_URL: postgresql://platform:platform@localhost:5432/platform

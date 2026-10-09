@@ -11,7 +11,7 @@ name: cloud-orchestrator
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: mirror.gcr.io/library/postgres:18-alpine
     environment:
       POSTGRES_USER: platform
       POSTGRES_PASSWORD: platform
@@ -27,7 +27,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:8-alpine
+    image: mirror.gcr.io/library/redis:8-alpine
     command: ['redis-server', '--appendonly', 'yes']
     ports:
       - '6379:6379'
@@ -41,7 +41,7 @@ services:
 
   # Local SMTP sink with a web UI at http://localhost:8025
   mailpit:
-    image: axllent/mailpit:latest
+    image: ghcr.io/axllent/mailpit:latest
     ports:
       - '1025:1025'
       - '8025:8025'
