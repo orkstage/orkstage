@@ -1,9 +1,10 @@
-# Polyrepo plan
+# Polyrepo layout
 
-Decided on October 5, 2026: split into focused repositories, share code as **versioned packages**,
-and use **git submodules only in a meta repository** for local development. Development
-continues in this monorepo until the split is executed with `scripts/polyrepo/split.sh`, which
-preserves history.
+Decided on October 5, 2026: focused repositories, code shared as **versioned packages**, and
+**git submodules only in a meta repository** for local development. The monorepo was split on
+October 9, 2026 with its history preserved. The repositories below are now the source of truth,
+and day to day development happens in the [`orkstage-dev`](https://github.com/orkstage/orkstage-dev)
+workspace.
 
 ## Repositories (GitHub organization `orkstage`)
 
@@ -15,11 +16,11 @@ preserves history.
 | `orkstage-modules` | `infra/tofu/modules`, `infra/docker/tofu-runner.Dockerfile` | git tags `vX.Y.Z`; `ghcr.io/orkstage/tofu-runner:<tag>` | Apache-2.0 |
 | `orkstage-site` | `site/` | static site on S3 and CloudFront (orkstage.io) | MIT (code), CC BY 4.0 (content) |
 | `orkstage-dev` | `infra/local/*` plus generated meta files | nothing (submodules, compose, scripts) | MIT |
-| `.github` | `scripts/polyrepo/org-dotgithub/` | organization profile and default community health files | |
+| `.github` | organization profile and default community health files | | |
 | `orkstage-licensing` | new, private | license signing service | proprietary |
 
-Repository metadata (descriptions, topics, visibility) lives in
-[`scripts/polyrepo/repos.json`](../scripts/polyrepo/repos.json).
+Every repository is private for now. The open source ones become public at launch;
+`orkstage-licensing` stays private.
 
 ## Dependency graph
 
@@ -73,36 +74,16 @@ the API, worker and console, RDS PostgreSQL, ElastiCache Valkey, an ALB with ACM
 for `SESSION_SECRET`, `ENCRYPTION_KEY` and the license, and S3 with CloudFront for orkstage.io.
 The worker's OpenTofu runner becomes an ECS RunTask (no Docker socket in production).
 
-## Executing the split
+## How the split was done
 
-`scripts/polyrepo/split.sh <out-dir>` creates one local repository per target. Folder
-repositories keep their history (`git subtree split`), the core keeps the full history without
-the private material, the package scope is renamed from `@co` to `@orkstage`, and the
-organization `.github` repository is created from `scripts/polyrepo/org-dotgithub/`. The script
-never creates remote repositories and never pushes.
+The monorepo was split with a script that kept the history of every folder (`git subtree
+split`), removed private material from the core history, renamed the package scope from `@co` to
+`@orkstage` and created the repositories as private. That tooling lived in the monorepo and is
+not part of these repositories. Changes now go to each repository through pull requests.
 
-Publishing is a separate, explicit step with `scripts/polyrepo/publish.sh`:
+## Known gaps
 
-```bash
-scripts/polyrepo/split.sh ../orkstage-split
-scripts/polyrepo/publish.sh --dry-run ../orkstage-split   # prints every action, no network
-scripts/polyrepo/publish.sh ../orkstage-split             # creates missing repos as private and pushes
-```
-
-`publish.sh` reads `repos.json`, creates missing repositories as **private**, pushes `main` and
-tags, and sets the description, homepage, topics and features. It never changes the visibility
-of an existing repository. Making a repository public is a manual decision. At the end it prints
-the steps that cannot be scripted, such as uploading the social preview images from
-`.github/assets/social-preview.png` in each repository.
-
-## Known gaps before the split is usable on its own
-
-- The core keeps the monorepo `pnpm-lock.yaml`. After the scope rename and the removal of the
-  console and CLI it must be regenerated (`pnpm install --lockfile-only`) before
-  `pnpm install --frozen-lockfile` passes in CI.
-- `infra/local/docker-compose.yml` builds the platform and runner images from the monorepo
-  layout (`context: ../..`). In the core repository the `platform` profile needs the console and
-  the modules, and in `orkstage-dev` the build contexts point outside the repository. Both need
-  published images (`ghcr.io/orkstage/platform`, `console`, `tofu-runner`) or new build contexts.
-- The console installs `@orkstage/*` packages from GitHub Packages, so its CI can only build once
-  those packages are published.
+- The shared `@orkstage/*` packages, the scan engine and the container images
+  (`ghcr.io/orkstage/platform`, `console`, `tofu-runner`) are not published yet. Until they are,
+  the console builds against the core checkout in `orkstage-dev` (pnpm overrides), the console
+  CI skips its build, and the full stack is built locally from the submodules.
