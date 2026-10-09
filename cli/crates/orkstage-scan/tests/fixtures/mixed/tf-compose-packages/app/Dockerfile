@@ -1,2 +1,0 @@
-FROM node:22
-EXPOSE 3000

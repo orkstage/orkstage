@@ -1,6 +1,0 @@
-# Default reviewers. Replace the placeholder team once the organization has its teams.
-*                       @orkstage/maintainers
-
-# Release signing and the published WebAssembly package.
-/.github/workflows/     @orkstage/maintainers
-/dist/scan-wasm/        @orkstage/maintainers

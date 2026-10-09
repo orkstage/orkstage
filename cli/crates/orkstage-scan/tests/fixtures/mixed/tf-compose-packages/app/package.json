@@ -1,1 +1,0 @@
-{"name":"app","dependencies":{"pg":"^8","@aws-sdk/client-sqs":"^3"}}

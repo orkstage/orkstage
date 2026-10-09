@@ -1,6 +1,0 @@
-{
-  "title": "Contributing",
-  "description": "Develop, build and release OrkStage",
-  "root": true,
-  "pages": ["development-setup", "repository-map", "architecture-decisions", "code-of-conduct", "release-process"]
-}

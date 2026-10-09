@@ -1,4 +1,0 @@
-[tool.poetry.dependencies]
-python = "^3.12"
-psycopg2-binary = "^2.9"
-aio-pika = "^9"
