@@ -13,20 +13,47 @@ updates:
         patterns: ['prisma', '@prisma/*']
       dev-tooling:
         dependency-type: development
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # Base images of the platform image.
   - package-ecosystem: docker
     directory: /infra/docker
     schedule:
       interval: weekly
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   # Images pinned in the local Compose stack (Postgres, Redis, MiniStack).
   - package-ecosystem: docker-compose
     directory: /infra/local
     schedule:
       interval: weekly
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
