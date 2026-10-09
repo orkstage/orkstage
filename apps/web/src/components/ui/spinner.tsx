@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
 export function Spinner({ size = 16, className, label }: { size?: number; className?: string; label?: string }) {
@@ -18,11 +21,12 @@ export function Spinner({ size = 16, className, label }: { size?: number; classN
   );
 }
 
-export function PageSpinner({ label = 'Loading' }: { label?: string }) {
+export function PageSpinner({ label }: { label?: string }) {
+  const t = useTranslations('common');
   return (
-    <div className="flex items-center justify-center gap-2 py-16 text-fg-subtle">
+    <div role="status" className="flex items-center justify-center gap-2 py-16 text-fg-subtle">
       <Spinner size={18} />
-      <span>{label}…</span>
+      <span>{label ?? t('loading')}</span>
     </div>
   );
 }

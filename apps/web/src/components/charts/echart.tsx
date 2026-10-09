@@ -6,6 +6,7 @@ import { AriaComponent, DataZoomComponent, GridComponent, LegendComponent, MarkL
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useMemo, useRef } from 'react';
+import { useTranslations } from 'use-intl';
 import { readTokens, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -154,9 +155,10 @@ export function EChart({
 
 /** Screen-reader / no-hover alternative: every charted value is reachable as a table. */
 export function DataTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: (string | number)[][] }) {
+  const t = useTranslations('charts');
   return (
     <details className="mt-2 text-xs">
-      <summary className="text-fg-subtle hover:text-fg">View data table</summary>
+      <summary className="text-fg-subtle hover:text-fg">{t('viewTable')}</summary>
       <div className="mt-2 max-h-56 overflow-auto rounded border border-border">
         <table className="w-full text-left">
           <caption className="sr-only">{caption}</caption>

@@ -1,13 +1,13 @@
 'use client';
 
 import { cloneTemplateSchema, PLAN_CODES, type TemplateDto, type TemplateVersionDto, type ValidationIssueDto } from '@co/contracts';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Copy, FilePlus2, Send, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'use-intl';
 import { IssuesList } from '@/components/plan-view';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -21,11 +21,14 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { YamlViewer } from '@/components/yaml-viewer';
+import { useFormat } from '@/i18n/format';
+import { useZodResolver } from '@/i18n/zod';
 import { apiSend, isApiError } from '@/lib/api';
+import { useDocumentTitle } from '@/lib/hooks';
 import { useCan } from '@/lib/ability';
 import { useTemplate } from '@/lib/queries';
 import { readTemplateDoc } from '@/lib/template-doc';
-import { cn, formatDateTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface ValidationReport {
   valid: boolean;
@@ -40,15 +43,19 @@ function issuesFromError(err: unknown): ValidationIssueDto[] {
 }
 
 export default function TemplatePage() {
+  const tt = useTranslations('templates');
+  const td = useTranslations('templates.detail');
+  const fmt = useFormat();
   const { id } = useParams<{ id: string }>();
   const q = useTemplate(id);
+  useDocumentTitle(q.data?.displayName);
   const can = useCan();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [cloning, setCloning] = useState(false);
 
   if (q.isPending) return <PageSpinner />;
-  if (q.error) return <ErrorNotice error={q.error} title="Template unavailable" />;
+  if (q.error) return <ErrorNotice error={q.error} title={tt('unavailable')} />;
   const t = q.data;
   const versions = [...(t.versions ?? (t.latestPublished ? [t.latestPublished] : []))].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
@@ -59,7 +66,7 @@ export default function TemplatePage() {
       <PageHeader
         breadcrumb={
           <Link href="/templates" className="hover:underline">
-            Templates
+            {tt('breadcrumb')}
           </Link>
         }
         title={t.displayName}
@@ -67,23 +74,23 @@ export default function TemplatePage() {
         meta={
           <>
             <code className="font-mono text-xs text-fg-subtle">{t.name}</code>
-            {t.visibility === 'SYSTEM' ? <Badge tone="info">System</Badge> : <Badge>Organization</Badge>}
-            {doc?.nonProduction ? <Badge tone="warn">Non-production</Badge> : null}
+            {t.visibility === 'SYSTEM' ? <Badge tone="info">{tt('system')}</Badge> : <Badge>{tt('organization')}</Badge>}
+            {doc?.nonProduction ? <Badge tone="warn">{tt('nonProduction')}</Badge> : null}
           </>
         }
         actions={
           <>
             <ButtonLink href={`/templates/${t.id}/builder${selected ? `?version=${selected.id}` : ''}`}>
-              <Workflow size={14} aria-hidden /> {t.visibility === 'SYSTEM' || !can('update', 'Template') ? 'View in builder' : 'Open in builder'}
+              <Workflow size={14} aria-hidden /> {t.visibility === 'SYSTEM' || !can('update', 'Template') ? td('viewInBuilder') : td('openInBuilder')}
             </ButtonLink>
             {can('create', 'Template') ? (
               <Button onClick={() => setCloning(true)}>
-                <Copy size={14} aria-hidden /> Clone
+                <Copy size={14} aria-hidden /> {td('clone')}
               </Button>
             ) : null}
             {can('update', 'Template') && !editing ? (
               <Button variant="primary" onClick={() => setEditing(true)}>
-                <FilePlus2 size={14} aria-hidden /> New version
+                <FilePlus2 size={14} aria-hidden /> {td('newVersion')}
               </Button>
             ) : null}
           </>
@@ -101,7 +108,7 @@ export default function TemplatePage() {
 
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <Card>
-          <CardHeader title="Versions" as="h2" />
+          <CardHeader title={td('versions')} as="h2" />
           <ul className="divide-y divide-border">
             {versions.map((v) => (
               <li key={v.id}>
@@ -113,23 +120,23 @@ export default function TemplatePage() {
                 >
                   <span>
                     <code className="block font-mono text-sm">{v.version}</code>
-                    <span className="text-[11px] text-fg-subtle">{formatDateTime(v.publishedAt ?? v.createdAt)}</span>
+                    <span className="text-[11px] text-fg-subtle">{fmt.dateTime(v.publishedAt ?? v.createdAt)}</span>
                   </span>
                   <span className="flex flex-col items-end gap-1">
                     <StatusBadge status={v.status} />
-                    {typeof v.instanceCount === 'number' ? <span className="text-[11px] text-fg-subtle">{v.instanceCount} inst.</span> : null}
+                    {typeof v.instanceCount === 'number' ? <span className="text-[11px] text-fg-subtle">{td('instanceCount', { count: v.instanceCount })}</span> : null}
                   </span>
                 </button>
               </li>
             ))}
-            {versions.length === 0 ? <li className="px-4 py-3 text-sm text-fg-subtle">No versions.</li> : null}
+            {versions.length === 0 ? <li className="px-4 py-3 text-sm text-fg-subtle">{td('noVersions')}</li> : null}
           </ul>
         </Card>
 
         {selected ? <VersionDetail template={t} version={selected} canPublish={can('publish', 'Template')} /> : null}
       </div>
 
-      <Dialog open={cloning} onClose={() => setCloning(false)} title={`Clone ${t.displayName}`} description="Creates an organization template you can edit, starting from this template's latest version.">
+      <Dialog open={cloning} onClose={() => setCloning(false)} title={td('cloneTitle', { name: t.displayName })} description={td('cloneDescription')}>
         <CloneForm template={t} onDone={() => setCloning(false)} />
       </Dialog>
     </>
@@ -137,6 +144,8 @@ export default function TemplatePage() {
 }
 
 function VersionDetail({ template, version, canPublish }: { template: TemplateDto; version: TemplateVersionDto; canPublish: boolean }) {
+  const t = useTranslations('templates.detail');
+  const fmt = useFormat();
   const qc = useQueryClient();
   const publish = useMutation({
     mutationFn: () => apiSend<TemplateVersionDto>('POST', `/templates/${template.id}/versions/${version.id}/publish`),
@@ -154,14 +163,18 @@ function VersionDetail({ template, version, canPublish }: { template: TemplateDt
         <CardHeader
           title={
             <span className="flex items-center gap-2">
-              Version <code className="font-mono">{version.version}</code> <StatusBadge status={version.status} />
+              {t.rich('version', { version: version.version, code: (chunks) => <code className="font-mono">{chunks}</code> })} <StatusBadge status={version.status} />
             </span>
           }
-          description={`Created ${formatDateTime(version.createdAt)}${version.publishedAt ? ` · published ${formatDateTime(version.publishedAt)}` : ''}`}
+          description={
+            version.publishedAt
+              ? t('createdPublished', { date: fmt.dateTime(version.createdAt), published: fmt.dateTime(version.publishedAt) })
+              : t('created', { date: fmt.dateTime(version.createdAt) })
+          }
           actions={
             version.status === 'DRAFT' && canPublish ? (
               <Button variant="primary" onClick={() => publish.mutate()} loading={publish.isPending}>
-                <Send size={14} aria-hidden /> Publish
+                <Send size={14} aria-hidden /> {t('publish')}
               </Button>
             ) : null
           }
@@ -171,29 +184,29 @@ function VersionDetail({ template, version, canPublish }: { template: TemplateDt
             {doc.plans.map((p) => (
               <Badge key={p}>{p}</Badge>
             ))}
-            <Badge>{doc.placements.length} placement slot(s)</Badge>
-            <Badge>{doc.resourceCount} resources</Badge>
-            <Badge>{doc.variables.length} variables</Badge>
-            {doc.profile ? <Badge>profile: {doc.profile}</Badge> : null}
+            <Badge>{t('placementSlots', { count: doc.placements.length })}</Badge>
+            <Badge>{t('resources', { count: doc.resourceCount })}</Badge>
+            <Badge>{t('variables', { count: doc.variables.length })}</Badge>
+            {doc.profile ? <Badge>{t('profile', { profile: doc.profile })}</Badge> : null}
           </div>
           {version.validation ? (
             version.validation.valid && version.validation.issues.length === 0 ? (
               <p className="flex items-center gap-1.5 text-sm text-ok-ink">
-                <CheckCircle2 size={14} aria-hidden /> Validation passed
+                <CheckCircle2 size={14} aria-hidden /> {t('validationPassed')}
               </p>
             ) : (
               <IssuesList issues={version.validation.issues} />
             )
           ) : (
-            <p className="text-xs text-fg-subtle">Not validated yet.</p>
+            <p className="text-xs text-fg-subtle">{t('notValidated')}</p>
           )}
-          {publish.error ? <ErrorNotice error={publish.error} title="Publish refused" /> : null}
+          {publish.error ? <ErrorNotice error={publish.error} title={t('publishRefused')} /> : null}
           {publishIssues.length > 0 ? <IssuesList issues={publishIssues} /> : null}
-          {publish.isSuccess ? <Notice tone="ok">Published. Instances can now use this version.</Notice> : null}
+          {publish.isSuccess ? <Notice tone="ok">{t('published')}</Notice> : null}
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Source" as="h3" description="YAML as submitted. Published versions are immutable." />
+        <CardHeader title={t('source')} as="h3" description={t('sourceHint')} />
         <CardBody>
           <YamlViewer source={version.source} />
         </CardBody>
@@ -203,6 +216,8 @@ function VersionDetail({ template, version, canPublish }: { template: TemplateDt
 }
 
 function VersionEditor({ template, initialSource, onClose, onSaved }: { template: TemplateDto; initialSource: string; onClose: () => void; onSaved: (v: TemplateVersionDto) => void }) {
+  const t = useTranslations('templates.editor');
+  const td = useTranslations('templates.detail');
   const qc = useQueryClient();
   const [source, setSource] = useState(initialSource);
   const [planCode, setPlanCode] = useState('');
@@ -235,17 +250,17 @@ function VersionEditor({ template, initialSource, onClose, onSaved }: { template
   return (
     <Card className="mb-4">
       <CardHeader
-        title="New version"
-        description="Edit the YAML (bump metadata.version), validate, save as draft, then publish."
+        title={t('title')}
+        description={t('hint')}
         actions={
           <Button size="sm" variant="ghost" onClick={onClose}>
-            Close editor
+            {t('close')}
           </Button>
         }
       />
       <CardBody className="space-y-3">
         <label htmlFor="tpl-source" className="sr-only">
-          Template YAML
+          {t('yaml')}
         </label>
         <Textarea
           id="tpl-source"
@@ -260,10 +275,10 @@ function VersionEditor({ template, initialSource, onClose, onSaved }: { template
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <label htmlFor="tpl-plan" className="mb-1 block text-xs text-fg-subtle">
-              Validate against plan (optional)
+              {t('plan')}
             </label>
-            <Select id="tpl-plan" value={planCode} onChange={(e) => setPlanCode(e.target.value)} className="w-40">
-              <option value="">Any plan</option>
+            <Select id="tpl-plan" value={planCode} onChange={(e) => setPlanCode(e.target.value)} className="w-44">
+              <option value="">{t('anyPlan')}</option>
               {PLAN_CODES.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -272,29 +287,29 @@ function VersionEditor({ template, initialSource, onClose, onSaved }: { template
             </Select>
           </div>
           <Button onClick={() => validate.mutate()} loading={validate.isPending} disabled={!source.trim()}>
-            Validate
+            {t('validate')}
           </Button>
           <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!source.trim() || !!saved}>
-            Save draft
+            {t('saveDraft')}
           </Button>
-          <Button variant="primary" onClick={() => saved && publish.mutate(saved.id)} loading={publish.isPending} disabled={!saved} title={!saved ? 'Save a draft first' : undefined}>
-            <Send size={14} aria-hidden /> Publish
+          <Button variant="primary" onClick={() => saved && publish.mutate(saved.id)} loading={publish.isPending} disabled={!saved} title={!saved ? t('saveFirst') : undefined}>
+            <Send size={14} aria-hidden /> {td('publish')}
           </Button>
-          {saved ? <span className="text-xs text-ok-ink">Saved as draft {saved.version}</span> : null}
+          {saved ? <span className="text-xs text-ok-ink">{t('savedAs', { version: saved.version })}</span> : null}
         </div>
         {validate.error ? <ErrorNotice error={validate.error} /> : null}
         {report ? (
           report.valid && issues.length === 0 ? (
-            <Notice tone="ok">Valid — no issues found.</Notice>
+            <Notice tone="ok">{t('valid')}</Notice>
           ) : (
             <div className="space-y-2">
-              <p className="text-sm font-medium">{report.valid ? 'Valid with warnings' : 'Invalid'}</p>
+              <p className="text-sm font-medium">{report.valid ? t('validWithWarnings') : t('invalid')}</p>
               <IssuesList issues={issues} />
             </div>
           )
         ) : null}
-        {save.error ? <ErrorNotice error={save.error} title="Could not save the draft" /> : null}
-        {publish.error ? <ErrorNotice error={publish.error} title="Publish refused" /> : null}
+        {save.error ? <ErrorNotice error={save.error} title={t('saveFailed')} /> : null}
+        {publish.error ? <ErrorNotice error={publish.error} title={td('publishRefused')} /> : null}
         {errorIssues.length > 0 ? <IssuesList issues={errorIssues} /> : null}
       </CardBody>
     </Card>
@@ -302,11 +317,13 @@ function VersionEditor({ template, initialSource, onClose, onSaved }: { template
 }
 
 function CloneForm({ template, onDone }: { template: TemplateDto; onDone: () => void }) {
+  const t = useTranslations('templates.cloneForm');
+  const tc = useTranslations('common');
   const router = useRouter();
   const qc = useQueryClient();
   const form = useForm({
-    resolver: zodResolver(cloneTemplateSchema),
-    defaultValues: { name: `${template.name}-copy`.slice(0, 63), displayName: `${template.displayName} (copy)`.slice(0, 80) },
+    resolver: useZodResolver(cloneTemplateSchema),
+    defaultValues: { name: `${template.name}-copy`.slice(0, 63), displayName: `${template.displayName} ${t('copySuffix')}`.slice(0, 80) },
   });
   const { errors } = form.formState;
   const clone = useMutation({
@@ -319,17 +336,17 @@ function CloneForm({ template, onDone }: { template: TemplateDto; onDone: () => 
   });
   return (
     <form onSubmit={form.handleSubmit((v) => clone.mutate(v))} className="space-y-4" noValidate>
-      <Field label="Name" htmlFor="clone-name" hint="Lowercase identifier, unique in your organization." error={errors.name?.message} required>
+      <Field label={t('name')} htmlFor="clone-name" hint={t('nameHint')} error={errors.name?.message} required>
         <Input id="clone-name" className="font-mono" autoFocus {...describedBy('clone-name', { hint: true, error: errors.name })} {...form.register('name')} />
       </Field>
-      <Field label="Display name" htmlFor="clone-display" error={errors.displayName?.message} required>
+      <Field label={t('displayName')} htmlFor="clone-display" error={errors.displayName?.message} required>
         <Input id="clone-display" {...describedBy('clone-display', { error: errors.displayName })} {...form.register('displayName')} />
       </Field>
       {clone.error ? <ErrorNotice error={clone.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={onDone}>{tc('cancel')}</Button>
         <Button type="submit" variant="primary" loading={clone.isPending}>
-          Clone template
+          {t('submit')}
         </Button>
       </div>
     </form>

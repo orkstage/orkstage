@@ -5,16 +5,27 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
 import type { MetricSeries } from '../charts/metrics-chart';
 import { apiGet, qs } from '@/lib/api';
-import { cn, formatTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { ErrorNotice } from '../ui/error-notice';
 import { Select } from '../ui/select';
 import { Spinner } from '../ui/spinner';
 
 // ECharts loads only when the Metrics tab renders.
-const MetricsChart = dynamic(() => import('../charts/metrics-chart'), { ssr: false, loading: () => <p className="py-8 text-center text-sm text-fg-subtle">Loading chart…</p> });
+const MetricsChart = dynamic(() => import('../charts/metrics-chart'), { ssr: false, loading: () => <ChartLoading /> });
+
+function ChartLoading() {
+  const t = useTranslations('telemetry');
+  return (
+    <p role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-fg-subtle">
+      <Spinner size={14} /> {t('loadingChart')}
+    </p>
+  );
+}
 
 interface ChartPoint {
   t: number;
@@ -66,15 +77,16 @@ function normalizePoints(data: unknown): { points: ChartPoint[]; unit: string } 
 }
 
 function ResourcePicker({ id, resources, value, onChange }: { id: string; resources: ResourceDto[]; value: string; onChange: (v: string) => void }) {
+  const t = useTranslations('telemetry');
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-xs text-fg-subtle">
-        Resource
+        {t('resource')}
       </label>
       <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="w-64">
         {resources.map((r) => (
           <option key={r.resourceId} value={r.resourceId}>
-            {r.resourceId} — {r.capabilityName}
+            {r.resourceId} · {r.capabilityName}
           </option>
         ))}
       </Select>
@@ -90,6 +102,8 @@ const LEVEL_CLASS: Record<string, string> = {
 };
 
 export function LogsPanel({ instanceId, resources }: { instanceId: string; resources: ResourceDto[] }) {
+  const t = useTranslations('telemetry');
+  const fmt = useFormat();
   const [resourceId, setResourceId] = useState(resources[0]?.resourceId ?? '');
   const [limit, setLimit] = useState(200);
   const [follow, setFollow] = useState(false);
@@ -100,7 +114,7 @@ export function LogsPanel({ instanceId, resources }: { instanceId: string; resou
     refetchInterval: follow ? 5000 : false,
   });
 
-  if (resources.length === 0) return <p className="text-sm text-fg-subtle">No resources yet. Logs are available after deployment.</p>;
+  if (resources.length === 0) return <p className="text-sm text-fg-subtle">{t('noResourcesLogs')}</p>;
 
   return (
     <div className="space-y-3">
@@ -108,7 +122,7 @@ export function LogsPanel({ instanceId, resources }: { instanceId: string; resou
         <ResourcePicker id="logs-resource" resources={resources} value={resourceId} onChange={setResourceId} />
         <div>
           <label htmlFor="logs-limit" className="mb-1 block text-xs text-fg-subtle">
-            Lines
+            {t('lines')}
           </label>
           <Select id="logs-limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-24">
             {[100, 200, 500].map((n) => (
@@ -119,22 +133,24 @@ export function LogsPanel({ instanceId, resources }: { instanceId: string; resou
           </Select>
         </div>
         <label className="flex h-8 items-center gap-1.5 text-xs text-fg-muted">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-accent" /> Auto-refresh (5s)
+          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-accent" /> {t('autoRefresh')}
         </label>
         <Button size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
-          {q.isFetching ? <Spinner size={12} /> : <RefreshCw size={12} aria-hidden />} Refresh
+          {q.isFetching ? <Spinner size={12} /> : <RefreshCw size={12} aria-hidden />} {t('refresh')}
         </Button>
       </div>
       {q.error ? <ErrorNotice error={q.error} /> : null}
-      <div role="log" aria-label="Resource logs" className="max-h-[32rem] overflow-auto rounded-md border border-border bg-surface-2/50 p-2 font-mono text-[11.5px] leading-relaxed">
+      <div role="log" aria-label={t('logsLabel')} className="max-h-[32rem] overflow-auto rounded-md border border-border bg-surface-2/50 p-2 font-mono text-[11.5px] leading-relaxed">
         {q.isPending ? (
-          <p className="p-2 text-fg-subtle">Loading…</p>
+          <p role="status" className="flex items-center gap-2 p-2 text-fg-subtle">
+            <Spinner size={12} /> {t('loadingLogs')}
+          </p>
         ) : (q.data ?? []).length === 0 ? (
-          <p className="p-2 text-fg-subtle">No log lines.</p>
+          <p className="p-2 text-fg-subtle">{t('noLogs')}</p>
         ) : (
           q.data!.map((l, i) => (
             <div key={i} className="flex gap-3 whitespace-pre-wrap break-all">
-              <span className="shrink-0 text-fg-subtle">{formatTime(l.at)}</span>
+              <span className="shrink-0 text-fg-subtle">{fmt.time(l.at)}</span>
               <span className={cn('w-10 shrink-0 uppercase', LEVEL_CLASS[l.level.toLowerCase()] ?? 'text-fg-muted')}>{l.level}</span>
               <span className="text-fg">{l.message}</span>
             </div>
@@ -146,12 +162,13 @@ export function LogsPanel({ instanceId, resources }: { instanceId: string; resou
 }
 
 const METRICS = [
-  { id: 'cpu', label: 'CPU', unit: '%' },
-  { id: 'memory', label: 'Memory', unit: '%' },
-  { id: 'requests', label: 'Requests / min', unit: '' },
-  { id: 'errors', label: 'Errors / min', unit: '' },
-  { id: 'latency', label: 'Latency p95', unit: ' ms' },
-];
+  { id: 'cpu', unit: '%' },
+  { id: 'memory', unit: '%' },
+  { id: 'requests', unit: '' },
+  { id: 'errors', unit: '' },
+  { id: 'latency', unit: ' ms' },
+] as const;
+type MetricId = (typeof METRICS)[number]['id'];
 
 const MAX_COMPARE = 3;
 
@@ -160,8 +177,9 @@ const MAX_COMPARE = 3;
  * colour slot it was given when selected, so deselecting one never repaints the others.
  */
 export function MetricsPanel({ instanceId, resources }: { instanceId: string; resources: ResourceDto[] }) {
+  const t = useTranslations('telemetry');
   const [selected, setSelected] = useState<{ id: string; slot: number }[]>(() => (resources[0] ? [{ id: resources[0].resourceId, slot: 0 }] : []));
-  const [metric, setMetric] = useState('cpu');
+  const [metric, setMetric] = useState<MetricId>('cpu');
   const [minutes, setMinutes] = useState(60);
 
   const queries = useQueries({
@@ -197,39 +215,39 @@ export function MetricsPanel({ instanceId, resources }: { instanceId: string; re
     [selected, dataKey],
   );
 
-  if (resources.length === 0) return <p className="text-sm text-fg-subtle">No resources yet. Metrics are available after deployment.</p>;
+  if (resources.length === 0) return <p className="text-sm text-fg-subtle">{t('noResourcesMetrics')}</p>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="metrics-metric" className="mb-1 block text-xs text-fg-subtle">
-            Metric
+            {t('metric')}
           </label>
-          <Select id="metrics-metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="w-40">
+          <Select id="metrics-metric" value={metric} onChange={(e) => setMetric(e.target.value as MetricId)} className="w-48">
             {METRICS.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label}
+                {t(`metrics.${m.id}`)}
               </option>
             ))}
           </Select>
         </div>
         <div>
           <label htmlFor="metrics-window" className="mb-1 block text-xs text-fg-subtle">
-            Window
+            {t('window')}
           </label>
           <Select id="metrics-window" value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="w-32">
-            <option value={15}>15 minutes</option>
-            <option value={60}>1 hour</option>
-            <option value={180}>3 hours</option>
-            <option value={1440}>24 hours</option>
+            <option value={15}>{t('minutes15')}</option>
+            <option value={60}>{t('hour1')}</option>
+            <option value={180}>{t('hours3')}</option>
+            <option value={1440}>{t('hours24')}</option>
           </Select>
         </div>
-        {fetching ? <Spinner size={14} label="Loading metrics" className="mb-2" /> : null}
+        {fetching ? <Spinner size={14} label={t('loadingMetrics')} className="mb-2" /> : null}
       </div>
       <fieldset>
         <legend className="mb-1.5 text-xs text-fg-subtle">
-          Resources to compare ({selected.length}/{MAX_COMPARE})
+          {t('compare', { selected: selected.length, max: MAX_COMPARE })}
         </legend>
         <div className="flex flex-wrap gap-1.5">
           {resources.map((r) => {
@@ -243,7 +261,7 @@ export function MetricsPanel({ instanceId, resources }: { instanceId: string; re
                   sel ? 'border-border-strong bg-surface-2 text-fg' : 'border-border text-fg-muted hover:bg-surface-2',
                   disabled && 'cursor-not-allowed opacity-50',
                 )}
-                title={disabled ? `Compare up to ${MAX_COMPARE} resources` : r.capabilityName}
+                title={disabled ? t('compareLimit', { max: MAX_COMPARE }) : r.capabilityName}
               >
                 <input type="checkbox" className="sr-only" checked={!!sel} disabled={disabled} onChange={() => toggle(r.resourceId)} />
                 <span aria-hidden className="h-0.5 w-3 rounded" style={{ background: sel ? `var(--chart-${sel.slot + 1})` : 'var(--border-strong)' }} />
@@ -256,11 +274,11 @@ export function MetricsPanel({ instanceId, resources }: { instanceId: string; re
       {error ? (
         <ErrorNotice error={error} />
       ) : selected.length === 0 ? (
-        <p className="py-8 text-center text-sm text-fg-subtle">Select at least one resource.</p>
+        <p className="py-8 text-center text-sm text-fg-subtle">{t('selectOne')}</p>
       ) : pending ? (
-        <p className="py-8 text-center text-sm text-fg-subtle">Loading…</p>
+        <ChartLoading />
       ) : (
-        <MetricsChart series={series} unit={unit} metricLabel={def?.label ?? metric} />
+        <MetricsChart series={series} unit={unit} metricLabel={t(`metrics.${metric}`)} />
       )}
     </div>
   );

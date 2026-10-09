@@ -4,6 +4,9 @@ import { Boxes, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
+import { useEnvironmentLabel, useStatusLabel } from '@/i18n/labels';
 import { SimulatedBadge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,7 +19,6 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useCan } from '@/lib/ability';
 import { useInstances, useTenants } from '@/lib/queries';
-import { formatRelative } from '@/lib/utils';
 
 export default function InstancesPage() {
   return (
@@ -29,6 +31,10 @@ export default function InstancesPage() {
 const STATUS_FILTERS = ['READY', 'DEGRADED', 'DRAFT', 'DEPLOYING', 'PROVISIONING', 'AWAITING_APPROVAL', 'DEPLOY_FAILED', 'PROVISION_FAILED', 'DESTROYED'];
 
 function InstancesView() {
+  const t = useTranslations('instances');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
+  const envLabel = useEnvironmentLabel();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -48,12 +54,12 @@ function InstancesView() {
   return (
     <>
       <PageHeader
-        title="Instances"
-        description="Every instance is a stage: a customer environment with its services, data and networking, wherever they run."
+        title={t('title')}
+        description={t('description')}
         actions={
           can('create', 'Instance') ? (
             <ButtonLink href="/instances/new" variant="primary">
-              <Plus size={14} aria-hidden /> New instance
+              <Plus size={14} aria-hidden /> {t('new')}
             </ButtonLink>
           ) : null
         }
@@ -62,10 +68,10 @@ function InstancesView() {
         {(tenants.data?.length ?? 0) > 1 ? (
           <div>
             <label htmlFor="filter-tenant" className="mb-1 block text-xs text-fg-subtle">
-              Tenant
+              {t('filters.tenant')}
             </label>
             <Select id="filter-tenant" value={tenantId} onChange={(e) => setFilter('tenantId', e.target.value)} className="w-52">
-              <option value="">All tenants</option>
+              <option value="">{t('filters.allTenants')}</option>
               {tenants.data!.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -76,13 +82,13 @@ function InstancesView() {
         ) : null}
         <div>
           <label htmlFor="filter-status" className="mb-1 block text-xs text-fg-subtle">
-            Status
+            {t('filters.status')}
           </label>
           <Select id="filter-status" value={status} onChange={(e) => setFilter('status', e.target.value)} className="w-48">
-            <option value="">Any status</option>
+            <option value="">{t('filters.anyStatus')}</option>
             {[...new Set([...STATUS_FILTERS, ...(status ? [status] : [])])].map((s) => (
               <option key={s} value={s}>
-                {s.replace(/_/g, ' ').toLowerCase()}
+                {statusLabel(s)}
               </option>
             ))}
           </Select>
@@ -96,12 +102,12 @@ function InstancesView() {
         ) : instances.data.length === 0 ? (
           <EmptyState
             icon={Boxes}
-            title={tenantId || status ? 'No instances match these filters' : 'No stages yet'}
-            description={tenantId || status ? 'Clear a filter to see more of the fleet.' : 'Create an instance from a template to put your first environment on stage.'}
+            title={tenantId || status ? t('emptyFilteredTitle') : t('emptyTitle')}
+            description={tenantId || status ? t('emptyFilteredBody') : t('emptyBody')}
             action={
               can('create', 'Instance') ? (
                 <ButtonLink href="/instances/new" variant="primary">
-                  New instance
+                  {t('new')}
                 </ButtonLink>
               ) : null
             }
@@ -110,13 +116,13 @@ function InstancesView() {
           <Table>
             <THead>
               <tr>
-                <TH>Name</TH>
-                <TH>Tenant</TH>
-                <TH>Template</TH>
-                <TH>Environment</TH>
-                <TH>Status</TH>
-                <TH>Health</TH>
-                <TH>Updated</TH>
+                <TH>{t('table.name')}</TH>
+                <TH>{t('table.tenant')}</TH>
+                <TH>{t('table.template')}</TH>
+                <TH>{t('table.environment')}</TH>
+                <TH>{t('table.status')}</TH>
+                <TH>{t('table.health')}</TH>
+                <TH>{t('table.updated')}</TH>
               </tr>
             </THead>
             <TBody>
@@ -136,15 +142,15 @@ function InstancesView() {
                     {i.template.displayName}
                     <span className="font-mono text-xs text-fg-subtle">@{i.template.version}</span>
                   </TD>
-                  <TD className="text-fg-muted">{i.environment}</TD>
+                  <TD className="text-fg-muted">{envLabel(i.environment)}</TD>
                   <TD>
-                    <StatusBadge status={i.status} prefix="Status" />
+                    <StatusBadge status={i.status} prefix={t('table.status')} />
                   </TD>
                   <TD>
-                    <StatusBadge status={i.health} prefix="Health" />
+                    <StatusBadge status={i.health} prefix={t('table.health')} />
                   </TD>
                   <TD className="whitespace-nowrap text-xs text-fg-muted">
-                    <time dateTime={i.updatedAt}>{formatRelative(i.updatedAt)}</time>
+                    <time dateTime={i.updatedAt}>{fmt.relative(i.updatedAt)}</time>
                   </TD>
                 </TR>
               ))}

@@ -1,15 +1,18 @@
 'use client';
 
 import { destroyInstanceSchema, upgradeInstanceSchema, type DeploymentSummaryDto, type InstanceDto } from '@co/contracts';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
+import { useEnvironmentLabel } from '@/i18n/labels';
+import { useZodResolver } from '@/i18n/zod';
 import { apiSend } from '@/lib/api';
 import { useTemplate } from '@/lib/queries';
-import { formatDateTime, newIdempotencyKey } from '@/lib/utils';
+import { newIdempotencyKey } from '@/lib/utils';
 import { SimulatedBadge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
@@ -19,14 +22,18 @@ import { Select } from '../ui/select';
 import { PageSpinner } from '../ui/spinner';
 
 export function DeployDialog({ instance, open, onClose }: { instance: InstanceDto; open: boolean; onClose: () => void }) {
+  const t = useTranslations('instanceDialogs');
   return (
-    <Dialog open={open} onClose={onClose} title={`Deploy ${instance.name}`} description="Applies the current template version and variables to the bound cloud targets.">
+    <Dialog open={open} onClose={onClose} title={t('deployTitle', { name: instance.name })} description={t('deployDescription')}>
       <DeployBody instance={instance} onClose={onClose} />
     </Dialog>
   );
 }
 
 function DeployBody({ instance, onClose }: { instance: InstanceDto; onClose: () => void }) {
+  const t = useTranslations('instanceDialogs');
+  const tc = useTranslations('common');
+  const envLabel = useEnvironmentLabel();
   const router = useRouter();
   const qc = useQueryClient();
   // One key per dialog opening: a double click or retry after a network blip returns the same deployment.
@@ -41,27 +48,24 @@ function DeployBody({ instance, onClose }: { instance: InstanceDto; onClose: () 
   });
   return (
     <div className="space-y-3">
-      <p className="text-sm text-fg-muted">
-        The deployment runs in the background; you will follow its progress live. Plans with high risk or protected environments may wait for approval.
-      </p>
+      <p className="text-sm text-fg-muted">{t('deployBody')}</p>
       <ul className="list-disc space-y-1 pl-5 text-sm text-fg-muted">
         <li>
-          Template <strong className="text-fg">{instance.template.displayName}</strong> <span className="font-mono text-xs">@{instance.template.version}</span>
+          {t.rich('templateLine', { name: instance.template.displayName, strong: (chunks) => <strong className="text-fg">{chunks}</strong> })}{' '}
+          <span className="font-mono text-xs">@{instance.template.version}</span>
         </li>
-        <li>
-          Environment <strong className="text-fg">{instance.environment}</strong>
-        </li>
+        <li>{t.rich('environmentLine', { environment: envLabel(instance.environment), strong: (chunks) => <strong className="text-fg">{chunks}</strong> })}</li>
       </ul>
       {instance.simulated ? (
         <Notice tone="info">
-          <SimulatedBadge /> This instance uses mock targets: nothing is created in a real cloud.
+          <SimulatedBadge /> {t('simulatedNote')}
         </Notice>
       ) : null}
       {deploy.error ? <ErrorNotice error={deploy.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{tc('cancel')}</Button>
         <Button variant="primary" loading={deploy.isPending} onClick={() => deploy.mutate()}>
-          Deploy
+          {t('deploy')}
         </Button>
       </div>
     </div>
@@ -69,21 +73,25 @@ function DeployBody({ instance, onClose }: { instance: InstanceDto; onClose: () 
 }
 
 export function DestroyDialog({ instance, open, onClose }: { instance: InstanceDto; open: boolean; onClose: () => void }) {
+  const t = useTranslations('instanceDialogs');
   return (
-    <Dialog open={open} onClose={onClose} title={`Destroy ${instance.name}`} description="Deletes every cloud resource of this instance. This cannot be undone.">
+    <Dialog open={open} onClose={onClose} title={t('destroyTitle', { name: instance.name })} description={t('destroyDescription')}>
       <DestroyBody instance={instance} onClose={onClose} />
     </Dialog>
   );
 }
 
 function DestroyBody({ instance, onClose }: { instance: InstanceDto; onClose: () => void }) {
+  const t = useTranslations('instanceDialogs');
+  const tc = useTranslations('common');
   const router = useRouter();
   const qc = useQueryClient();
+  const mismatch = t('confirmMismatch');
   const schema = useMemo(
-    () => destroyInstanceSchema.refine((v) => v.confirm === instance.slug, { message: 'Type the instance slug exactly to confirm.', path: ['confirm'] }),
-    [instance.slug],
+    () => destroyInstanceSchema.refine((v) => v.confirm === instance.slug, { message: mismatch, path: ['confirm'] }),
+    [instance.slug, mismatch],
   );
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: { confirm: '' }, mode: 'onChange' });
+  const form = useForm({ resolver: useZodResolver(schema), defaultValues: { confirm: '' }, mode: 'onChange' });
   const confirmValue = form.watch('confirm');
   const destroy = useMutation({
     mutationFn: (confirm: string) => apiSend<DeploymentSummaryDto>('POST', `/instances/${instance.id}/destroy`, { confirm }),
@@ -98,9 +106,9 @@ function DestroyBody({ instance, onClose }: { instance: InstanceDto; onClose: ()
   if (instance.protectedFromDestroy) {
     return (
       <div className="space-y-3">
-        <Notice tone="warn">This instance is protected from destroy. Remove the protection in its settings first.</Notice>
+        <Notice tone="warn">{t('protected')}</Notice>
         <div className="flex justify-end">
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{tc('close')}</Button>
         </div>
       </div>
     );
@@ -110,16 +118,10 @@ function DestroyBody({ instance, onClose }: { instance: InstanceDto; onClose: ()
     <form onSubmit={form.handleSubmit((v) => destroy.mutate(v.confirm))} className="space-y-4" noValidate>
       <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/8 p-3 text-sm">
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-danger-ink" aria-hidden />
-        <p>
-          All resources ({instance.resources?.length ?? 0}) across every bound cloud target will be deleted, including databases and object storage. Backups follow each provider&apos;s retention policy.
-        </p>
+        <p>{t('destroyWarning', { count: instance.resources?.length ?? 0 })}</p>
       </div>
       <Field
-        label={
-          <>
-            Type <code className="rounded bg-surface-2 px-1 font-mono text-fg">{instance.slug}</code> to confirm
-          </>
-        }
+        label={t.rich('confirmLabel', { slug: instance.slug, code: (chunks) => <code className="rounded bg-surface-2 px-1 font-mono text-fg">{chunks}</code> })}
         htmlFor="destroy-confirm"
         error={confirmValue && err ? err : undefined}
       >
@@ -127,9 +129,9 @@ function DestroyBody({ instance, onClose }: { instance: InstanceDto; onClose: ()
       </Field>
       {destroy.error ? <ErrorNotice error={destroy.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{tc('cancel')}</Button>
         <Button type="submit" variant="danger" disabled={confirmValue !== instance.slug} loading={destroy.isPending}>
-          Destroy instance
+          {t('destroy')}
         </Button>
       </div>
     </form>
@@ -137,18 +139,22 @@ function DestroyBody({ instance, onClose }: { instance: InstanceDto; onClose: ()
 }
 
 export function UpgradeDialog({ instance, open, onClose, onUpgraded }: { instance: InstanceDto; open: boolean; onClose: () => void; onUpgraded: (version: string) => void }) {
+  const t = useTranslations('instanceDialogs');
   return (
-    <Dialog open={open} onClose={onClose} title="Change template version" description="Upgrading changes the definition only. Preview the plan, then deploy to apply it.">
+    <Dialog open={open} onClose={onClose} title={t('upgradeTitle')} description={t('upgradeDescription')}>
       <UpgradeBody instance={instance} onClose={onClose} onUpgraded={onUpgraded} />
     </Dialog>
   );
 }
 
 function UpgradeBody({ instance, onClose, onUpgraded }: { instance: InstanceDto; onClose: () => void; onUpgraded: (version: string) => void }) {
+  const t = useTranslations('instanceDialogs');
+  const tc = useTranslations('common');
+  const fmt = useFormat();
   const qc = useQueryClient();
   const template = useTemplate(instance.template.id);
   const versions = (template.data?.versions ?? []).filter((v) => v.status === 'PUBLISHED' && v.id !== instance.template.versionId);
-  const form = useForm({ resolver: zodResolver(upgradeInstanceSchema), defaultValues: { templateVersionId: '' } });
+  const form = useForm({ resolver: useZodResolver(upgradeInstanceSchema), defaultValues: { templateVersionId: '' } });
   const upgrade = useMutation({
     mutationFn: (templateVersionId: string) => apiSend<InstanceDto>('POST', `/instances/${instance.id}/upgrade`, { templateVersionId }),
     onSuccess: (_res, templateVersionId) => {
@@ -164,10 +170,15 @@ function UpgradeBody({ instance, onClose, onUpgraded }: { instance: InstanceDto;
     return (
       <div className="space-y-3">
         <p className="text-sm text-fg-muted">
-          No other published version of <strong>{instance.template.displayName}</strong> is available. Current version: <code className="font-mono">{instance.template.version}</code>.
+          {t.rich('noOtherVersion', {
+            name: instance.template.displayName,
+            version: instance.template.version,
+            strong: (chunks) => <strong>{chunks}</strong>,
+            code: (chunks) => <code className="font-mono">{chunks}</code>,
+          })}
         </p>
         <div className="flex justify-end">
-          <Button onClick={onClose}>Close</Button>
+          <Button onClick={onClose}>{tc('close')}</Button>
         </div>
       </div>
     );
@@ -176,23 +187,23 @@ function UpgradeBody({ instance, onClose, onUpgraded }: { instance: InstanceDto;
   return (
     <form onSubmit={form.handleSubmit((v) => upgrade.mutate(v.templateVersionId))} className="space-y-4" noValidate>
       <p className="text-sm text-fg-muted">
-        Current version: <code className="font-mono text-fg">{instance.template.version}</code>
+        {t.rich('currentVersion', { version: instance.template.version, code: (chunks) => <code className="font-mono text-fg">{chunks}</code> })}
       </p>
-      <Field label="Target version" htmlFor="upgrade-version" error={err ? 'Choose a version.' : undefined}>
+      <Field label={t('targetVersion')} htmlFor="upgrade-version" error={err ? t('chooseVersion') : undefined}>
         <Select id="upgrade-version" {...describedBy('upgrade-version', { error: err })} {...form.register('templateVersionId')}>
-          <option value="">Select a version…</option>
+          <option value="">{t('selectVersion')}</option>
           {versions.map((v) => (
             <option key={v.id} value={v.id}>
-              {v.version} — published {formatDateTime(v.publishedAt)}
+              {t('versionOption', { version: v.version, date: fmt.dateTime(v.publishedAt) })}
             </option>
           ))}
         </Select>
       </Field>
       {upgrade.error ? <ErrorNotice error={upgrade.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{tc('cancel')}</Button>
         <Button type="submit" variant="primary" loading={upgrade.isPending}>
-          Change version
+          {t('changeVersion')}
         </Button>
       </div>
     </form>

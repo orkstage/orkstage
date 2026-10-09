@@ -4,9 +4,11 @@ import type { DeploymentSummaryDto, Page } from '@co/contracts';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Rocket } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
 import { apiGet } from '@/lib/api';
 import { isDeploymentActive } from '@/lib/status';
-import { durationBetween, formatDateTime, formatDuration, shortId } from '@/lib/utils';
+import { durationBetween, shortId } from '@/lib/utils';
 import { Badge, SimulatedBadge } from './ui/badge';
 import { Button } from './ui/button';
 import { EmptyState } from './ui/empty-state';
@@ -33,18 +35,20 @@ export function useDeploymentPages(basePath: string, params: Record<string, stri
 }
 
 export function DeploymentsList({ basePath, params, showInstance = true }: { basePath: string; params?: Record<string, string | undefined>; showInstance?: boolean }) {
+  const t = useTranslations('deployments');
+  const tc = useTranslations('common');
   const q = useDeploymentPages(basePath, params);
   if (q.isPending) return <PageSpinner />;
   if (q.error) return <ErrorNotice error={q.error} className="m-4" />;
   const items = q.data.pages.flatMap((p) => p.items);
-  if (items.length === 0) return <EmptyState icon={Rocket} title="No deployments yet" description="Deploy an instance and its rollout appears here, step by step." />;
+  if (items.length === 0) return <EmptyState icon={Rocket} title={t('emptyTitle')} description={t('emptyBody')} />;
   return (
     <>
       <DeploymentsTable deployments={items} showInstance={showInstance} />
       {q.hasNextPage ? (
         <div className="flex justify-center border-t border-border p-3">
           <Button size="sm" onClick={() => q.fetchNextPage()} loading={q.isFetchingNextPage}>
-            Load more
+            {tc('loadMore')}
           </Button>
         </div>
       ) : null}
@@ -53,17 +57,19 @@ export function DeploymentsList({ basePath, params, showInstance = true }: { bas
 }
 
 export function DeploymentsTable({ deployments, showInstance = true }: { deployments: DeploymentSummaryDto[]; showInstance?: boolean }) {
+  const t = useTranslations('deployments');
+  const fmt = useFormat();
   return (
     <Table>
       <THead>
         <tr>
-          <TH>Deployment</TH>
-          {showInstance ? <TH>Instance</TH> : null}
-          <TH>Kind</TH>
-          <TH>Status</TH>
-          <TH>Queued</TH>
-          <TH>Duration</TH>
-          <TH>Error</TH>
+          <TH>{t('table.deployment')}</TH>
+          {showInstance ? <TH>{t('table.instance')}</TH> : null}
+          <TH>{t('table.kind')}</TH>
+          <TH>{t('table.status')}</TH>
+          <TH>{t('table.queued')}</TH>
+          <TH>{t('table.duration')}</TH>
+          <TH>{t('table.error')}</TH>
         </tr>
       </THead>
       <TBody>
@@ -85,13 +91,13 @@ export function DeploymentsTable({ deployments, showInstance = true }: { deploym
               </TD>
             ) : null}
             <TD>
-              <Badge tone={d.kind === 'DESTROY' ? 'danger' : 'neutral'}>{d.kind}</Badge>
+              <Badge tone={d.kind === 'DESTROY' ? 'danger' : 'neutral'}>{t(`kind.${d.kind}`)}</Badge>
             </TD>
             <TD>
               <StatusBadge status={d.status} />
             </TD>
-            <TD className="whitespace-nowrap text-xs text-fg-muted">{formatDateTime(d.queuedAt)}</TD>
-            <TD className="whitespace-nowrap text-xs tabular-nums text-fg-muted">{d.startedAt ? formatDuration(durationBetween(d.startedAt, d.finishedAt)) : '—'}</TD>
+            <TD className="whitespace-nowrap text-xs text-fg-muted">{fmt.dateTime(d.queuedAt)}</TD>
+            <TD className="whitespace-nowrap text-xs tabular-nums text-fg-muted">{d.startedAt ? fmt.duration(durationBetween(d.startedAt, d.finishedAt)) : fmt.empty}</TD>
             <TD className="max-w-xs truncate text-xs text-danger-ink" title={d.errorMessage ?? undefined}>
               {d.errorMessage ?? ''}
             </TD>

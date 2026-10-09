@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "echo \"web: covered by e2e flows (next milestone)\""
+    "test": "node scripts/check-i18n.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
     "@co/authorization": "workspace:*",
@@ -30,6 +31,7 @@
     "react-dom": "19.3.0",
     "react-hook-form": "7.89.0",
     "tailwind-merge": "3.7.0",
+    "use-intl": "4.9.2",
     "yaml": "2.9.1",
     "zod": "4.6.5"
   },

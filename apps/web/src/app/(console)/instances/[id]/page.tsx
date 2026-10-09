@@ -6,6 +6,7 @@ import { ClipboardCheck, FileSearch, Rocket, Trash2, ArrowUpCircle } from 'lucid
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { DeploymentsList } from '@/components/deployments-table';
 import { DeployDialog, DestroyDialog, UpgradeDialog } from '@/components/instance/action-dialogs';
 import { LogsPanel, MetricsPanel } from '@/components/instance/telemetry';
@@ -23,16 +24,13 @@ import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { apiGet, apiSend } from '@/lib/api';
 import { useCan } from '@/lib/ability';
 import { isDeploymentActive, isInstanceTransitional } from '@/lib/status';
-import { formatDateTime, formatRelative, shortId } from '@/lib/utils';
+import { useFormat } from '@/i18n/format';
+import { useEnvironmentLabel, useStatusLabel } from '@/i18n/labels';
+import { useDocumentTitle } from '@/lib/hooks';
+import { shortId } from '@/lib/utils';
 
 type TabId = 'overview' | 'plan' | 'deployments' | 'logs' | 'metrics';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan & cost' },
-  { id: 'deployments', label: 'Deployments' },
-  { id: 'logs', label: 'Logs' },
-  { id: 'metrics', label: 'Metrics' },
-];
+const TAB_IDS: TabId[] = ['overview', 'plan', 'deployments', 'logs', 'metrics'];
 
 export default function InstancePage() {
   return (
@@ -43,9 +41,14 @@ export default function InstancePage() {
 }
 
 function InstanceView() {
+  const t = useTranslations('instance');
+  const tk = useTranslations('deployments.kind');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
+  const envLabel = useEnvironmentLabel();
   const { id } = useParams<{ id: string }>();
   const search = useSearchParams();
-  const initialTab = TABS.some((t) => t.id === search.get('tab')) ? (search.get('tab') as TabId) : 'overview';
+  const initialTab = TAB_IDS.includes(search.get('tab') as TabId) ? (search.get('tab') as TabId) : 'overview';
   const [tab, setTab] = useState<TabId>(initialTab);
   const [dialog, setDialog] = useState<'deploy' | 'destroy' | 'upgrade' | null>(null);
   const [upgradedTo, setUpgradedTo] = useState<string | null>(null);
@@ -74,8 +77,10 @@ function InstanceView() {
     runPreviewMutation();
   }, [initialTab, hasData, runPreviewMutation]);
 
+  useDocumentTitle(q.data?.name);
+
   if (q.isPending) return <PageSpinner />;
-  if (q.error) return <ErrorNotice error={q.error} title="Instance unavailable" />;
+  if (q.error) return <ErrorNotice error={q.error} title={t('unavailable')} />;
   const inst = q.data;
 
   const canDeploy = can('deploy', 'Instance', inst.tenantId);
@@ -96,7 +101,7 @@ function InstanceView() {
         breadcrumb={
           <>
             <Link href="/instances" className="hover:underline">
-              Instances
+              {t('breadcrumb')}
             </Link>{' '}
             / <span className="font-mono">{inst.slug}</span>
           </>
@@ -104,18 +109,22 @@ function InstanceView() {
         title={inst.name}
         description={
           <>
-            {inst.tenantName} · {inst.template.displayName} <span className="font-mono text-xs">@{inst.template.version}</span> · {inst.environment}
+            {inst.tenantName} · {inst.template.displayName} <span className="font-mono text-xs">@{inst.template.version}</span> · {envLabel(inst.environment)}
           </>
         }
         meta={
           <>
-            <StatusBadge status={inst.status} prefix="Status" />
-            <StatusBadge status={inst.health} prefix="Health" />
+            <StatusBadge status={inst.status} prefix={t('statusPrefix')} />
+            <StatusBadge status={inst.health} prefix={t('healthPrefix')} />
             {inst.simulated ? <SimulatedBadge /> : null}
-            {inst.protectedFromDestroy ? <Badge tone="info">Destroy protected</Badge> : null}
+            {inst.protectedFromDestroy ? <Badge tone="info">{t('destroyProtected')}</Badge> : null}
             {inst.lastDeployment ? (
               <Link href={`/deployments/${inst.lastDeployment.id}`} className="text-xs text-fg-subtle hover:text-accent-ink hover:underline">
-                Last deployment {inst.lastDeployment.kind.toLowerCase()} · {inst.lastDeployment.status.toLowerCase().replace(/_/g, ' ')} · {formatRelative(inst.lastDeployment.queuedAt)}
+                {t('lastDeployment', {
+                  kind: tk(inst.lastDeployment.kind),
+                  status: statusLabel(inst.lastDeployment.status),
+                  when: fmt.relative(inst.lastDeployment.queuedAt),
+                })}
               </Link>
             ) : null}
           </>
@@ -124,22 +133,22 @@ function InstanceView() {
           <>
             {canDeploy || canUpdate ? (
               <Button onClick={runPreview} loading={preview.isPending} disabled={destroyed}>
-                <FileSearch size={14} aria-hidden /> Preview
+                <FileSearch size={14} aria-hidden /> {t('preview')}
               </Button>
             ) : null}
             {canUpdate ? (
               <Button onClick={() => setDialog('upgrade')} disabled={busy || destroyed}>
-                <ArrowUpCircle size={14} aria-hidden /> Upgrade template
+                <ArrowUpCircle size={14} aria-hidden /> {t('upgrade')}
               </Button>
             ) : null}
             {canDeploy ? (
-              <Button variant="primary" onClick={() => setDialog('deploy')} disabled={busy || destroyed} title={busy ? 'A deployment is already in progress' : undefined}>
-                <Rocket size={14} aria-hidden /> Deploy
+              <Button variant="primary" onClick={() => setDialog('deploy')} disabled={busy || destroyed} title={busy ? t('deployBusy') : undefined}>
+                <Rocket size={14} aria-hidden /> {t('deploy')}
               </Button>
             ) : null}
             {canDestroy ? (
               <Button variant="danger-outline" onClick={() => setDialog('destroy')} disabled={busy || destroyed}>
-                <Trash2 size={14} aria-hidden /> Destroy
+                <Trash2 size={14} aria-hidden /> {t('destroy')}
               </Button>
             ) : null}
           </>
@@ -148,48 +157,48 @@ function InstanceView() {
 
       {inst.lastDeployment && isDeploymentActive(inst.lastDeployment.status) ? (
         <Notice tone="info" className="mb-4">
-          A {inst.lastDeployment.kind.toLowerCase()} deployment is {inst.lastDeployment.status.toLowerCase().replace(/_/g, ' ')}.{' '}
+          {t('activeDeployment', { kind: tk(inst.lastDeployment.kind), status: statusLabel(inst.lastDeployment.status).toLowerCase() })}{' '}
           <Link href={`/deployments/${inst.lastDeployment.id}`} className="font-medium text-accent-ink underline">
-            Follow progress
+            {t('followProgress')}
           </Link>
         </Notice>
       ) : null}
       {upgradedTo !== null ? (
         <Notice tone="ok" className="mb-4">
-          Template version changed{upgradedTo ? ` to ${upgradedTo}` : ''}. Run a preview to review the changes, then deploy to apply them.
+          {upgradedTo ? t('upgradedTo', { version: upgradedTo }) : t('upgraded')}
         </Notice>
       ) : null}
 
-      <Tabs tabs={TABS} value={tab} onChange={setTab} label="Instance sections" idPrefix="inst" />
+      <Tabs tabs={TAB_IDS.map((tabId) => ({ id: tabId, label: t(`tabs.${tabId}`) }))} value={tab} onChange={setTab} label={t('tabs.label')} idPrefix="inst" />
 
       {tab === 'overview' ? (
         <TabPanel id="overview" idPrefix="inst">
           <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
             <Card>
-              <CardHeader title="Topology" description="Grouped by provider, cloud target and region. Knowledge: DESIRED (planned) → KNOWN (recorded) → ACTUAL (observed)." />
+              <CardHeader title={t('topology')} description={t('topologyHint')} />
               <CardBody>
                 <Topology instance={inst} canSimulate={canDeploy || canUpdate} connectivity={preview.data?.connectivity} />
               </CardBody>
             </Card>
             <div className="space-y-4">
               <Card>
-                <CardHeader title="Details" as="h3" />
+                <CardHeader title={t('details')} as="h3" />
                 <CardBody>
                   <KeyValues
                     items={[
-                      { label: 'Slug', value: <code className="font-mono text-xs">{inst.slug}</code> },
-                      { label: 'Tenant', value: inst.tenantName },
-                      { label: 'Environment', value: inst.environment },
-                      { label: 'Template', value: `${inst.template.displayName} @${inst.template.version}` },
-                      { label: 'Created', value: formatDateTime(inst.createdAt) },
-                      { label: 'Updated', value: formatDateTime(inst.updatedAt) },
-                      { label: 'Id', value: <code className="font-mono text-xs" title={inst.id}>{shortId(inst.id)}</code> },
+                      { label: t('fields.slug'), value: <code className="font-mono text-xs">{inst.slug}</code> },
+                      { label: t('fields.tenant'), value: inst.tenantName },
+                      { label: t('fields.environment'), value: envLabel(inst.environment) },
+                      { label: t('fields.template'), value: `${inst.template.displayName} @${inst.template.version}` },
+                      { label: t('fields.created'), value: fmt.dateTime(inst.createdAt) },
+                      { label: t('fields.updated'), value: fmt.dateTime(inst.updatedAt) },
+                      { label: t('fields.id'), value: <code className="font-mono text-xs" title={inst.id}>{shortId(inst.id)}</code> },
                     ]}
                   />
                 </CardBody>
               </Card>
               <Card>
-                <CardHeader title="Placement" as="h3" />
+                <CardHeader title={t('placement')} as="h3" />
                 <CardBody>
                   <ul className="space-y-1 text-sm">
                     {Object.entries(inst.bindings).map(([slot, b]) => (
@@ -204,7 +213,7 @@ function InstanceView() {
                 </CardBody>
               </Card>
               {Object.keys(inst.variables).length > 0 ? (
-                <Disclosure summary={`Variables (${Object.keys(inst.variables).length})`} className="bg-surface">
+                <Disclosure summary={t('variables', { count: Object.keys(inst.variables).length })} className="bg-surface">
                   <KeyValues items={Object.entries(inst.variables).map(([k, v]) => ({ label: <span className="font-mono text-xs">{k}</span>, value: String(v) }))} />
                 </Disclosure>
               ) : null}
@@ -217,23 +226,23 @@ function InstanceView() {
         <TabPanel id="plan" idPrefix="inst">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Button onClick={() => preview.mutate()} loading={preview.isPending} disabled={destroyed || !(canDeploy || canUpdate)}>
-              <ClipboardCheck size={14} aria-hidden /> {preview.data ? 'Re-run preview' : 'Run preview'}
+              <ClipboardCheck size={14} aria-hidden /> {preview.data ? t('rerunPreview') : t('runPreview')}
             </Button>
             {canDeploy ? (
               <Button variant="primary" onClick={() => setDialog('deploy')} disabled={busy || destroyed || (preview.data ? !preview.data.valid : false)}>
-                <Rocket size={14} aria-hidden /> Deploy
+                <Rocket size={14} aria-hidden /> {t('deploy')}
               </Button>
             ) : null}
-            <span className="text-xs text-fg-subtle">Preview compiles the template, checks policies, estimates cost and computes the plan. Nothing is changed.</span>
+            <span className="text-xs text-fg-subtle">{t('previewHint')}</span>
           </div>
-          {preview.error ? <ErrorNotice error={preview.error} title="Preview failed" className="mb-4" /> : null}
+          {preview.error ? <ErrorNotice error={preview.error} title={t('previewFailed')} className="mb-4" /> : null}
           {preview.data ? (
             <PreviewReport preview={preview.data} />
           ) : preview.isPending ? (
-            <PageSpinner label="Compiling and planning" />
+            <PageSpinner label={t('planning')} />
           ) : (
             <Card>
-              <EmptyState icon={FileSearch} title="No preview yet" description="Run a preview to see validation issues, policy results, connectivity, cost and the change plan." />
+              <EmptyState icon={FileSearch} title={t('noPreviewTitle')} description={t('noPreviewBody')} />
             </Card>
           )}
         </TabPanel>

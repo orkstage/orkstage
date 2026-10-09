@@ -1,6 +1,11 @@
+'use client';
+
 import { Icon, type IconifyIcon } from '@iconify/react/offline';
 import { Archive, Box, Container, Database, Globe, ListOrdered, Network, Package, Waypoints, Zap, type LucideIcon } from 'lucide-react';
 import cloudIcons from '@/lib/cloud-icons.json';
+import { useCallback } from 'react';
+import { useTranslations } from 'use-intl';
+import type { Messages } from '@/i18n/messages';
 import { cn } from '@/lib/utils';
 
 /*
@@ -9,17 +14,29 @@ import { cn } from '@/lib/utils';
  */
 const ICONS = cloudIcons as Record<string, IconifyIcon>;
 
-export const RESOURCE_TYPE_META: Record<string, { label: string; glyph: LucideIcon; short: string }> = {
-  network: { label: 'Network', glyph: Network, short: 'network' },
-  'compute.container-service': { label: 'Container service', glyph: Container, short: 'service' },
-  'container-registry': { label: 'Container registry', glyph: Package, short: 'registry' },
-  'database.postgresql': { label: 'PostgreSQL', glyph: Database, short: 'database' },
-  'cache.redis': { label: 'Redis cache', glyph: Zap, short: 'cache' },
-  queue: { label: 'Queue', glyph: ListOrdered, short: 'queue' },
-  'object-storage': { label: 'Object storage', glyph: Archive, short: 'storage' },
-  ingress: { label: 'Ingress', glyph: Waypoints, short: 'ingress' },
-  dns: { label: 'DNS', glyph: Globe, short: 'dns' },
+type ResourceTypeKey = keyof Messages['resourceTypes'];
+
+/** Display name (translated through `resourceTypes.<labelKey>`), glyph and short name per type. */
+export const RESOURCE_TYPE_META: Record<string, { labelKey: ResourceTypeKey; glyph: LucideIcon; short: string }> = {
+  network: { labelKey: 'network', glyph: Network, short: 'network' },
+  'compute.container-service': { labelKey: 'containerService', glyph: Container, short: 'service' },
+  'container-registry': { labelKey: 'containerRegistry', glyph: Package, short: 'registry' },
+  'database.postgresql': { labelKey: 'postgresql', glyph: Database, short: 'database' },
+  'cache.redis': { labelKey: 'redis', glyph: Zap, short: 'cache' },
+  queue: { labelKey: 'queue', glyph: ListOrdered, short: 'queue' },
+  'object-storage': { labelKey: 'objectStorage', glyph: Archive, short: 'storage' },
+  ingress: { labelKey: 'ingress', glyph: Waypoints, short: 'ingress' },
+  dns: { labelKey: 'dns', glyph: Globe, short: 'dns' },
 };
+
+/** Translated name of a resource type; unknown types are shown as their raw type string. */
+export function useResourceTypeLabel() {
+  const t = useTranslations('resourceTypes');
+  return useCallback((type: string): string => {
+    const meta = RESOURCE_TYPE_META[type];
+    return meta ? t(meta.labelKey) : type;
+  }, [t]);
+}
 
 /** AWS service icons by capability, then by logical type. */
 const AWS_BY_CAPABILITY: Record<string, string> = {

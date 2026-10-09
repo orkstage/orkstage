@@ -5,10 +5,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClipboardCopy, FlaskConical, Layers, LayoutList, Workflow } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
 import { apiSend } from '@/lib/api';
 import { useCloudTargets, useTemplate } from '@/lib/queries';
 import { useDismiss } from '@/lib/hooks';
-import { cn, displayOutput, formatRelative, shortId } from '@/lib/utils';
+import { cn, displayOutput, shortId } from '@/lib/utils';
 import { Badge, SimulatedBadge } from '../ui/badge';
 import { CopyButton } from '../ui/copy-button';
 import { EmptyState } from '../ui/empty-state';
@@ -36,7 +38,12 @@ function group(resources: ResourceDto[]): Grouped {
 }
 
 // React Flow + dagre load only when the diagram view is shown.
-const TopologyDiagram = dynamic(() => import('./topology-diagram'), { ssr: false, loading: () => <PageSpinner label="Drawing topology" /> });
+const TopologyDiagram = dynamic(() => import('./topology-diagram'), { ssr: false, loading: () => <DiagramLoading /> });
+
+function DiagramLoading() {
+  const t = useTranslations('topology');
+  return <PageSpinner label={t('drawing')} />;
+}
 
 type View = 'diagram' | 'list';
 const VIEW_KEY = 'orkstage-topology-view';
@@ -50,6 +57,7 @@ export function Topology({
   canSimulate: boolean;
   connectivity?: PreviewDto['connectivity'] | null;
 }) {
+  const t = useTranslations('topology');
   // Customers cannot list cloud targets; fall back to the target id when names are unavailable.
   const targets = useCloudTargets();
   const targetName = useMemo(() => new Map((targets.data ?? []).map((t) => [t.id, t.name])), [targets.data]);
@@ -92,8 +100,8 @@ export function Topology({
     return (
       <EmptyState
         icon={Layers}
-        title="No resources yet"
-        description="This stage is still empty. Run a preview to see what will be created, then deploy."
+        title={t('emptyTitle')}
+        description={t('emptyBody')}
       />
     );
   }
@@ -101,7 +109,7 @@ export function Topology({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-md border border-border bg-surface p-0.5" role="group" aria-label="Topology view">
+        <div className="inline-flex rounded-md border border-border bg-surface p-0.5" role="group" aria-label={t('viewLabel')}>
           {(['diagram', 'list'] as const).map((v) => (
             <button
               key={v}
@@ -111,13 +119,13 @@ export function Topology({
               className={cn('flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium', view === v ? 'bg-accent/10 text-accent-ink' : 'text-fg-muted hover:text-fg')}
             >
               {v === 'diagram' ? <Workflow size={13} aria-hidden /> : <LayoutList size={13} aria-hidden />}
-              {v === 'diagram' ? 'Diagram' : 'List'}
+              {v === 'diagram' ? t('diagram') : t('list')}
             </button>
           ))}
         </div>
         <button type="button" onClick={copyMermaid} className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-fg-muted hover:bg-surface-2 hover:text-fg">
           <ClipboardCopy size={13} aria-hidden />
-          <span aria-live="polite">{copied === 'ok' ? 'Mermaid copied' : copied === 'error' ? 'Copy failed' : 'Copy as Mermaid'}</span>
+          <span aria-live="polite">{copied === 'ok' ? t('mermaidCopied') : copied === 'error' ? t('copyFailed') : t('copyMermaid')}</span>
         </button>
       </div>
       {view === 'diagram' ? (
@@ -140,6 +148,7 @@ function TopologyList({
   canSimulate: boolean;
   targetName: Map<string, string>;
 }) {
+  const t = useTranslations('topology');
   const grouped = group(resources);
   return (
     <div className="space-y-5">
@@ -147,7 +156,7 @@ function TopologyList({
         const simulated = key.startsWith('sim:');
         const provider = simulated ? key.slice(4) : key;
         return (
-          <section key={key} aria-label={`Provider ${provider}${simulated ? ' (simulated)' : ''}`}>
+          <section key={key} aria-label={simulated ? t('providerSectionSimulated', { provider }) : t('providerSection', { provider })}>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <span className="font-mono uppercase">{provider}</span>
               {simulated ? <SimulatedBadge /> : null}
@@ -158,10 +167,10 @@ function TopologyList({
                   {[...byRegion.entries()].map(([region, list]) => (
                     <div key={region} className="border-b border-border last:border-b-0">
                       <p className="flex flex-wrap items-center gap-2 bg-surface-2/60 px-3 py-1.5 text-xs">
-                        <span className="font-medium">{targetName.get(targetId) ?? <span className="font-mono">target {shortId(targetId)}</span>}</span>
+                        <span className="font-medium">{targetName.get(targetId) ?? <span className="font-mono">{t('targetFallback', { id: shortId(targetId) })}</span>}</span>
                         <span className="text-fg-subtle">/</span>
                         <span className="font-mono text-fg-muted">{region}</span>
-                        <span className="ml-auto text-fg-subtle">{list.length} resource{list.length === 1 ? '' : 's'}</span>
+                        <span className="ml-auto text-fg-subtle">{t('resourceCount', { count: list.length })}</span>
                       </p>
                       <div className="grid gap-2 p-2 sm:grid-cols-2 2xl:grid-cols-3">
                         {list.map((r) => (
@@ -183,6 +192,8 @@ function TopologyList({
 const KEY_OUTPUTS = 6;
 
 function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: ResourceDto; instanceId: string; canSimulate: boolean }) {
+  const t = useTranslations('topology');
+  const fmt = useFormat();
   const outputs = Object.entries(r.outputs ?? {});
   const drifted = r.drift && !['IN_SYNC', 'UNKNOWN', 'NONE', ''].includes(r.drift.toUpperCase());
   const simulated = r.simulatedProvider !== null || r.provider === 'mock';
@@ -194,23 +205,24 @@ function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: Reso
           <h4 className="truncate text-sm font-medium" title={r.capabilityName}>
             {r.capabilityName}
           </h4>
-          <p className="truncate font-mono text-[11px] text-fg-subtle" title={`${r.resourceId} · ${r.type} · slot ${r.slot}`}>
+          <p className="truncate font-mono text-[11px] text-fg-subtle" title={t('slotTitle', { id: r.resourceId, type: r.type, slot: r.slot })}>
             {r.resourceId} · {r.type}
           </p>
         </div>
         {simulated && canSimulate ? <SimulateMenu instanceId={instanceId} resource={r} /> : null}
       </header>
       <div className="mt-2 flex flex-wrap gap-1">
-        <StatusBadge status={r.status} prefix="Status" />
-        <StatusBadge status={r.health} prefix="Health" />
-        <StatusBadge status={r.knowledge} prefix="Knowledge" label={r.knowledge} />
-        {drifted ? <StatusBadge status={r.drift} prefix="Drift" /> : null}
-        {r.critical ? <Badge>critical</Badge> : null}
+        <StatusBadge status={r.status} prefix={t('statusPrefix')} />
+        <StatusBadge status={r.health} prefix={t('healthPrefix')} />
+        <StatusBadge status={r.knowledge} prefix={t('knowledgePrefix')} label={r.knowledge} />
+        {drifted ? <StatusBadge status={r.drift} prefix={t('driftPrefix')} /> : null}
+        {r.critical ? <Badge>{t('critical')}</Badge> : null}
       </div>
       {drifted && r.driftChanges?.length ? (
         <div className="mt-1.5 rounded border border-warn/40 bg-warn/8 px-2 py-1.5 text-xs">
           <p className="text-warn-ink">
-            Changed outside OrkStage{r.driftCheckedAt ? <span className="text-fg-subtle"> · {formatRelative(r.driftCheckedAt)}</span> : null}. Redeploy to restore.
+            {t('driftChanged')}
+            {r.driftCheckedAt ? <span className="text-fg-subtle"> · {fmt.relative(r.driftCheckedAt)}</span> : null}. {t('driftRedeploy')}
           </p>
           <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-fg-muted">
             {r.driftChanges.slice(0, 4).map((c) => (
@@ -218,14 +230,14 @@ function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: Reso
                 {c.action} {c.address.replace(/^module\.resource\./, '')}
               </li>
             ))}
-            {r.driftChanges.length > 4 ? <li className="text-fg-subtle">+{r.driftChanges.length - 4} more</li> : null}
+            {r.driftChanges.length > 4 ? <li className="text-fg-subtle">{t('more', { count: r.driftChanges.length - 4 })}</li> : null}
           </ul>
         </div>
       ) : null}
       {r.healthMessage ? (
         <p className="mt-1.5 text-xs text-fg-muted">
           {r.healthMessage}
-          {r.healthCheckedAt ? <span className="text-fg-subtle"> · {formatRelative(r.healthCheckedAt)}</span> : null}
+          {r.healthCheckedAt ? <span className="text-fg-subtle"> · {fmt.relative(r.healthCheckedAt)}</span> : null}
         </p>
       ) : null}
       {outputs.length > 0 ? (
@@ -239,20 +251,20 @@ function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: Reso
                 </dt>
                 <dd className="flex min-w-0 items-center gap-1">
                   {d.hidden ? (
-                    <span className="italic text-fg-subtle">hidden</span>
+                    <span className="italic text-fg-subtle">{t('hidden')}</span>
                   ) : (
                     <>
                       <code className={cn('truncate font-mono', d.reference ? 'text-info-ink' : 'text-fg-muted')} title={d.text}>
                         {d.text}
                       </code>
-                      <CopyButton value={d.text} label={`Copy ${k}`} />
+                      <CopyButton value={d.text} label={t('copyOutput', { name: k })} />
                     </>
                   )}
                 </dd>
               </div>
             );
           })}
-          {outputs.length > KEY_OUTPUTS ? <p className="text-fg-subtle">+{outputs.length - KEY_OUTPUTS} more</p> : null}
+          {outputs.length > KEY_OUTPUTS ? <p className="text-fg-subtle">{t('more', { count: outputs.length - KEY_OUTPUTS })}</p> : null}
         </dl>
       ) : null}
     </article>
@@ -260,6 +272,7 @@ function ResourceCard({ resource: r, instanceId, canSimulate }: { resource: Reso
 }
 
 function SimulateMenu({ instanceId, resource }: { instanceId: string; resource: ResourceDto }) {
+  const t = useTranslations('topology');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
@@ -276,11 +289,11 @@ function SimulateMenu({ instanceId, resource }: { instanceId: string; resource: 
 
   const drifted = resource.drift === 'DRIFT_DETECTED';
   const actions: { label: string; body: { health?: string | null; drift?: boolean } }[] = [
-    { label: 'Mark unhealthy', body: { health: 'UNHEALTHY' } },
-    { label: 'Mark degraded', body: { health: 'DEGRADED' } },
-    { label: 'Mark healthy', body: { health: 'HEALTHY' } },
-    { label: 'Clear health override', body: { health: null } },
-    { label: drifted ? 'Clear drift' : 'Introduce drift', body: { drift: !drifted } },
+    { label: t('actions.unhealthy'), body: { health: 'UNHEALTHY' } },
+    { label: t('actions.degraded'), body: { health: 'DEGRADED' } },
+    { label: t('actions.healthy'), body: { health: 'HEALTHY' } },
+    { label: t('actions.clearHealth'), body: { health: null } },
+    { label: drifted ? t('actions.clearDrift') : t('actions.introduceDrift'), body: { drift: !drifted } },
   ];
 
   return (
@@ -291,9 +304,9 @@ function SimulateMenu({ instanceId, resource }: { instanceId: string; resource: 
         aria-expanded={open}
         aria-haspopup="menu"
         className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-fg-subtle hover:bg-surface-2 hover:text-fg"
-        title="Simulation controls (mock provider only)"
+        title={t('simulateTitle')}
       >
-        {simulate.isPending ? <Spinner size={11} /> : <FlaskConical size={12} aria-hidden />} Simulate
+        {simulate.isPending ? <Spinner size={11} /> : <FlaskConical size={12} aria-hidden />} {t('simulate')}
       </button>
       {open ? (
         <div role="menu" className="absolute right-0 z-20 mt-1 w-48 rounded-md border border-border bg-surface p-1 shadow-xl">

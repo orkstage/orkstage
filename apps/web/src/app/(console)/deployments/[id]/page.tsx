@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { CostTable, PlanGroups, PlanSummary } from '@/components/plan-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,11 +18,13 @@ import { ErrorNotice } from '@/components/ui/error-notice';
 import { Disclosure, PageHeader } from '@/components/ui/page-header';
 import { PageSpinner, Spinner } from '@/components/ui/spinner';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useFormat } from '@/i18n/format';
+import { useStatusLabel } from '@/i18n/labels';
 import { apiGet, apiSend, asItems, qs } from '@/lib/api';
 import { useCan } from '@/lib/ability';
 import { isDeploymentActive } from '@/lib/status';
-import { useNow } from '@/lib/hooks';
-import { cn, displayOutput, durationBetween, formatDateTime, formatDuration, formatTime, shortId } from '@/lib/utils';
+import { useDocumentTitle, useNow } from '@/lib/hooks';
+import { cn, displayOutput, durationBetween, shortId } from '@/lib/utils';
 
 const POLL_MS = 1500;
 
@@ -67,6 +70,10 @@ function useDeploymentEvents(id: string, active: boolean) {
 }
 
 export default function DeploymentPage() {
+  const t = useTranslations('deployments.detail');
+  const tk = useTranslations('deployments.kind');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
@@ -99,9 +106,10 @@ export default function DeploymentPage() {
     },
   });
   const retry = useMutation({ mutationFn: () => apiSend<DeploymentSummaryDto>('POST', `/deployments/${id}/retry`), onSuccess: onAction });
+  useDocumentTitle(dep.data ? `${dep.data.instanceName} ${shortId(dep.data.id)}` : null);
 
   if (dep.isPending) return <PageSpinner />;
-  if (dep.error) return <ErrorNotice error={dep.error} title="Deployment unavailable" />;
+  if (dep.error) return <ErrorNotice error={dep.error} title={t('unavailable')} />;
   const d = dep.data;
 
   const steps = [...d.steps].sort((a, b) => a.position - b.position);
@@ -117,7 +125,7 @@ export default function DeploymentPage() {
     <>
       {d.simulated ? (
         <div role="note" className="mb-4 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
-          <strong className="font-semibold uppercase tracking-wide text-accent-ink">Simulated</strong> — this deployment runs against the mock provider. No real cloud resources are created or changed.
+          <strong className="font-semibold uppercase tracking-wide text-accent-ink">{t('simulatedTitle')}</strong> {t('simulatedBody')}
         </div>
       ) : null}
 
@@ -125,14 +133,14 @@ export default function DeploymentPage() {
         breadcrumb={
           <>
             <Link href="/deployments" className="hover:underline">
-              Deployments
+              {t('breadcrumb')}
             </Link>{' '}
             / <span className="font-mono">{shortId(d.id)}</span>
           </>
         }
         title={
           <>
-            {d.kind === 'DESTROY' ? 'Destroy' : 'Deploy'}{' '}
+            {d.kind === 'DESTROY' ? t('titleDestroy') : t('titleApply')}{' '}
             <Link href={`/instances/${d.instanceId}`} className="hover:text-accent-ink hover:underline">
               {d.instanceName}
             </Link>
@@ -141,9 +149,9 @@ export default function DeploymentPage() {
         meta={
           <>
             <StatusBadge status={d.status} />
-            <Badge tone={d.kind === 'DESTROY' ? 'danger' : 'neutral'}>{d.kind}</Badge>
+            <Badge tone={d.kind === 'DESTROY' ? 'danger' : 'neutral'}>{tk(d.kind)}</Badge>
             <span className="text-xs text-fg-subtle">
-              Elapsed <span className="tabular-nums text-fg">{formatDuration(elapsed)}</span>
+              {t('elapsed')} <span className="tabular-nums text-fg">{fmt.duration(elapsed)}</span>
             </span>
             {current ? (
               <span className="flex items-center gap-1 text-xs text-info-ink">
@@ -151,7 +159,7 @@ export default function DeploymentPage() {
               </span>
             ) : null}
             <span className="flex items-center gap-1 font-mono text-[11px] text-fg-subtle">
-              correlation {d.correlationId} <CopyButton value={d.correlationId} label="Copy correlation id" />
+              {t('correlation', { id: d.correlationId })} <CopyButton value={d.correlationId} label={t('copyCorrelation')} />
             </span>
           </>
         }
@@ -159,17 +167,17 @@ export default function DeploymentPage() {
           <>
             {d.status === 'AWAITING_APPROVAL' && canApprove ? (
               <Button variant="primary" onClick={() => approve.mutate()} loading={approve.isPending}>
-                <ShieldCheck size={14} aria-hidden /> Approve
+                <ShieldCheck size={14} aria-hidden /> {t('approve')}
               </Button>
             ) : null}
             {active && canDeploy ? (
               <Button variant="danger-outline" onClick={() => setConfirmCancel(true)}>
-                <Ban size={14} aria-hidden /> Cancel
+                <Ban size={14} aria-hidden /> {t('cancel')}
               </Button>
             ) : null}
             {(d.status === 'FAILED' || d.status === 'PARTIALLY_FAILED') && canDeploy ? (
               <Button variant="primary" onClick={() => retry.mutate()} loading={retry.isPending}>
-                <RotateCcw size={14} aria-hidden /> Retry failed
+                <RotateCcw size={14} aria-hidden /> {t('retry')}
               </Button>
             ) : null}
           </>
@@ -179,37 +187,37 @@ export default function DeploymentPage() {
       {mutationError ? <ErrorNotice error={mutationError} className="mb-4" /> : null}
       {d.status === 'AWAITING_APPROVAL' ? (
         <div role="status" className="mb-4 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm">
-          This deployment is waiting for approval{d.plan ? ` (plan risk: ${d.plan.risk})` : ''}. Review the plan below{canApprove ? ' and approve to continue' : ''}.
+          {d.plan ? t('awaitingRisk', { risk: statusLabel(d.plan.risk).toLowerCase() }) : t('awaiting')} {canApprove ? t('reviewPlanApprove') : t('reviewPlan')}
         </div>
       ) : null}
       {d.errorMessage ? (
         <div role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/8 px-3 py-2 text-sm">
-          <p className="font-medium text-danger-ink">{d.errorClass ?? 'Deployment error'}</p>
+          <p className="font-medium text-danger-ink">{d.errorClass ?? t('error')}</p>
           <p className="text-fg-muted">{d.errorMessage}</p>
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader
-            title="Progress"
-            description={`${done} of ${steps.length} steps complete${failed ? ` · ${failed} failed` : ''}`}
-            actions={<span className="text-xs text-fg-subtle">Queued {formatDateTime(d.queuedAt)}</span>}
+            title={t('progress')}
+            description={failed ? t('stepsCompleteFailed', { done, total: steps.length, failed }) : t('stepsComplete', { done, total: steps.length })}
+            actions={<span className="text-xs text-fg-subtle">{t('queuedAt', { date: fmt.dateTime(d.queuedAt) })}</span>}
           />
           <div className="h-1 bg-surface-2" aria-hidden>
             <div className={cn('h-full', failed ? 'bg-danger' : 'bg-ok')} style={{ width: `${steps.length ? (done / steps.length) * 100 : 0}%` }} />
           </div>
           {steps.some((s) => s.startedAt) ? (
             <div className="border-b border-border">
-              <p className="px-4 pt-2 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">Timeline</p>
+              <p className="px-4 pt-2 text-[11px] font-medium uppercase tracking-wide text-fg-subtle">{t('timeline')}</p>
               <DeploymentGantt steps={steps} now={now} />
             </div>
           ) : null}
-          <ol className="divide-y divide-border" aria-label="Deployment steps">
+          <ol className="divide-y divide-border" aria-label={t('stepsLabel')}>
             {steps.map((s) => (
               <StepRow key={s.key} step={s} now={now} />
             ))}
-            {steps.length === 0 ? <li className="px-4 py-6 text-sm text-fg-subtle">Steps appear once the worker picks up the deployment.</li> : null}
+            {steps.length === 0 ? <li className="px-4 py-6 text-sm text-fg-subtle">{t('noSteps')}</li> : null}
           </ol>
         </Card>
 
@@ -217,14 +225,14 @@ export default function DeploymentPage() {
           <EventLog events={events} active={active} error={eventsError} />
           {d.status === 'SUCCEEDED' && d.outputs && Object.keys(d.outputs).length > 0 ? <Outputs outputs={d.outputs} /> : null}
           {d.plan ? (
-            <Disclosure summary="Plan" className="bg-surface" defaultOpen={d.status === 'AWAITING_APPROVAL'}>
+            <Disclosure summary={t('plan')} className="bg-surface" defaultOpen={d.status === 'AWAITING_APPROVAL'}>
               <PlanSummary plan={d.plan} />
               <PlanGroups plan={d.plan} />
               <pre className="max-h-80 overflow-auto rounded bg-surface-2 p-2 font-mono text-xs">{d.plan.text}</pre>
             </Disclosure>
           ) : null}
           {d.cost ? (
-            <Disclosure summary="Estimated cost (approximate)" className="bg-surface">
+            <Disclosure summary={t('estimatedCost')} className="bg-surface">
               <CostTable cost={d.cost} />
             </Disclosure>
           ) : null}
@@ -234,20 +242,18 @@ export default function DeploymentPage() {
       <Dialog
         open={confirmCancel}
         onClose={() => setConfirmCancel(false)}
-        title="Cancel deployment?"
+        title={t('cancelTitle')}
         size="sm"
         footer={
           <>
-            <Button onClick={() => setConfirmCancel(false)}>Keep running</Button>
+            <Button onClick={() => setConfirmCancel(false)}>{t('keepRunning')}</Button>
             <Button variant="danger" onClick={() => cancel.mutate()} loading={cancel.isPending}>
-              Cancel deployment
+              {t('cancelDeployment')}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-fg-muted">
-          Cancellation is cooperative: the step in progress finishes, then remaining steps are skipped. Resources already created are kept and can be removed by a destroy or reconciled by a later deploy.
-        </p>
+        <p className="text-sm text-fg-muted">{t('cancelBody')}</p>
         {cancel.error ? <ErrorNotice error={cancel.error} className="mt-3" /> : null}
       </Dialog>
     </>
@@ -276,6 +282,9 @@ function StepIcon({ status }: { status: DeploymentStepDto['status'] }) {
 }
 
 function StepRow({ step: s, now }: { step: DeploymentStepDto; now: number }) {
+  const t = useTranslations('deployments.detail');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
   const duration = s.startedAt ? durationBetween(s.startedAt, s.finishedAt, now) : null;
   return (
     <li className={cn('flex gap-3 px-4 py-2.5', s.status === 'RUNNING' && 'bg-info/5', s.status === 'FAILED' && 'bg-danger/5')} aria-current={s.status === 'RUNNING' ? 'step' : undefined}>
@@ -285,17 +294,17 @@ function StepRow({ step: s, now }: { step: DeploymentStepDto; now: number }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className={cn('text-sm', s.status === 'PENDING' ? 'text-fg-subtle' : 'font-medium text-fg')}>{s.name}</span>
-          <span className="sr-only">({s.status.toLowerCase()})</span>
-          {s.kind === 'PHASE' ? <Badge>phase</Badge> : null}
+          <span className="sr-only">({statusLabel(s.status)})</span>
+          {s.kind === 'PHASE' ? <Badge>{t('phase')}</Badge> : null}
           {s.provider ? (
             <span className="font-mono text-[11px] text-fg-subtle">
               {s.provider}
               {s.region ? ` / ${s.region}` : ''}
             </span>
           ) : null}
-          {s.attempt > 1 ? <Badge tone="warn">attempt {s.attempt}</Badge> : null}
-          {s.status === 'SKIPPED' ? <span className="text-xs text-fg-subtle">skipped</span> : null}
-          <span className="ml-auto text-xs tabular-nums text-fg-subtle">{duration !== null ? formatDuration(duration) : ''}</span>
+          {s.attempt > 1 ? <Badge tone="warn">{t('attempt', { attempt: s.attempt })}</Badge> : null}
+          {s.status === 'SKIPPED' ? <span className="text-xs text-fg-subtle">{t('skipped')}</span> : null}
+          <span className="ml-auto text-xs tabular-nums text-fg-subtle">{duration !== null ? fmt.duration(duration) : ''}</span>
         </div>
         {s.errorMessage ? (
           <p className="mt-1 rounded bg-danger/8 px-2 py-1 text-xs text-danger-ink">
@@ -311,6 +320,8 @@ function StepRow({ step: s, now }: { step: DeploymentStepDto; now: number }) {
 const LEVEL_CLASS: Record<string, string> = { error: 'text-danger-ink', warn: 'text-warn-ink', debug: 'text-fg-subtle', info: 'text-info-ink' };
 
 function EventLog({ events, active, error }: { events: DeploymentEventDto[]; active: boolean; error: unknown }) {
+  const t = useTranslations('deployments.detail');
+  const fmt = useFormat();
   const ref = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
 
@@ -322,12 +333,12 @@ function EventLog({ events, active, error }: { events: DeploymentEventDto[]; act
   return (
     <Card>
       <CardHeader
-        title="Event log"
-        description={active ? 'Streaming — refreshes every 1.5 s' : 'Complete'}
+        title={t('eventLog')}
+        description={active ? t('streaming') : t('complete')}
         actions={
           !stick ? (
             <Button size="sm" variant="ghost" onClick={() => setStick(true)}>
-              Jump to latest
+              {t('jumpLatest')}
             </Button>
           ) : active ? (
             <Spinner size={13} className="text-fg-subtle" />
@@ -338,7 +349,7 @@ function EventLog({ events, active, error }: { events: DeploymentEventDto[]; act
       <div
         ref={ref}
         role="log"
-        aria-label="Deployment events"
+        aria-label={t('eventsLabel')}
         onScroll={(e) => {
           const el = e.currentTarget;
           setStick(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
@@ -346,12 +357,14 @@ function EventLog({ events, active, error }: { events: DeploymentEventDto[]; act
         className="h-80 overflow-auto bg-surface-2/50 px-3 py-2 font-mono text-[11.5px] leading-relaxed"
       >
         {events.length === 0 ? (
-          <p className="text-fg-subtle">Waiting for events…</p>
+          <p role="status" className="flex items-center gap-2 text-fg-subtle">
+            <Spinner size={11} /> {t('waiting')}
+          </p>
         ) : (
           events.map((e) => (
             <div key={e.id} className="flex gap-2.5 whitespace-pre-wrap break-words">
               <time dateTime={e.at} className="shrink-0 text-fg-subtle">
-                {formatTime(e.at)}
+                {fmt.time(e.at)}
               </time>
               <span className={cn('w-10 shrink-0 uppercase', LEVEL_CLASS[e.level] ?? 'text-fg-muted')}>{e.level}</span>
               {e.stepKey ? <span className="shrink-0 text-fg-subtle">[{e.stepKey}]</span> : null}
@@ -365,9 +378,10 @@ function EventLog({ events, active, error }: { events: DeploymentEventDto[]; act
 }
 
 function Outputs({ outputs }: { outputs: Record<string, Record<string, unknown>> }) {
+  const t = useTranslations('deployments.detail');
   return (
     <Card>
-      <CardHeader title="Outputs" description="Secrets are shown only as references." />
+      <CardHeader title={t('outputs')} description={t('outputsHint')} />
       <CardBody className="space-y-3">
         {Object.entries(outputs).map(([resourceId, values]) => (
           <div key={resourceId}>
@@ -380,13 +394,13 @@ function Outputs({ outputs }: { outputs: Record<string, Record<string, unknown>>
                     <dt className="w-32 shrink-0 truncate text-fg-subtle">{k}</dt>
                     <dd className="flex min-w-0 items-center gap-1">
                       {out.hidden ? (
-                        <span className="italic text-fg-subtle">hidden</span>
+                        <span className="italic text-fg-subtle">{t('hidden')}</span>
                       ) : (
                         <>
                           <code className={cn('truncate font-mono', out.reference ? 'text-info-ink' : 'text-fg-muted')} title={out.text}>
                             {out.text}
                           </code>
-                          <CopyButton value={out.text} label={`Copy ${k}`} />
+                          <CopyButton value={out.text} label={t('copyOutput', { name: k })} />
                         </>
                       )}
                     </dd>

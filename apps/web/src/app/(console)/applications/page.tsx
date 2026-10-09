@@ -4,6 +4,7 @@ import type { ApplicationDto, Page } from '@co/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { AppWindow } from 'lucide-react';
 import { Fragment } from 'react';
+import { useTranslations } from 'use-intl';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { MonoValue } from '@/components/ui/copy-button';
@@ -16,6 +17,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { apiGet, asItems } from '@/lib/api';
 
 export default function ApplicationsPage() {
+  const t = useTranslations('applications');
   const q = useQuery({
     queryKey: ['applications'],
     queryFn: async ({ signal }) => asItems(await apiGet<ApplicationDto[] | Page<ApplicationDto>>('/applications', { signal })),
@@ -23,24 +25,24 @@ export default function ApplicationsPage() {
 
   return (
     <>
-      <PageHeader title="Applications" description="The container images your stages run. Templates reference them as catalog://<name>; every deploy pins an immutable digest." />
+      <PageHeader title={t('title')} description={t('description')} />
       <Card>
         {q.isPending ? (
           <PageSpinner />
         ) : q.error ? (
           <ErrorNotice error={q.error} className="m-4" />
         ) : q.data.length === 0 ? (
-          <EmptyState icon={AppWindow} title="The catalog is empty" description="Applications appear here once images are registered for templates to use." />
+          <EmptyState icon={AppWindow} title={t('emptyTitle')} description={t('emptyBody')} />
         ) : (
           <Table>
             <THead>
               <tr>
-                <TH>Application / version</TH>
-                <TH>Registry</TH>
-                <TH>Image</TH>
-                <TH>Digest</TH>
-                <TH>Architectures</TH>
-                <TH>Scan</TH>
+                <TH>{t('table.appVersion')}</TH>
+                <TH>{t('table.registry')}</TH>
+                <TH>{t('table.image')}</TH>
+                <TH>{t('table.digest')}</TH>
+                <TH>{t('table.architectures')}</TH>
+                <TH>{t('table.scan')}</TH>
               </tr>
             </THead>
             <TBody>
@@ -52,7 +54,7 @@ export default function ApplicationsPage() {
                         <span className="font-medium">{app.displayName}</span>
                         <code className="font-mono text-xs text-fg-subtle">catalog://{app.name}</code>
                         <span className="text-xs text-fg-muted">
-                          port <span className="font-mono">{app.port}</span> · health <span className="font-mono">{app.healthPath}</span>
+                          {t('port')} <span className="font-mono">{app.port}</span> · {t('health')} <span className="font-mono">{app.healthPath}</span>
                         </span>
                         <MonoValue value={app.repository} maxWidth="max-w-[22rem]" />
                       </div>
@@ -61,7 +63,7 @@ export default function ApplicationsPage() {
                   {app.versions.length === 0 ? (
                     <TR>
                       <TD colSpan={6} className="pl-6 text-xs text-fg-subtle">
-                        No versions.
+                        {t('noVersions')}
                       </TD>
                     </TR>
                   ) : (

@@ -70,16 +70,25 @@ export function readTemplateDoc(document: Record<string, unknown> | null | undef
   };
 }
 
-/** Returns an error message for a variable value, or null when valid. */
-export function checkVariable(v: TemplateVariable, value: unknown): string | null {
+/** Why a variable value is invalid; the console turns it into text in the active language. */
+export type VariableIssue =
+  | { code: 'enterNumber' }
+  | { code: 'numberTooSmall'; minimum: number }
+  | { code: 'numberTooBig'; maximum: number }
+  | { code: 'chooseBoolean' }
+  | { code: 'enterValue' }
+  | { code: 'oneOf'; values: string };
+
+/** Returns the problem with a variable value, or null when valid. */
+export function checkVariable(v: TemplateVariable, value: unknown): VariableIssue | null {
   if (v.type === 'number') {
-    if (typeof value !== 'number' || Number.isNaN(value)) return 'Enter a number.';
-    if (v.min !== undefined && value < v.min) return `Must be at least ${v.min}.`;
-    if (v.max !== undefined && value > v.max) return `Must be at most ${v.max}.`;
+    if (typeof value !== 'number' || Number.isNaN(value)) return { code: 'enterNumber' };
+    if (v.min !== undefined && value < v.min) return { code: 'numberTooSmall', minimum: v.min };
+    if (v.max !== undefined && value > v.max) return { code: 'numberTooBig', maximum: v.max };
     return null;
   }
-  if (v.type === 'boolean') return typeof value === 'boolean' ? null : 'Choose true or false.';
-  if (typeof value !== 'string') return 'Enter a value.';
-  if (v.allowed && v.allowed.length > 0 && !v.allowed.includes(value)) return `Must be one of: ${v.allowed.join(', ')}.`;
+  if (v.type === 'boolean') return typeof value === 'boolean' ? null : { code: 'chooseBoolean' };
+  if (typeof value !== 'string') return { code: 'enterValue' };
+  if (v.allowed && v.allowed.length > 0 && !v.allowed.includes(value)) return { code: 'oneOf', values: v.allowed.join(', ') };
   return null;
 }

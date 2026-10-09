@@ -1,4 +1,7 @@
-import { statusLabel, toneOf, type Tone } from '@/lib/status';
+'use client';
+
+import { useStatusLabel } from '@/i18n/labels';
+import { toneOf, type Tone } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
 
@@ -28,12 +31,14 @@ export function StatusBadge({
   prefix?: string;
   className?: string;
 }) {
+  const statusLabel = useStatusLabel();
   const tone = toneOf(status);
+  const text = label ?? statusLabel(status);
   return (
-    <Badge tone={tone} className={className} title={prefix ? `${prefix}: ${statusLabel(status)}` : undefined}>
+    <Badge tone={tone} className={className} title={prefix ? `${prefix}: ${text}` : undefined}>
       <StatusDot tone={tone} className="h-1.5 w-1.5" />
       {prefix ? <span className="sr-only">{prefix}: </span> : null}
-      {label ?? statusLabel(status)}
+      {text}
     </Badge>
   );
 }

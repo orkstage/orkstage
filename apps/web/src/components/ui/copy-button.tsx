@@ -2,10 +2,13 @@
 
 import { Check, Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
-export function CopyButton({ value, label = 'Copy', className }: { value: string; label?: string; className?: string }) {
+export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
+  const t = useTranslations('common');
   const [copied, setCopied] = useState(false);
+  const text = copied ? t('copied') : (label ?? t('copy'));
   useEffect(() => {
     if (!copied) return;
     const t = setTimeout(() => setCopied(false), 1500);
@@ -24,8 +27,8 @@ export function CopyButton({ value, label = 'Copy', className }: { value: string
         }
       }}
       className={cn('inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-surface-2 hover:text-fg', className)}
-      aria-label={copied ? 'Copied' : label}
-      title={copied ? 'Copied' : label}
+      aria-label={text}
+      title={text}
     >
       {copied ? <Check size={12} className="text-ok-ink" /> : <Copy size={12} />}
     </button>
@@ -34,12 +37,13 @@ export function CopyButton({ value, label = 'Copy', className }: { value: string
 
 /** Monospace value truncated in the middle-ish (CSS ellipsis) with a copy button. */
 export function MonoValue({ value, className, maxWidth = 'max-w-[18rem]' }: { value: string; className?: string; maxWidth?: string }) {
+  const t = useTranslations('common');
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-1', className)}>
       <code className={cn('truncate font-mono text-xs text-fg-muted', maxWidth)} title={value}>
         {value}
       </code>
-      <CopyButton value={value} label={`Copy ${value}`} />
+      <CopyButton value={value} label={t('copyValue', { value })} />
     </span>
   );
 }

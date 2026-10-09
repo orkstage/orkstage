@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'use-intl';
+import type { Messages } from '@/i18n/messages';
 import { Button } from '../ui/button';
 import { Field, Input } from '../ui/input';
 import { Select } from '../ui/select';
@@ -66,18 +68,27 @@ export function defaultObject(shape: Record<string, ZodLike>): Record<string, un
   return out;
 }
 
-function rangeHint(u: Unwrapped): string | undefined {
+type FieldsT = ReturnType<typeof useTranslations<'fields'>>;
+type FieldKey = keyof Messages['schemaFields'];
+
+/** Translated label for a template schema field; unknown keys are humanized. */
+export function useFieldLabel() {
+  const t = useTranslations('schemaFields');
+  return (key: string): string => (t.has(key as FieldKey) ? t(key as FieldKey) : humanizeKey(key));
+}
+
+function rangeHint(u: Unwrapped, t: FieldsT): string | undefined {
   const parts: string[] = [];
   if (u.kind === 'number') {
     const min = u.inner.minValue;
     const max = u.inner.maxValue;
-    const finite = (n: number | null | undefined) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < Number.MAX_SAFE_INTEGER;
-    if (finite(min) && finite(max)) parts.push(`${min}–${max}`);
-    else if (finite(min)) parts.push(`≥ ${min}`);
-    else if (finite(max)) parts.push(`≤ ${max}`);
+    const finite = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < Number.MAX_SAFE_INTEGER;
+    if (finite(min) && finite(max)) parts.push(t('range', { min, max }));
+    else if (finite(min)) parts.push(t('atLeast', { min }));
+    else if (finite(max)) parts.push(t('atMost', { max }));
   }
-  if (u.defaultValue !== undefined && typeof u.defaultValue !== 'object') parts.push(`default ${String(u.defaultValue)}`);
-  else if (u.optional && u.defaultValue === undefined) parts.push('optional');
+  if (u.defaultValue !== undefined && typeof u.defaultValue !== 'object') parts.push(t('default', { value: String(u.defaultValue) }));
+  else if (u.optional && u.defaultValue === undefined) parts.push(t('optional'));
   return parts.length ? parts.join(' · ') : undefined;
 }
 
@@ -96,9 +107,12 @@ export function SchemaField({
   onChange: (value: unknown) => void;
   readOnly?: boolean;
 }) {
+  const t = useTranslations('fields');
+  const tc = useTranslations('common');
+  const fieldLabel = useFieldLabel();
   const u = unwrap(schema);
-  const label = humanizeKey(name);
-  const hint = rangeHint(u);
+  const label = fieldLabel(name);
+  const hint = rangeHint(u, t);
 
   if (u.kind === 'boolean') {
     const checked = typeof value === 'boolean' ? value : u.defaultValue === true;
@@ -123,7 +137,7 @@ export function SchemaField({
     return (
       <Field label={label} htmlFor={id} hint={hint}>
         <Select id={id} value={typeof value === 'string' ? value : String(u.defaultValue ?? '')} disabled={readOnly} onChange={(e) => onChange(e.target.value)}>
-          {u.optional && u.defaultValue === undefined ? <option value="">—</option> : null}
+          {u.optional && u.defaultValue === undefined ? <option value="">{tc('empty')}</option> : null}
           {options.map((o) => (
             <option key={o} value={o}>
               {o}
@@ -160,13 +174,13 @@ export function SchemaField({
             ))}
             {u.optional && u.defaultValue === undefined && !readOnly ? (
               <Button size="sm" variant="ghost" onClick={() => onChange(undefined)}>
-                Remove {label.toLowerCase()}
+                {t('remove', { name: label })}
               </Button>
             ) : null}
           </div>
         ) : (
           <Button size="sm" disabled={readOnly} onClick={() => onChange(defaultObject(u.inner.shape!))}>
-            Add {label.toLowerCase()}
+            {t('add', { name: label })}
           </Button>
         )}
       </fieldset>
@@ -233,13 +247,14 @@ export function TextInput({ id, value, onChange, placeholder, readOnly, classNam
 }
 
 function JsonField({ id, label, value, onChange, readOnly }: { id: string; label: string; value: unknown; onChange: (v: unknown) => void; readOnly?: boolean }) {
+  const t = useTranslations('fields');
   const [text, setText] = useState(value === undefined ? '' : JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setText(value === undefined ? '' : JSON.stringify(value, null, 2));
   }, [value]);
   return (
-    <Field label={label} htmlFor={id} hint="JSON object. Provider-specific escape hatch; less portable." error={error}>
+    <Field label={label} htmlFor={id} hint={t('jsonHint')} error={error}>
       <Textarea
         id={id}
         value={text}
@@ -259,7 +274,7 @@ function JsonField({ id, label, value, onChange, readOnly }: { id: string; label
             setError(null);
             onChange(parsed);
           } catch {
-            setError('Must be a JSON object.');
+            setError(t('jsonError'));
           }
         }}
       />

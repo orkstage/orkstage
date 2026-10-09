@@ -3,12 +3,14 @@
 import type { EChartsOption } from 'echarts';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
+import { useTranslations } from 'use-intl';
 import { Card, CardBody, CardHeader, StatCard } from '@/components/ui/card';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { PageSpinner } from '@/components/ui/spinner';
 import { apiGet, isApiError } from '@/lib/api';
-import { statusLabel } from '@/lib/status';
-import { cn, formatMoney } from '@/lib/utils';
+import { useFormat, type Formatters } from '@/i18n/format';
+import { useStatusLabel } from '@/i18n/labels';
+import { cn } from '@/lib/utils';
 import { axisStyle, baseOption, DataTable, EChart, seriesColor, statusColor, tooltipRow, type ChartTokens } from './echart';
 
 export interface OverviewTrendsDto {
@@ -27,13 +29,15 @@ const HEALTH_DOT: Record<(typeof HEALTH_ORDER)[number], string> = {
   UNKNOWN: 'bg-neutral',
 };
 
-const dayLabel = (day: string) => {
+const dayLabel = (fmt: Formatters, day: string) => {
   const d = new Date(`${day}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? day : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return Number.isNaN(d.getTime()) ? day : fmt.dayMonth(d);
 };
 
 /** Platform trends (GET /overview/trends). Renders nothing alarming when the endpoint is absent. */
 export default function OverviewTrends({ days = 14 }: { days?: number }) {
+  const t = useTranslations('trends');
+  const to = useTranslations('overview');
   const q = useQuery({
     queryKey: ['overview-trends', days],
     queryFn: ({ signal }) => apiGet<OverviewTrendsDto>(`/overview/trends?days=${days}`, { signal }),
@@ -41,21 +45,23 @@ export default function OverviewTrends({ days = 14 }: { days?: number }) {
     retry: false,
   });
 
-  if (q.isPending) return <PageSpinner label="Loading trends" />;
+  if (q.isPending) return <PageSpinner label={to('loadingTrends')} />;
   if (q.error) {
     if (isApiError(q.error, 404)) {
       return (
         <Card className="px-4 py-3 text-sm text-fg-subtle">
-          Trend charts appear here once the control API serves <code className="font-mono text-xs">/overview/trends</code>.
+          {t.rich('notServed', { code: (chunks) => <code className="font-mono text-xs">{chunks}</code> })}
         </Card>
       );
     }
-    return <ErrorNotice error={q.error} title="Trends unavailable" />;
+    return <ErrorNotice error={q.error} title={t('unavailable')} />;
   }
   return <TrendsView data={q.data} days={days} />;
 }
 
 function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
+  const tr = useTranslations('trends');
+  const fmt = useFormat();
   const dep = data.deploymentsByDay;
   const inc = data.incidentsByDay;
   const totals = dep.reduce((s, d) => ({ ok: s.ok + d.succeeded, failed: s.failed + d.failed, other: s.other + d.other }), { ok: 0, failed: 0, other: 0 });
@@ -70,9 +76,9 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
   const deploymentsOption = useCallback(
     (t: ChartTokens): EChartsOption => {
       const keys = [
-        { key: 'succeeded' as const, name: 'Succeeded', color: statusColor(t, 'SUCCEEDED') },
-        { key: 'failed' as const, name: 'Failed', color: statusColor(t, 'FAILED') },
-        { key: 'other' as const, name: 'Other', color: t.neutral },
+        { key: 'succeeded' as const, name: tr('succeeded'), color: statusColor(t, 'SUCCEEDED') },
+        { key: 'failed' as const, name: tr('failed'), color: statusColor(t, 'FAILED') },
+        { key: 'other' as const, name: tr('other'), color: t.neutral },
       ];
       // 4px rounded data-end on whichever segment is on top for that day; square at the baseline.
       const topIndex = dep.map((d) => {
@@ -91,10 +97,10 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
             const list = params as { dataIndex: number }[];
             const d = dep[list[0]?.dataIndex ?? 0];
             if (!d) return '';
-            return `<div style="margin-bottom:4px;opacity:.75">${dayLabel(d.day)}</div>${keys.map((k) => tooltipRow(k.color, k.name, String(d[k.key]))).join('')}`;
+            return `<div style="margin-bottom:4px;opacity:.75">${dayLabel(fmt, d.day)}</div>${keys.map((k) => tooltipRow(k.color, k.name, fmt.number(d[k.key]))).join('')}`;
           },
         },
-        xAxis: { type: 'category', data: dep.map((d) => dayLabel(d.day)), ...axisStyle(t), splitLine: { show: false } },
+        xAxis: { type: 'category', data: dep.map((d) => dayLabel(fmt, d.day)), ...axisStyle(t), splitLine: { show: false } },
         yAxis: { type: 'value', minInterval: 1, ...axisStyle(t), axisLine: { show: false } },
         series: keys.map((k, ki) => ({
           name: k.name,
@@ -108,14 +114,14 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
         })),
       };
     },
-    [dep],
+    [dep, tr, fmt],
   );
 
   const incidentsOption = useCallback(
     (t: ChartTokens): EChartsOption => {
       const lines = [
-        { key: 'opened' as const, name: 'Opened', color: seriesColor(t, 1) },
-        { key: 'resolved' as const, name: 'Resolved', color: seriesColor(t, 0) },
+        { key: 'opened' as const, name: tr('opened'), color: seriesColor(t, 1) },
+        { key: 'resolved' as const, name: tr('resolved'), color: seriesColor(t, 0) },
       ];
       return {
         ...baseOption(t),
@@ -129,10 +135,10 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
             const list = params as { dataIndex: number }[];
             const d = inc[list[0]?.dataIndex ?? 0];
             if (!d) return '';
-            return `<div style="margin-bottom:4px;opacity:.75">${dayLabel(d.day)}</div>${lines.map((l) => tooltipRow(l.color, l.name, String(d[l.key]))).join('')}`;
+            return `<div style="margin-bottom:4px;opacity:.75">${dayLabel(fmt, d.day)}</div>${lines.map((l) => tooltipRow(l.color, l.name, fmt.number(d[l.key]))).join('')}`;
           },
         },
-        xAxis: { type: 'category', boundaryGap: false, data: inc.map((d) => dayLabel(d.day)), ...axisStyle(t), splitLine: { show: false } },
+        xAxis: { type: 'category', boundaryGap: false, data: inc.map((d) => dayLabel(fmt, d.day)), ...axisStyle(t), splitLine: { show: false } },
         yAxis: { type: 'value', minInterval: 1, ...axisStyle(t), axisLine: { show: false } },
         series: lines.map((l) => ({
           name: l.name,
@@ -148,7 +154,7 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
         })),
       };
     },
-    [inc],
+    [inc, tr, fmt],
   );
 
   const costOption = useCallback(
@@ -160,7 +166,7 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
         trigger: 'item',
         formatter: (p: unknown) => {
           const item = p as { name: string; value: number };
-          return tooltipRow(seriesColor(t, 0), `${item.name} · approximate monthly`, formatMoney(item.value));
+          return tooltipRow(seriesColor(t, 0), tr('approxMonthly', { provider: item.name }), fmt.money(item.value));
         },
       },
       xAxis: { type: 'value', ...axisStyle(t), axisLabel: { show: false }, splitLine: { show: false } },
@@ -171,12 +177,12 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
           barMaxWidth: 20,
           color: seriesColor(t, 0),
           itemStyle: { borderRadius: [0, 4, 4, 0] },
-          label: { show: true, position: 'right', color: t['fg-muted'], formatter: (p: { value: unknown }) => formatMoney(Number(p.value)) },
+          label: { show: true, position: 'right', color: t['fg-muted'], formatter: (p: { value: unknown }) => fmt.money(Number(p.value)) },
           data: cost.map((c) => c.monthly),
         },
       ],
     }),
-    [cost],
+    [cost, tr, fmt],
   );
 
   const health = data.resourcesByHealth;
@@ -185,43 +191,55 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
   return (
     <section aria-labelledby="trends-heading" className="space-y-3">
       <h2 id="trends-heading" className="font-display text-base font-semibold">
-        Last {days} days
+        {tr('heading', { days })}
       </h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Deployments" value={total.toLocaleString()} hint={`${totals.failed} failed`} />
-        <StatCard label="Deployment success rate" value={successRate === null ? '—' : `${successRate}%`} hint="Succeeded ÷ finished" />
-        <StatCard label="Incidents opened" value={opened} hint={`${resolved} resolved`} />
-        <StatCard label="Est. monthly cost" value={formatMoney(costTotal)} hint="Approximate — not an invoice" />
+        <StatCard label={tr('deployments')} value={fmt.number(total)} hint={tr('failedHint', { count: totals.failed })} />
+        <StatCard label={tr('successRate')} value={successRate === null ? fmt.empty : fmt.percent(successRate / 100, 1)} hint={tr('successRateHint')} />
+        <StatCard label={tr('incidentsOpened')} value={fmt.number(opened)} hint={tr('resolvedHint', { count: resolved })} />
+        <StatCard label={tr('monthlyCost')} value={fmt.money(costTotal)} hint={tr('approximate')} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Deployments per day" description="Finished rollouts and teardowns, by outcome." as="h3" />
+          <CardHeader title={tr('perDay')} description={tr('perDayHint')} as="h3" />
           <CardBody>
-            <EChart option={deploymentsOption} height={220} ariaLabel={`Deployments per day over the last ${days} days: ${totals.ok} succeeded, ${totals.failed} failed, ${totals.other} other`} />
-            <DataTable caption="Deployments per day" columns={['Day', 'Succeeded', 'Failed', 'Other']} rows={dep.map((d) => [d.day, d.succeeded, d.failed, d.other])} />
+            <EChart option={deploymentsOption} height={220} ariaLabel={tr('perDayAria', { days, ok: totals.ok, failed: totals.failed, other: totals.other })} />
+            <DataTable
+              caption={tr('perDay')}
+              columns={[tr('day'), tr('succeeded'), tr('failed'), tr('other')]}
+              rows={dep.map((d) => [dayLabel(fmt, d.day), d.succeeded, d.failed, d.other])}
+            />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Incidents opened vs resolved" description="A widening gap means incidents are piling up." as="h3" />
+          <CardHeader title={tr('incidents')} description={tr('incidentsHint')} as="h3" />
           <CardBody>
-            <EChart option={incidentsOption} height={220} ariaLabel={`Incidents over the last ${days} days: ${opened} opened, ${resolved} resolved`} />
-            <DataTable caption="Incidents per day" columns={['Day', 'Opened', 'Resolved']} rows={inc.map((d) => [d.day, d.opened, d.resolved])} />
+            <EChart option={incidentsOption} height={220} ariaLabel={tr('incidentsAria', { days, opened, resolved })} />
+            <DataTable caption={tr('incidentsCaption')} columns={[tr('day'), tr('opened'), tr('resolved')]} rows={inc.map((d) => [dayLabel(fmt, d.day), d.opened, d.resolved])} />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Estimated cost by provider" description="Approximate monthly run-rate of everything deployed." as="h3" />
+          <CardHeader title={tr('costByProvider')} description={tr('costByProviderHint')} as="h3" />
           <CardBody>
             {cost.length === 0 ? (
-              <p className="py-6 text-center text-sm text-fg-subtle">No deployed resources with a cost estimate.</p>
+              <p className="py-6 text-center text-sm text-fg-subtle">{tr('noCost')}</p>
             ) : (
-              <EChart option={costOption} height={Math.max(96, cost.length * 36 + 16)} ariaLabel={`Approximate monthly cost by provider: ${cost.map((c) => `${c.provider} ${formatMoney(c.monthly)}`).join(', ')}`} />
+              <EChart
+                option={costOption}
+                height={Math.max(96, cost.length * 36 + 16)}
+                ariaLabel={tr('costAria', { list: cost.map((c) => `${c.provider} ${fmt.money(c.monthly)}`).join(', ') })}
+              />
             )}
-            <DataTable caption="Approximate monthly cost by provider" columns={['Provider', 'Approximate monthly (USD)']} rows={cost.map((c) => [c.provider, Math.round(c.monthly * 100) / 100])} />
+            <DataTable
+              caption={tr('costCaption')}
+              columns={[tr('provider'), tr('approxMonthlyUsd')]}
+              rows={cost.map((c) => [c.provider, fmt.money(c.monthly)])}
+            />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Resource health" description={`${healthTotal} resources across the fleet.`} as="h3" />
+          <CardHeader title={tr('resourceHealth')} description={tr('resourceHealthHint', { count: healthTotal })} as="h3" />
           <CardBody>
             <HealthBar health={health} total={healthTotal} />
           </CardBody>
@@ -233,7 +251,9 @@ function TrendsView({ data, days }: { data: OverviewTrendsDto; days: number }) {
 
 /** Part-to-whole at a glance: a segmented bar with a 2px surface gap and a labelled legend. */
 function HealthBar({ health, total }: { health: OverviewTrendsDto['resourcesByHealth']; total: number }) {
-  if (total === 0) return <p className="py-6 text-center text-sm text-fg-subtle">No resources are being watched yet.</p>;
+  const t = useTranslations('trends');
+  const statusLabel = useStatusLabel();
+  if (total === 0) return <p className="py-6 text-center text-sm text-fg-subtle">{t('noResources')}</p>;
   const parts = HEALTH_ORDER.map((k) => ({ key: k, n: health[k] ?? 0 })).filter((p) => p.n > 0);
   return (
     <div className="space-y-4">

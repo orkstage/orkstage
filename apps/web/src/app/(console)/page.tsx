@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { useTranslations } from 'use-intl';
 import { AuditTable } from '@/components/audit-table';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { Card, CardBody, CardHeader, StatCard } from '@/components/ui/card';
@@ -17,13 +18,20 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { apiGet } from '@/lib/api';
 import { isPlatformStaff, useMe } from '@/lib/ability';
-import { statusLabel, toneOf } from '@/lib/status';
-import { cn, formatMoney } from '@/lib/utils';
+import { useFormat } from '@/i18n/format';
+import { toneOf } from '@/lib/status';
+import { cn } from '@/lib/utils';
 
 // ECharts is only loaded on pages that chart (kept out of the shared bundle).
-const OverviewTrends = dynamic(() => import('@/components/charts/overview-trends'), { ssr: false, loading: () => <PageSpinner label="Loading trends" /> });
+const OverviewTrends = dynamic(() => import('@/components/charts/overview-trends'), { ssr: false, loading: () => <TrendsSpinner /> });
+
+function TrendsSpinner() {
+  const t = useTranslations('overview');
+  return <PageSpinner label={t('loadingTrends')} />;
+}
 
 export default function OverviewPage() {
+  const t = useTranslations('overview');
   const me = useMe();
   const router = useRouter();
   const staff = isPlatformStaff(me.data);
@@ -36,14 +44,16 @@ export default function OverviewPage() {
   if (!me.data) return <PageSpinner />;
   if (!staff) {
     if (!firstTenant) {
-      return <EmptyState icon={Users} title="No tenant access yet" description="Ask your organization administrator to add you to a tenant." />;
+      return <EmptyState icon={Users} title={t('noTenantTitle')} description={t('noTenantBody')} />;
     }
-    return <PageSpinner label="Opening your status page" />;
+    return <PageSpinner label={t('openingStatus')} />;
   }
   return <PlatformOverview />;
 }
 
 function PlatformOverview() {
+  const t = useTranslations('overview');
+  const fmt = useFormat();
   const q = useQuery({
     queryKey: ['overview'],
     queryFn: ({ signal }) => apiGet<OverviewDto>('/overview', { signal }),
@@ -51,7 +61,7 @@ function PlatformOverview() {
   });
 
   if (q.isPending) return <PageSpinner />;
-  if (q.error) return <ErrorNotice error={q.error} title="Overview unavailable" />;
+  if (q.error) return <ErrorNotice error={q.error} title={t('unavailable')} />;
   const o = q.data;
 
   const statusEntries = Object.entries(o.instancesByStatus).sort((a, b) => b[1] - a[1]);
@@ -60,28 +70,28 @@ function PlatformOverview() {
 
   return (
     <>
-      <PageHeader title="Overview" description="Your fleet at a glance: health, deployments and spend across every cloud." />
+      <PageHeader title={t('title')} description={t('description')} />
       <OnboardingChecklist instanceCount={o.instances} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Tenants" value={o.tenants} />
-        <StatCard label="Instances" value={o.instances} />
-        <StatCard label="Unhealthy resources" value={o.unhealthyResources} tone={o.unhealthyResources > 0 ? 'danger' : 'ok'} />
-        <StatCard label="Open incidents" value={o.openIncidents} tone={o.openIncidents > 0 ? 'warn' : undefined} />
+        <StatCard label={t('stats.tenants')} value={fmt.number(o.tenants)} />
+        <StatCard label={t('stats.instances')} value={fmt.number(o.instances)} />
+        <StatCard label={t('stats.unhealthyResources')} value={fmt.number(o.unhealthyResources)} tone={o.unhealthyResources > 0 ? 'danger' : 'ok'} />
+        <StatCard label={t('stats.openIncidents')} value={fmt.number(o.openIncidents)} tone={o.openIncidents > 0 ? 'warn' : undefined} />
         <StatCard
-          label="Deployments (24h)"
-          value={o.deployments24h.total}
-          hint={<span className={cn(o.deployments24h.failed > 0 && 'text-danger-ink')}>{o.deployments24h.failed} failed</span>}
+          label={t('stats.deployments24h')}
+          value={fmt.number(o.deployments24h.total)}
+          hint={<span className={cn(o.deployments24h.failed > 0 && 'text-danger-ink')}>{t('stats.failed', { count: o.deployments24h.failed })}</span>}
         />
-        <StatCard label="Est. monthly cost" value={formatMoney(o.estimatedMonthlyCost)} hint="Approximate — not an invoice" />
+        <StatCard label={t('stats.monthlyCost')} value={fmt.money(o.estimatedMonthlyCost)} hint={t('stats.approximate')} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader title="Instances by status" />
+          <CardHeader title={t('byStatus')} />
           <CardBody>
             {statusEntries.length === 0 ? (
-              <p className="text-sm text-fg-subtle">No instances yet.</p>
+              <p className="text-sm text-fg-subtle">{t('noInstances')}</p>
             ) : (
               <ul className="space-y-1.5">
                 {statusEntries.map(([status, n]) => (
@@ -96,7 +106,7 @@ function PlatformOverview() {
             )}
             {providerEntries.length > 0 ? (
               <div className="mt-4 border-t border-border pt-3">
-                <p className="mb-2 text-xs font-medium text-fg-subtle">Resources by provider</p>
+                <p className="mb-2 text-xs font-medium text-fg-subtle">{t('byProvider')}</p>
                 <ul className="space-y-1.5">
                   {providerEntries.map(([provider, n]) => (
                     <li key={provider} className="grid grid-cols-[8.5rem_1fr_2.5rem] items-center gap-2 text-xs">
@@ -116,18 +126,25 @@ function PlatformOverview() {
         </Card>
 
         <Card>
-          <CardHeader title="Cloud target health" actions={<Link href="/cloud-targets" className="text-xs text-accent-ink hover:underline">All targets</Link>} />
+          <CardHeader
+            title={t('targetHealth')}
+            actions={
+              <Link href="/cloud-targets" className="text-xs text-accent-ink hover:underline">
+                {t('allTargets')}
+              </Link>
+            }
+          />
           {o.targets.length === 0 ? (
-            <EmptyState icon={Cloud} title="No cloud targets connected" description="Connect a cloud account, or register a mock target, before your first deploy." />
+            <EmptyState icon={Cloud} title={t('noTargetsTitle')} description={t('noTargetsBody')} />
           ) : (
             <ul className="divide-y divide-border">
-              {o.targets.map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-2 px-4 py-2">
+              {o.targets.map((target) => (
+                <li key={target.id} className="flex items-center justify-between gap-2 px-4 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{t.name}</p>
-                    <p className="font-mono text-[11px] text-fg-subtle">{t.provider}</p>
+                    <p className="truncate text-sm font-medium">{target.name}</p>
+                    <p className="font-mono text-[11px] text-fg-subtle">{target.provider}</p>
                   </div>
-                  <StatusBadge status={t.health} prefix="Health" />
+                  <StatusBadge status={target.health} prefix={t('healthPrefix')} />
                 </li>
               ))}
             </ul>
@@ -135,14 +152,14 @@ function PlatformOverview() {
         </Card>
 
         <Card>
-          <CardHeader title="Attention" description="What needs an operator right now." />
+          <CardHeader title={t('attention')} description={t('attentionHint')} />
           <CardBody className="space-y-2 text-sm">
-            <AttentionRow label="Unhealthy resources" count={o.unhealthyResources} href="/instances" />
-            <AttentionRow label="Open incidents" count={o.openIncidents} href="/incidents" />
-            <AttentionRow label="Failed deployments (24h)" count={o.deployments24h.failed} href="/deployments" />
+            <AttentionRow label={t('attentionRows.unhealthyResources')} count={o.unhealthyResources} href="/instances" />
+            <AttentionRow label={t('attentionRows.openIncidents')} count={o.openIncidents} href="/incidents" />
+            <AttentionRow label={t('attentionRows.failedDeployments')} count={o.deployments24h.failed} href="/deployments" />
             <AttentionRow
-              label="Unhealthy cloud targets"
-              count={o.targets.filter((t) => ['danger', 'warn'].includes(toneOf(t.health))).length}
+              label={t('attentionRows.unhealthyTargets')}
+              count={o.targets.filter((target) => ['danger', 'warn'].includes(toneOf(target.health))).length}
               href="/cloud-targets"
             />
           </CardBody>
@@ -154,18 +171,26 @@ function PlatformOverview() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader title="Recent audit events" actions={<Link href="/audit" className="text-xs text-accent-ink hover:underline">Full audit log</Link>} />
-        {o.recentAudit.length === 0 ? <EmptyState icon={ScrollText} title="No audit events yet" /> : <AuditTable events={o.recentAudit} compact />}
+        <CardHeader
+          title={t('recentAudit')}
+          actions={
+            <Link href="/audit" className="text-xs text-accent-ink hover:underline">
+              {t('fullAudit')}
+            </Link>
+          }
+        />
+        {o.recentAudit.length === 0 ? <EmptyState icon={ScrollText} title={t('noAudit')} /> : <AuditTable events={o.recentAudit} compact />}
       </Card>
     </>
   );
 }
 
 function AttentionRow({ label, count, href }: { label: string; count: number; href: string }) {
+  const t = useTranslations('overview');
   return (
     <Link href={href} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-surface-2">
       <span className="text-fg-muted">{label}</span>
-      <span className={cn('tabular-nums font-semibold', count > 0 ? 'text-danger-ink' : 'text-ok-ink')} aria-label={`${count} (${count > 0 ? statusLabel('UNHEALTHY') : 'ok'})`}>
+      <span className={cn('tabular-nums font-semibold', count > 0 ? 'text-danger-ink' : 'text-ok-ink')} aria-label={t('attentionCount', { count })}>
         {count}
       </span>
     </Link>

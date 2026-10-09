@@ -5,6 +5,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileUp, Import } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useId, useState, type ChangeEvent } from 'react';
+import { useTranslations } from 'use-intl';
+import { useStatusLabel } from '@/i18n/labels';
 import { YamlViewer } from '@/components/yaml-viewer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,7 +21,7 @@ import { apiGet, apiSend } from '@/lib/api';
 import { useCan } from '@/lib/ability';
 import { slugify } from '@/lib/utils';
 
-/** Text files the scan engine understands; everything else is skipped client-side. */
+/** Text files the scan engine understands; everything else is skipped in the browser. */
 const ACCEPT = /\.(tf|tf\.json|ya?ml|json|toml|txt|gradle|kts|xml|bicep|lock)$|(^|\/)(Dockerfile|Gemfile|go\.mod|requirements\.txt|package\.json|composer\.json|Chart\.yaml)$/i;
 const SKIP_DIRS = /(^|\/)(node_modules|\.git|\.terraform|target|vendor|dist|build|\.next)\//;
 const MAX_FILE = 512 * 1024;
@@ -36,6 +38,8 @@ export default function ImportPage() {
 }
 
 function ImportView() {
+  const t = useTranslations('importPage');
+  const statusLabel = useStatusLabel();
   const id = useId();
   const router = useRouter();
   const can = useCan();
@@ -45,18 +49,19 @@ function ImportView() {
   const [result, setResult] = useState<ImportDto | null>(null);
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [jsonError, setJsonError] = useState(false);
 
   const show = (r: ImportDto) => {
     setResult(r);
     const base = r.report.template.match(/name:\s*([a-z0-9-]+)/)?.[1] ?? 'imported';
     setName(slugify(`${base}-imported`));
-    setDisplayName('Imported template');
+    setDisplayName(t('defaultDisplayName'));
   };
   const run = useMutation({
     mutationFn: (body: unknown) => apiSend<ImportDto>('POST', '/imports', body),
     onSuccess: show,
   });
-  // `ork import` links here with ?importId=… so a scan made locally opens straight in review.
+  // `ork import` links here with ?importId=<id> so a scan made locally opens straight in review.
   const importId = useSearchParams().get('importId');
   const linked = useQuery({ queryKey: ['import', importId], queryFn: () => apiGet<ImportDto>(`/imports/${importId}`), enabled: Boolean(importId) });
   useEffect(() => {
@@ -89,42 +94,55 @@ function ImportView() {
   return (
     <>
       <PageHeader
-        title="Import infrastructure"
-        description="Bring existing Terraform, CloudFormation, Kubernetes or Compose setups into OrkStage. You get a draft template to review before anything is deployed."
+        title={t('title')}
+        description={t('description')}
       />
 
       {!result ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="space-y-3 p-4">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <FileUp size={15} aria-hidden /> Upload a project folder
+              <FileUp size={15} aria-hidden /> {t('uploadTitle')}
             </h2>
-            <p className="text-sm text-fg-muted">Only IaC and manifest files are read (up to 5 MB). Dependencies, build output and secrets folders are skipped in your browser.</p>
+            <p className="text-sm text-fg-muted">{t('uploadHint')}</p>
             <Input
               type="file"
               multiple
-              aria-label="Project folder"
+              aria-label={t('folder')}
               onChange={onFiles}
               {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
             />
             {files.length > 0 ? (
               <p className="text-xs text-fg-subtle">
-                {files.length} file(s) selected{skipped ? `, ${skipped} skipped` : ''}.
+                {skipped ? t('selectedSkipped', { count: files.length, skipped }) : `${t('selected', { count: files.length })}.`}
               </p>
             ) : null}
             <Button variant="primary" disabled={files.length === 0} loading={run.isPending && !!files.length} onClick={() => run.mutate({ files })}>
-              Scan and import
+              {t('scan')}
             </Button>
           </Card>
           <Card className="space-y-3 p-4">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Import size={15} aria-hidden /> Paste a report from the CLI
+              <Import size={15} aria-hidden /> {t('pasteTitle')}
             </h2>
-            <p className="text-sm text-fg-muted">
-              Scan locally so your code never leaves your machine: <code className="font-mono text-xs">ork scan --format json</code>, then paste the output (or run{' '}
-              <code className="font-mono text-xs">ork import</code>).
-            </p>
-            <Textarea rows={7} aria-label="Scan report JSON" value={reportJson} onChange={(e) => setReportJson(e.target.value)} className="font-mono text-xs" placeholder='{ "version": 1, ... }' />
+            <p className="text-sm text-fg-muted">{t.rich('pasteHint', { code: (chunks) => <code className="font-mono text-xs">{chunks}</code> })}</p>
+            <Textarea
+              rows={7}
+              aria-label={t('reportLabel')}
+              aria-invalid={jsonError || undefined}
+              value={reportJson}
+              onChange={(e) => {
+                setReportJson(e.target.value);
+                setJsonError(false);
+              }}
+              className="font-mono text-xs"
+              placeholder='{ "version": 1 }'
+            />
+            {jsonError ? (
+              <p role="alert" className="text-xs text-danger-ink">
+                {t('invalidJson')}
+              </p>
+            ) : null}
             <Button
               variant="primary"
               disabled={!reportJson.trim()}
@@ -133,11 +151,11 @@ function ImportView() {
                   run.mutate({ report: JSON.parse(reportJson) });
                 } catch {
                   run.reset();
-                  window.alert('That is not valid JSON.');
+                  setJsonError(true);
                 }
               }}
             >
-              Import report
+              {t('importReport')}
             </Button>
           </Card>
           {run.error ? <ErrorNotice error={run.error} className="lg:col-span-2" /> : null}
@@ -151,19 +169,19 @@ function ImportView() {
                 {k}
               </Badge>
             ))}
-            {result.validation.valid ? <Badge tone="ok">Template valid</Badge> : <Badge tone="warn">Needs review</Badge>}
+            {result.validation.valid ? <Badge tone="ok">{t('templateValid')}</Badge> : <Badge tone="warn">{t('needsReview')}</Badge>}
           </div>
 
           <Card>
-            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">Detected resources ({report!.resources.length})</h2>
+            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">{t('detected', { count: report!.resources.length })}</h2>
             <Table>
               <THead>
                 <tr>
-                  <TH>Resource</TH>
-                  <TH>Type</TH>
-                  <TH>Provider</TH>
-                  <TH>Confidence</TH>
-                  <TH>Evidence</TH>
+                  <TH>{t('table.resource')}</TH>
+                  <TH>{t('table.type')}</TH>
+                  <TH>{t('table.provider')}</TH>
+                  <TH>{t('table.confidence')}</TH>
+                  <TH>{t('table.evidence')}</TH>
                 </tr>
               </THead>
               <TBody>
@@ -174,9 +192,9 @@ function ImportView() {
                       <code className="font-mono text-xs">{r.type}</code>
                       {r.implementation ? <span className="text-[11px] text-fg-subtle"> · {r.implementation}</span> : null}
                     </TD>
-                    <TD className="text-xs">{r.provider ?? <span className="text-fg-subtle">any</span>}</TD>
+                    <TD className="text-xs">{r.provider ?? <span className="text-fg-subtle">{t('anyProvider')}</span>}</TD>
                     <TD>
-                      <Badge tone={confidenceTone[r.confidence]}>{r.confidence}</Badge>
+                      <Badge tone={confidenceTone[r.confidence]}>{statusLabel(r.confidence)}</Badge>
                     </TD>
                     <TD className="max-w-96 text-[11px] text-fg-subtle">
                       {r.sources.slice(0, 3).map((s) => (
@@ -184,7 +202,7 @@ function ImportView() {
                           {s.kind}: {s.address}
                         </p>
                       ))}
-                      {r.sources.length > 3 ? <p>+{r.sources.length - 3} more</p> : null}
+                      {r.sources.length > 3 ? <p>{t('more', { count: r.sources.length - 3 })}</p> : null}
                     </TD>
                   </TR>
                 ))}
@@ -194,11 +212,11 @@ function ImportView() {
 
           {report!.unmapped.length > 0 ? (
             <Card className="p-4">
-              <h2 className="mb-2 text-sm font-semibold">Not imported ({report!.unmapped.length})</h2>
+              <h2 className="mb-2 text-sm font-semibold">{t('notImported', { count: report!.unmapped.length })}</h2>
               <ul className="space-y-1 text-sm">
                 {report!.unmapped.map((u) => (
                   <li key={`${u.source.file}:${u.source.address}`}>
-                    <code className="font-mono text-xs">{u.source.address}</code> <span className="text-fg-subtle">— {u.reason}</span>
+                    <code className="font-mono text-xs">{u.source.address}</code> <span className="text-fg-subtle">({u.reason})</span>
                   </li>
                 ))}
               </ul>
@@ -222,31 +240,31 @@ function ImportView() {
           ) : null}
 
           <Card className="p-4">
-            <h2 className="mb-2 text-sm font-semibold">Generated template</h2>
+            <h2 className="mb-2 text-sm font-semibold">{t('generated')}</h2>
             <YamlViewer source={report!.template} />
           </Card>
 
           {can('create', 'Template') ? (
             <Card className="space-y-3 p-4">
-              <h2 className="text-sm font-semibold">Create a draft template</h2>
+              <h2 className="text-sm font-semibold">{t('createDraft')}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Template name" htmlFor={`${id}-name`} hint="Lowercase letters, digits and dashes">
+                <Field label={t('name')} htmlFor={`${id}-name`} hint={t('nameHint')}>
                   <Input id={`${id}-name`} value={name} onChange={(e) => setName(slugify(e.target.value))} />
                 </Field>
-                <Field label="Display name" htmlFor={`${id}-display`}>
+                <Field label={t('displayName')} htmlFor={`${id}-display`}>
                   <Input id={`${id}-display`} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </Field>
               </div>
               {toTemplate.error ? <ErrorNotice error={toTemplate.error} /> : null}
               <div className="flex gap-2">
                 <Button variant="primary" loading={toTemplate.isPending} disabled={!name || !displayName} onClick={() => toTemplate.mutate()}>
-                  Create draft and open builder
+                  {t('createAndOpen')}
                 </Button>
-                <Button onClick={() => setResult(null)}>Start over</Button>
+                <Button onClick={() => setResult(null)}>{t('startOver')}</Button>
               </div>
             </Card>
           ) : (
-            <Notice tone="info">A platform admin can turn this import into a template. Share import id {result.id}.</Notice>
+            <Notice tone="info">{t('askAdmin', { id: result.id })}</Notice>
           )}
         </div>
       )}

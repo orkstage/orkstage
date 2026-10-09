@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { apiGet } from '@/lib/api';
 import { useCloudTargets, useTemplates } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,7 @@ const DISMISS_KEY = 'orkstage-onboarding-dismissed';
  * passed validation; every step derives "done" from data the console already loads.
  */
 export function OnboardingChecklist({ instanceCount }: { instanceCount: number }) {
+  const t = useTranslations('onboarding');
   const [dismissed, setDismissed] = useState(true);
   useEffect(() => {
     try {
@@ -40,22 +42,20 @@ export function OnboardingChecklist({ instanceCount }: { instanceCount: number }
 
   const deps = deployments.data?.items ?? [];
   const steps = [
-    { label: 'Connect or validate a cloud target', hint: 'Give OrkStage an account to build on, or a mock target to rehearse.', href: '/cloud-targets', done: validatedTarget },
-    { label: 'Pick or forge a template', hint: 'Start from a system blueprint or build your own visually.', href: '/templates', done: (templates.data ?? []).some((t) => t.latestPublished) },
-    { label: 'Create an instance', hint: 'Choose the customer, template and where each part runs.', href: '/instances/new', done: instanceCount > 0 },
-    { label: 'Review plan & cost', hint: 'See every change and the approximate monthly cost before anything runs.', href: '/instances', done: deps.length > 0 },
-    { label: 'Deploy and watch', hint: 'Follow the rollout live, then keep watch from the status page.', href: '/deployments', done: deps.some((d) => d.kind === 'APPLY' && d.status === 'SUCCEEDED') },
-  ];
+    { key: 'target', href: '/cloud-targets', done: validatedTarget },
+    { key: 'template', href: '/templates', done: (templates.data ?? []).some((tpl) => tpl.latestPublished) },
+    { key: 'instance', href: '/instances/new', done: instanceCount > 0 },
+    { key: 'plan', href: '/instances', done: deps.length > 0 },
+    { key: 'deploy', href: '/deployments', done: deps.some((d) => d.kind === 'APPLY' && d.status === 'SUCCEEDED') },
+  ] as const;
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
     <Card className="bg-grid mb-4 overflow-hidden">
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div>
-          <h2 className="font-display text-base font-semibold">Set the stage</h2>
-          <p className="text-xs text-fg-subtle">
-            Five steps from an empty console to a watched, running environment. {doneCount} of {steps.length} done.
-          </p>
+          <h2 className="font-display text-base font-semibold">{t('title')}</h2>
+          <p className="text-xs text-fg-subtle">{t('intro', { done: doneCount, total: steps.length })}</p>
         </div>
         <button
           type="button"
@@ -68,14 +68,14 @@ export function OnboardingChecklist({ instanceCount }: { instanceCount: number }
             }
           }}
           className="rounded p-1 text-fg-subtle hover:bg-surface-2 hover:text-fg"
-          aria-label="Dismiss the getting started checklist"
+          aria-label={t('dismiss')}
         >
           <X size={16} />
         </button>
       </div>
       <ol className="grid gap-px bg-border sm:grid-cols-5">
         {steps.map((s, i) => (
-          <li key={s.label} className="bg-surface">
+          <li key={s.key} className="bg-surface">
             <Link href={s.href} className="flex h-full gap-3 px-4 py-3 hover:bg-surface-2">
               <span
                 className={cn(
@@ -88,10 +88,10 @@ export function OnboardingChecklist({ instanceCount }: { instanceCount: number }
               </span>
               <span>
                 <span className="block text-sm font-medium text-fg">
-                  {s.label}
-                  <span className="sr-only">{s.done ? ' (done)' : ' (not done)'}</span>
+                  {t(`steps.${s.key}Label`)}
+                  <span className="sr-only"> {s.done ? t('done') : t('notDone')}</span>
                 </span>
-                <span className="block text-xs text-fg-subtle">{s.hint}</span>
+                <span className="block text-xs text-fg-subtle">{t(`steps.${s.key}Hint`)}</span>
               </span>
             </Link>
           </li>

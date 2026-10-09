@@ -107,12 +107,13 @@ export function toDraft(input: unknown): Draft {
   } as Draft;
 }
 
-export function emptyDraft(): Draft {
+/** A new template. The display name and slot description are passed in the active language. */
+export function emptyDraft(text: { displayName: string; slotDescription: string }): Draft {
   return {
     apiVersion: 'platform/v1',
     kind: 'EnvironmentTemplate',
-    metadata: { name: 'my-template', version: '1.0.0', displayName: 'My template', description: '', profile: 'starter' },
-    spec: { plans: ['STARTER'], placements: [{ name: 'primary', description: 'Everything runs in one account and region.' }], resources: [], connectivity: [] },
+    metadata: { name: 'my-template', version: '1.0.0', displayName: text.displayName, description: '', profile: 'starter' },
+    spec: { plans: ['STARTER'], placements: [{ name: 'primary', description: text.slotDescription }], resources: [], connectivity: [] },
   };
 }
 
@@ -205,6 +206,7 @@ export interface DraftEdge {
   kind: EdgeKind;
   from: string;
   to: string;
+  /** Connectivity: protocol and port. Route: the path prefix. Shown through `useEdgeLabel()`. */
   label?: string;
   index?: number;
 }
@@ -216,13 +218,13 @@ export function draftEdges(doc: Draft): DraftEdge[] {
     if (ids.has(c.from) && ids.has(c.to)) out.push({ id: `conn:${index}`, kind: 'connectivity', from: c.from, to: c.to, index, label: `${c.protocol}${c.port ? `:${c.port}` : ''}` });
   });
   for (const r of doc.spec.resources) {
-    for (const dep of r.dependsOn ?? []) if (ids.has(dep)) out.push({ id: `dep:${r.id}>${dep}`, kind: 'dependsOn', from: r.id, to: dep, label: 'depends on' });
+    for (const dep of r.dependsOn ?? []) if (ids.has(dep)) out.push({ id: `dep:${r.id}>${dep}`, kind: 'dependsOn', from: r.id, to: dep });
     if (r.type === 'ingress') {
       for (const rt of arr<{ service: string; pathPrefix?: string }>(r.routes)) {
-        if (ids.has(rt.service)) out.push({ id: `route:${r.id}>${rt.service}`, kind: 'route', from: r.id, to: rt.service, label: `route ${rt.pathPrefix ?? '/'}` });
+        if (ids.has(rt.service)) out.push({ id: `route:${r.id}>${rt.service}`, kind: 'route', from: r.id, to: rt.service, label: rt.pathPrefix ?? '/' });
       }
     }
-    if (r.type === 'dns' && typeof r.target === 'string' && ids.has(r.target)) out.push({ id: `dns:${r.id}>${r.target}`, kind: 'dns', from: r.id, to: r.target, label: 'points to' });
+    if (r.type === 'dns' && typeof r.target === 'string' && ids.has(r.target)) out.push({ id: `dns:${r.id}>${r.target}`, kind: 'dns', from: r.id, to: r.target });
   }
   return out;
 }

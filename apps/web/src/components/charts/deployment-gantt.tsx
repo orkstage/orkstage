@@ -3,19 +3,24 @@
 import type { DeploymentStepDto } from '@co/contracts';
 import type { CustomSeriesRenderItem, EChartsOption } from 'echarts';
 import { useCallback, useMemo } from 'react';
-import { statusLabel } from '@/lib/status';
-import { durationBetween, formatDuration, formatTime } from '@/lib/utils';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
+import { useStatusLabel } from '@/i18n/labels';
+import { durationBetween } from '@/lib/utils';
 import { axisStyle, baseOption, DataTable, EChart, escapeHtml, statusColor, type ChartTokens } from './echart';
 
 const ROW = 26;
 
-/** Gantt-style timeline: one bar per started step, from start to finish (or now while running). */
+/** Gantt style timeline: one bar per started step, from start to finish (or now while running). */
 export default function DeploymentGantt({ steps, now }: { steps: DeploymentStepDto[]; now: number }) {
+  const t = useTranslations('charts');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
   const ordered = useMemo(() => [...steps].sort((a, b) => a.position - b.position), [steps]);
   const started = ordered.filter((s) => s.startedAt);
 
   const option = useCallback(
-    (t: ChartTokens): EChartsOption => {
+    (tokens: ChartTokens): EChartsOption => {
       const renderItem: CustomSeriesRenderItem = (_params, api) => {
         const row = api.value(0) as number;
         const start = api.coord([api.value(1), row]);
@@ -30,32 +35,32 @@ export default function DeploymentGantt({ steps, now }: { steps: DeploymentStepD
         };
       };
       return {
-        ...baseOption(t),
+        ...baseOption(tokens),
         animation: false,
         grid: { left: 8, right: 24, top: 8, bottom: 4, containLabel: true },
         tooltip: {
-          ...baseOption(t).tooltip,
+          ...baseOption(tokens).tooltip,
           trigger: 'item',
           formatter: (p: unknown) => {
             const s = ordered[(p as { value: number[] }).value[0] ?? 0];
             if (!s) return '';
-            const dur = formatDuration(durationBetween(s.startedAt, s.finishedAt, now));
+            const dur = fmt.duration(durationBetween(s.startedAt, s.finishedAt, now));
             const where = s.provider ? `${s.provider}${s.region ? ` / ${s.region}` : ''}` : '';
-            return `<div style="line-height:1.5"><strong>${escapeHtml(dur)}</strong> <span style="opacity:.75">${escapeHtml(s.name)}</span><br/><span style="opacity:.75">${escapeHtml(statusLabel(s.status))}${where ? ` · ${escapeHtml(where)}` : ''}${s.attempt > 1 ? ` · attempt ${s.attempt}` : ''}</span></div>`;
+            return `<div style="line-height:1.5"><strong>${escapeHtml(dur)}</strong> <span style="opacity:.75">${escapeHtml(s.name)}</span><br/><span style="opacity:.75">${escapeHtml(statusLabel(s.status))}${where ? ` · ${escapeHtml(where)}` : ''}${s.attempt > 1 ? ` · ${escapeHtml(t('attempt', { attempt: s.attempt }))}` : ''}</span></div>`;
           },
         },
         xAxis: {
           type: 'time',
-          ...axisStyle(t),
-          axisLabel: { color: t['fg-subtle'], fontSize: 10, hideOverlap: true, formatter: (v: number) => formatTime(new Date(v).toISOString()) },
+          ...axisStyle(tokens),
+          axisLabel: { color: tokens['fg-subtle'], fontSize: 10, hideOverlap: true, formatter: (v: number) => fmt.time(new Date(v).toISOString()) },
         },
         yAxis: {
           type: 'category',
           inverse: true,
           data: ordered.map((s) => s.name),
-          ...axisStyle(t),
+          ...axisStyle(tokens),
           splitLine: { show: false },
-          axisLabel: { color: t['fg-muted'], fontSize: 11, width: 170, overflow: 'truncate' },
+          axisLabel: { color: tokens['fg-muted'], fontSize: 11, width: 170, overflow: 'truncate' },
         },
         series: [
           {
@@ -67,7 +72,7 @@ export default function DeploymentGantt({ steps, now }: { steps: DeploymentStepD
                 ? [
                     {
                       value: [i, new Date(s.startedAt).getTime(), s.finishedAt ? new Date(s.finishedAt).getTime() : now],
-                      itemStyle: { color: s.status === 'SKIPPED' || s.status === 'CANCELLED' ? t.neutral : statusColor(t, s.status) },
+                      itemStyle: { color: s.status === 'SKIPPED' || s.status === 'CANCELLED' ? tokens.neutral : statusColor(tokens, s.status) },
                     },
                   ]
                 : [],
@@ -76,23 +81,29 @@ export default function DeploymentGantt({ steps, now }: { steps: DeploymentStepD
         ],
       };
     },
-    [ordered, now],
+    [ordered, now, t, fmt, statusLabel],
   );
 
-  if (started.length === 0) return <p className="px-4 py-3 text-xs text-fg-subtle">The timeline appears once the first step starts.</p>;
+  if (started.length === 0) return <p className="px-4 py-3 text-xs text-fg-subtle">{t('timelineEmpty')}</p>;
 
   return (
     <div className="px-2 pt-2">
       <EChart
         option={option}
         height={ordered.length * ROW + 36}
-        ariaLabel={`Deployment timeline: ${started.length} of ${ordered.length} steps started`}
+        ariaLabel={t('timelineAria', { started: started.length, total: ordered.length })}
       />
       <div className="px-2 pb-1">
         <DataTable
-          caption="Deployment step timeline"
-          columns={['Step', 'Status', 'Started', 'Finished', 'Duration']}
-          rows={ordered.map((s) => [s.name, statusLabel(s.status), formatTime(s.startedAt), formatTime(s.finishedAt), s.startedAt ? formatDuration(durationBetween(s.startedAt, s.finishedAt, now)) : '—'])}
+          caption={t('timelineCaption')}
+          columns={[t('step'), t('status'), t('started'), t('finished'), t('duration')]}
+          rows={ordered.map((s) => [
+            s.name,
+            statusLabel(s.status),
+            fmt.time(s.startedAt),
+            fmt.time(s.finishedAt),
+            s.startedAt ? fmt.duration(durationBetween(s.startedAt, s.finishedAt, now)) : fmt.empty,
+          ])}
         />
       </div>
     </div>

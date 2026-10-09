@@ -5,6 +5,7 @@ import type { PreviewDto, ResourceDto } from '@co/contracts';
 import { Graph, layout } from '@dagrejs/dagre';
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import { memo, useMemo } from 'react';
+import { useTranslations } from 'use-intl';
 import { useTheme } from '@/lib/theme';
 import { topologyEdges } from '@/lib/topology-graph';
 import { cn, shortId } from '@/lib/utils';
@@ -50,7 +51,7 @@ function layoutRegion(list: ResourceDto[], edges: { from: string; to: string }[]
   return { pos, w: maxX, h: maxY };
 }
 
-function buildGraph(resources: ResourceDto[], edges: ReturnType<typeof topologyEdges>, targetNames: Map<string, string>) {
+function buildGraph(resources: ResourceDto[], edges: ReturnType<typeof topologyEdges>, targetNames: Map<string, string>, targetFallback: (id: string) => string) {
   // provider key → targetId → region → resources
   const tree = new Map<string, Map<string, Map<string, ResourceDto[]>>>();
   for (const r of resources) {
@@ -124,7 +125,7 @@ function buildGraph(resources: ResourceDto[], edges: ReturnType<typeof topologyE
           type: 'zone',
           parentId: providerId,
           position: { x: PAD, y: ty },
-          data: { label: targetNames.get(targetId) ?? `target ${shortId(targetId)}`, level: 'target' },
+          data: { label: targetNames.get(targetId) ?? targetFallback(shortId(targetId)), level: 'target' },
           style: { width: tBox.w, height: tBox.h },
           draggable: false,
           selectable: false,
@@ -157,6 +158,7 @@ function buildGraph(resources: ResourceDto[], edges: ReturnType<typeof topologyE
 }
 
 const ZoneView = memo(function ZoneView({ data }: NodeProps<ZoneNode>) {
+  const t = useTranslations('topology');
   return (
     <div
       className={cn(
@@ -171,13 +173,14 @@ const ZoneView = memo(function ZoneView({ data }: NodeProps<ZoneNode>) {
         <span className={cn(data.level === 'provider' ? 'font-display font-semibold uppercase tracking-wide text-fg' : data.level === 'region' ? 'font-mono text-fg-subtle' : 'font-medium text-fg-muted')}>
           {data.label}
         </span>
-        {data.simulated ? <span className="rounded bg-accent/12 px-1 text-[9px] font-semibold uppercase tracking-wide text-accent-ink">Simulated</span> : null}
+        {data.simulated ? <span className="rounded bg-accent/12 px-1 text-[9px] font-semibold uppercase tracking-wide text-accent-ink">{t('simulated')}</span> : null}
       </div>
     </div>
   );
 });
 
 const ResourceView = memo(function ResourceView({ data }: NodeProps<ResNode>) {
+  const t = useTranslations('topology');
   const r = data.r;
   const drifted = r.drift && !['IN_SYNC', 'UNKNOWN', 'NONE', ''].includes(r.drift.toUpperCase());
   return (
@@ -186,7 +189,7 @@ const ResourceView = memo(function ResourceView({ data }: NodeProps<ResNode>) {
         'flex h-16 w-[220px] items-center gap-2.5 rounded-md border bg-surface px-2.5 shadow-card',
         r.health === 'UNHEALTHY' ? 'border-danger/60' : r.health === 'DEGRADED' ? 'border-warn/60' : 'border-border-strong',
       )}
-      title={`${r.resourceId} · ${r.capabilityName} · health ${r.health}`}
+      title={t('nodeTitle', { id: r.resourceId, name: r.capabilityName, health: r.health })}
     >
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !min-w-0 !border-0 !bg-transparent" isConnectable={false} />
       <ResourceIcon type={r.type} capability={r.capability} provider={r.provider} simulatedProvider={r.simulatedProvider} size={24} />
@@ -197,8 +200,8 @@ const ResourceView = memo(function ResourceView({ data }: NodeProps<ResNode>) {
           {r.resourceId}
         </p>
         <div className="mt-0.5 flex gap-1">
-          {drifted ? <span className="rounded bg-warn/12 px-1 text-[9px] font-medium text-warn-ink">drift</span> : null}
-          {r.simulatedProvider || r.provider === 'mock' ? <span className="rounded bg-accent/12 px-1 text-[9px] font-medium text-accent-ink">sim</span> : null}
+          {drifted ? <span className="rounded bg-warn/12 px-1 text-[9px] font-medium text-warn-ink">{t('drift')}</span> : null}
+          {r.simulatedProvider || r.provider === 'mock' ? <span className="rounded bg-accent/12 px-1 text-[9px] font-medium text-accent-ink">{t('sim')}</span> : null}
         </div>
       </div>
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !min-w-0 !border-0 !bg-transparent" isConnectable={false} />
@@ -219,9 +222,20 @@ export default function TopologyDiagram({
   connectivity: PreviewDto['connectivity'] | null | undefined;
   targetNames: Map<string, string>;
 }) {
+  const t = useTranslations('topology');
   const theme = useTheme();
   const graph = useMemo(() => topologyEdges(resources, document, connectivity), [resources, document, connectivity]);
-  const nodes = useMemo(() => buildGraph(resources, graph, targetNames), [resources, graph, targetNames]);
+  const targetFallback = useMemo(() => (id: string) => t('targetFallback', { id }), [t]);
+  const nodes = useMemo(() => buildGraph(resources, graph, targetNames, targetFallback), [resources, graph, targetNames, targetFallback]);
+  const ariaLabelConfig = useMemo(
+    () => ({
+      'controls.ariaLabel': t('controls.label'),
+      'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+      'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+      'controls.fitView.ariaLabel': t('controls.fitView'),
+    }),
+    [t],
+  );
   const edges: Edge[] = useMemo(
     () =>
       graph.map((e) =>
@@ -251,10 +265,11 @@ export default function TopologyDiagram({
 
   return (
     <div className="space-y-2">
-      <div className="bg-grid h-[560px] overflow-hidden rounded-md border border-border" aria-label="Topology diagram. Use the List view for a text alternative.">
+      <div className="bg-grid h-[560px] overflow-hidden rounded-md border border-border" aria-label={t('diagramLabel')}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          ariaLabelConfig={ariaLabelConfig}
           nodeTypes={nodeTypes}
           colorMode={theme}
           fitView
@@ -272,15 +287,15 @@ export default function TopologyDiagram({
       </div>
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-subtle">
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block h-px w-5 bg-fg-subtle" /> connectivity
+          <span aria-hidden className="inline-block h-px w-5 bg-fg-subtle" /> {t('legendConnectivity')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block w-5 border-t border-dashed border-info" /> cross-cloud ({crossCloud})
+          <span aria-hidden className="inline-block w-5 border-t border-dashed border-info" /> {t('legendCrossCloud', { count: crossCloud })}
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block h-px w-5 bg-border-strong" /> dependency
+          <span aria-hidden className="inline-block h-px w-5 bg-border-strong" /> {t('legendDependency')}
         </span>
-        {connectivity ? null : <span>Run a preview to label connections with their network strategy.</span>}
+        {connectivity ? null : <span>{t('runPreviewForLabels')}</span>}
       </p>
     </div>
   );

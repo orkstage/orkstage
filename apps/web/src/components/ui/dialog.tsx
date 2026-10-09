@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
 /**
@@ -30,6 +31,7 @@ export function Dialog({
   variant?: 'modal' | 'drawer';
   className?: string;
 }) {
+  const t = useTranslations('common');
   const ref = useRef<HTMLDialogElement>(null);
   const downOnBackdrop = useRef(false);
   const titleId = useId();
@@ -83,7 +85,7 @@ export function Dialog({
               type="button"
               onClick={onClose}
               className="-mr-1.5 rounded p-1 text-fg-subtle hover:bg-surface-2 hover:text-fg"
-              aria-label="Close dialog"
+              aria-label={t('closeDialog')}
             >
               <X size={16} />
             </button>

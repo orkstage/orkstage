@@ -2,6 +2,9 @@
 
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import type { AppLocale } from '@/i18n/config';
+import type { Messages } from '@/i18n/messages';
+import { I18nProvider } from '@/i18n/provider';
 import { isApiError } from '@/lib/api';
 
 function redirectToLogin() {
@@ -34,7 +37,11 @@ function makeClient() {
   });
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ locale, messages, children }: { locale: AppLocale; messages: Messages; children: ReactNode }) {
   const [client] = useState(makeClient);
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <I18nProvider locale={locale} messages={messages}>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </I18nProvider>
+  );
 }

@@ -4,6 +4,7 @@ import type { AuditEventDto, Page } from '@co/contracts';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { ScrollText } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { AuditTable } from '@/components/audit-table';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,6 +17,8 @@ import { apiGet, qs } from '@/lib/api';
 import { useTenants } from '@/lib/queries';
 
 export default function AuditPage() {
+  const t = useTranslations('auditPage');
+  const tc = useTranslations('common');
   const [tenantId, setTenantId] = useState('');
   const tenants = useTenants();
   const q = useInfiniteQuery({
@@ -28,17 +31,17 @@ export default function AuditPage() {
 
   return (
     <>
-      <PageHeader title="Audit log" description="Who did what, when, and whether it worked. Quote the correlation id when contacting support." />
+      <PageHeader title={t('title')} description={t('description')} />
       {(tenants.data?.length ?? 0) > 0 ? (
         <div className="mb-3">
           <label htmlFor="audit-tenant" className="mb-1 block text-xs text-fg-subtle">
-            Tenant
+            {t('tenant')}
           </label>
           <Select id="audit-tenant" value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="w-56">
-            <option value="">All tenants</option>
-            {tenants.data!.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            <option value="">{t('allTenants')}</option>
+            {tenants.data!.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
               </option>
             ))}
           </Select>
@@ -50,18 +53,18 @@ export default function AuditPage() {
         ) : q.error ? (
           <ErrorNotice error={q.error} className="m-4" />
         ) : events.length === 0 ? (
-          <EmptyState icon={ScrollText} title="No audit events yet" description="Sign-ins, deployments and configuration changes are recorded here." />
+          <EmptyState icon={ScrollText} title={t('emptyTitle')} description={t('emptyBody')} />
         ) : (
           <>
             <AuditTable events={events} />
             <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-fg-subtle">
-              <span>{events.length} events loaded</span>
+              <span>{t('loaded', { count: events.length })}</span>
               {q.hasNextPage ? (
                 <Button size="sm" onClick={() => q.fetchNextPage()} loading={q.isFetchingNextPage}>
-                  Load more
+                  {tc('loadMore')}
                 </Button>
               ) : (
-                <span>End of log</span>
+                <span>{t('end')}</span>
               )}
             </div>
           </>

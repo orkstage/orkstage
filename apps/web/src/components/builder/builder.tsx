@@ -4,7 +4,6 @@ import '@xyflow/react/dist/style.css';
 import { cloneTemplateSchema, type PlanDto, type TemplateDto, type TemplateVersionDto } from '@co/contracts';
 import type { Entitlements, PlanCode } from '@co/domain/core';
 import { validateTemplate, type ValidationIssue, type ValidationReport } from '@co/templates';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Background,
@@ -26,12 +25,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'use-intl';
 import { parse as parseYaml } from 'yaml';
+import { useStatusLabel } from '@/i18n/labels';
+import { useZodResolver } from '@/i18n/zod';
 import { apiSend } from '@/lib/api';
 import { usePlans } from '@/lib/queries';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { RESOURCE_TYPE_META, ResourceIcon } from '../resource-icon';
+import { ResourceIcon, useResourceTypeLabel } from '../resource-icon';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
@@ -60,7 +62,7 @@ import {
   type Res,
   type ResourceType,
 } from './model';
-import { EdgeDialog, EdgeInspector, LaneInspector, ResourceInspector, TemplatePanel, yamlOf, YamlPanel } from './panels';
+import { EdgeDialog, EdgeInspector, LaneInspector, ResourceInspector, TemplatePanel, useEdgeLabel, yamlOf, YamlPanel } from './panels';
 
 /* ---------- geometry ---------- */
 const NODE_W = 210;
@@ -170,17 +172,18 @@ type LaneData = { name: string; description?: string; providers: string[]; count
 type ResData = { res: Res; selected: boolean; errors: number; warnings: number };
 
 const LaneNode = memo(function LaneNode({ data }: NodeProps<Node<LaneData, 'lane'>>) {
+  const t = useTranslations('builder');
   return (
     <div
       className={cn('h-full w-full rounded-lg border', data.unknown ? 'border-dashed border-danger/60 bg-danger/5' : 'border-border bg-surface/50', data.selected && 'border-accent ring-1 ring-accent')}
       style={{ width: data.width, height: data.height }}
     >
       <div className="flex h-9 items-center gap-2 border-b border-border/60 px-3">
-        <span className="font-mono text-xs font-semibold text-fg">{data.unknown ? 'unknown placement' : data.name}</span>
+        <span className="font-mono text-xs font-semibold text-fg">{data.unknown ? t('unknownPlacement') : data.name}</span>
         {data.description ? <span className="truncate text-[11px] text-fg-subtle">{data.description}</span> : null}
         <span className="ml-auto flex gap-1">
           {data.providers.length === 0 ? (
-            <span className="rounded-full border border-border px-1.5 text-[10px] text-fg-subtle">any provider</span>
+            <span className="rounded-full border border-border px-1.5 text-[10px] text-fg-subtle">{t('anyProvider')}</span>
           ) : (
             data.providers.map((p) => (
               <span key={p} className="rounded-full border border-border px-1.5 font-mono text-[10px] text-fg-muted">
@@ -196,8 +199,9 @@ const LaneNode = memo(function LaneNode({ data }: NodeProps<Node<LaneData, 'lane
 });
 
 const ResNode = memo(function ResNode({ data }: NodeProps<Node<ResData, 'res'>>) {
+  const t = useTranslations('builder');
+  const typeLabel = useResourceTypeLabel();
   const r = data.res;
-  const meta = RESOURCE_TYPE_META[r.type];
   const disabled = r.enabled === false;
   return (
     <div
@@ -213,14 +217,14 @@ const ResNode = memo(function ResNode({ data }: NodeProps<Node<ResData, 'res'>>)
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-xs font-semibold text-fg">{r.id}</p>
         <p className="truncate text-[11px] text-fg-subtle">
-          {meta?.label ?? r.type}
-          {disabled ? ' · disabled' : ''}
+          {typeLabel(r.type)}
+          {disabled ? ` · ${t('disabled')}` : ''}
         </p>
       </div>
       {data.errors || data.warnings ? (
         <span
           className={cn('absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold', data.errors ? 'bg-danger text-danger-fg' : 'bg-warn text-accent-fg')}
-          title={`${data.errors} error(s), ${data.warnings} warning(s)`}
+          title={t('nodeIssues', { errors: data.errors, warnings: data.warnings })}
         >
           {data.errors || data.warnings}
         </span>
@@ -253,6 +257,10 @@ export default function TemplateBuilder(props: TemplateBuilderProps) {
 }
 
 function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnlyReason, canClone, canPublish }: TemplateBuilderProps) {
+  const t = useTranslations('builder');
+  const typeLabel = useResourceTypeLabel();
+  const edgeLabel = useEdgeLabel();
+  const statusLabel = useStatusLabel();
   const router = useRouter();
   const qc = useQueryClient();
   const theme = useTheme();
@@ -261,7 +269,7 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
   const isNew = !template;
 
   const [initialDoc] = useState<Draft>(() => {
-    if (!initialSource) return emptyDraft();
+    if (!initialSource) return emptyDraft({ displayName: t('newDisplayName'), slotDescription: t('newSlotDescription') });
     try {
       return toDraft(parseYaml(initialSource));
     } catch {
@@ -295,20 +303,20 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
 
   /* live validation (debounced) */
   useEffect(() => {
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const plan = plans.data?.find((p) => p.code === planCode);
       setReport(validateTemplate(doc, plan ? { code: plan.code as PlanCode, entitlements: plan.entitlements as unknown as Entitlements } : undefined));
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [doc, planCode, plans.data]);
 
   const issuesBy = useMemo(() => {
     const res = new Map<string, ValidationIssue[]>();
     const lanes = new Map<string, ValidationIssue[]>();
     for (const i of report.issues) {
-      const t = issueTarget(i, doc);
-      if (t.kind === 'resource') res.set(t.id, [...(res.get(t.id) ?? []), i]);
-      if (t.kind === 'lane') lanes.set(t.name, [...(lanes.get(t.name) ?? []), i]);
+      const target = issueTarget(i, doc);
+      if (target.kind === 'resource') res.set(target.id, [...(res.get(target.id) ?? []), i]);
+      if (target.kind === 'lane') lanes.set(target.name, [...(lanes.get(target.name) ?? []), i]);
     }
     return { res, lanes };
   }, [report, doc]);
@@ -367,7 +375,7 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
           id: e.id,
           source: `res:${e.from}`,
           target: `res:${e.to}`,
-          label: e.kind === 'dependsOn' ? undefined : e.label,
+          label: e.kind === 'dependsOn' ? undefined : edgeLabel(e),
           zIndex: 2,
           interactionWidth: 18,
           style: { stroke: color, strokeWidth: selected ? 2 : e.kind === 'dependsOn' ? 1 : 1.5, strokeDasharray: e.kind === 'dependsOn' || e.kind === 'dns' ? '5 4' : undefined },
@@ -375,7 +383,7 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
           labelBgPadding: [4, 2] as [number, number],
         };
       }),
-    [dEdges, selection],
+    [dEdges, selection, edgeLabel],
   );
 
   /* actions */
@@ -426,8 +434,8 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
   /* keyboard: Delete removes the selection; Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('dialog'))) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.closest('input, textarea, select, [contenteditable="true"]') || el.closest('dialog'))) return;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -485,11 +493,11 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
   };
 
   const focusIssue = (issue: ValidationIssue) => {
-    const t = issueTarget(issue, doc);
-    if (t.kind === 'resource') {
-      select({ kind: 'resource', id: t.id });
-      void flow.fitView({ nodes: [{ id: `res:${t.id}` }], duration: 250, maxZoom: 1.2 });
-    } else if (t.kind === 'lane') select({ kind: 'lane', name: t.name });
+    const target = issueTarget(issue, doc);
+    if (target.kind === 'resource') {
+      select({ kind: 'resource', id: target.id });
+      void flow.fitView({ nodes: [{ id: `res:${target.id}` }], duration: 250, maxZoom: 1.2 });
+    } else if (target.kind === 'lane') select({ kind: 'lane', name: target.name });
     else setTab('template');
   };
 
@@ -545,37 +553,35 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
         <div className="mr-auto min-w-0">
           <p className="text-xs text-fg-subtle">
             <Link href={template ? `/templates/${template.id}` : '/templates'} className="hover:underline">
-              {template ? template.displayName : 'Templates'}
+              {template ? template.displayName : t('breadcrumbTemplates')}
             </Link>{' '}
-            / builder
+            / {t('breadcrumbBuilder')}
           </p>
           <h1 className="flex flex-wrap items-center gap-2 font-display text-lg font-semibold">
-            {doc.metadata.displayName || doc.metadata.name || 'Untitled template'}
+            {doc.metadata.displayName || doc.metadata.name || t('untitled')}
             <Badge>
               <span className="font-mono">v{doc.metadata.version}</span>
             </Badge>
             {readOnly ? (
               <Badge tone="info">
-                <Lock size={10} aria-hidden /> read-only
+                <Lock size={10} aria-hidden /> {t('readOnly')}
               </Badge>
             ) : dirty ? (
-              <Badge tone="warn">unsaved</Badge>
+              <Badge tone="warn">{t('unsaved')}</Badge>
             ) : null}
             {errors.length ? (
-              <Badge tone="danger">
-                {errors.length} error{errors.length === 1 ? '' : 's'}
-              </Badge>
+              <Badge tone="danger">{t('errors', { count: errors.length })}</Badge>
             ) : (
               <Badge tone="ok">
-                <CheckCircle2 size={10} aria-hidden /> valid
+                <CheckCircle2 size={10} aria-hidden /> {t('valid')}
               </Badge>
             )}
           </h1>
         </div>
-        <Button size="sm" variant="ghost" onClick={undo} disabled={!canUndo || readOnly} aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)">
+        <Button size="sm" variant="ghost" onClick={undo} disabled={!canUndo || readOnly} aria-label={t('undo')} title={t('undo')}>
           <Undo2 size={14} />
         </Button>
-        <Button size="sm" variant="ghost" onClick={redo} disabled={!canRedo || readOnly} aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)">
+        <Button size="sm" variant="ghost" onClick={redo} disabled={!canRedo || readOnly} aria-label={t('redo')} title={t('redo')}>
           <Redo2 size={14} />
         </Button>
         <Button
@@ -587,38 +593,38 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
             select({ kind: 'lane', name });
           }}
         >
-          <Plus size={13} aria-hidden /> Add slot
+          <Plus size={13} aria-hidden /> {t('addSlot')}
         </Button>
         <label className="sr-only" htmlFor="builder-plan">
-          Validate against plan
+          {t('validatePlan')}
         </label>
-        <Select id="builder-plan" value={planCode} onChange={(e) => setPlanCode(e.target.value)} className="h-7 w-40 text-xs">
-          <option value="">Any plan</option>
+        <Select id="builder-plan" value={planCode} onChange={(e) => setPlanCode(e.target.value)} className="h-7 w-44 text-xs">
+          <option value="">{t('anyPlan')}</option>
           {(plans.data ?? []).map((p: PlanDto) => (
             <option key={p.code} value={p.code}>
-              Check vs {p.name}
+              {t('checkAgainst', { plan: p.name })}
             </option>
           ))}
         </Select>
         {!isNew ? (
           <Button size="sm" onClick={() => serverValidate.mutate()} loading={serverValidate.isPending}>
-            <ShieldCheck size={13} aria-hidden /> Validate on server
+            <ShieldCheck size={13} aria-hidden /> {t('validateServer')}
           </Button>
         ) : null}
         {readOnly ? (
           canClone && template ? (
             <Button size="sm" variant="primary" onClick={() => setCloning(true)}>
-              <Copy size={13} aria-hidden /> Clone to edit
+              <Copy size={13} aria-hidden /> {t('cloneToEdit')}
             </Button>
           ) : null
         ) : (
           <>
             <Button size="sm" variant="primary" onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty && !isNew}>
-              <Save size={13} aria-hidden /> {isNew ? 'Create template' : 'Save draft'}
+              <Save size={13} aria-hidden /> {isNew ? t('createTemplate') : t('saveDraft')}
             </Button>
             {!isNew ? (
-              <Button size="sm" onClick={() => saved && publish.mutate(saved.version.id)} loading={publish.isPending} disabled={!canPublishSaved} title={canPublishSaved ? undefined : 'Save a draft first; publishing applies to the saved version'}>
-                <Send size={13} aria-hidden /> Publish
+              <Button size="sm" onClick={() => saved && publish.mutate(saved.version.id)} loading={publish.isPending} disabled={!canPublishSaved} title={canPublishSaved ? undefined : t('publishNeedsSave')}>
+                <Send size={13} aria-hidden /> {t('publish')}
               </Button>
             ) : null}
           </>
@@ -632,23 +638,24 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
           </span>
         </Notice>
       ) : null}
-      {save.error ? <ErrorNotice error={save.error} title="Not saved" /> : null}
-      {publish.error ? <ErrorNotice error={publish.error} title="Publish refused" /> : null}
+      {save.error ? <ErrorNotice error={save.error} title={t('notSaved')} /> : null}
+      {publish.error ? <ErrorNotice error={publish.error} title={t('publishRefused')} /> : null}
       {saved && !publish.isSuccess ? (
         <Notice tone="ok">
-          Saved as draft <strong className="font-mono">{saved.version.version}</strong>. {canPublish ? 'Publish it when you are ready; published versions never change.' : ''}
+          {t.rich('savedAs', { version: saved.version.version, strong: (chunks) => <strong className="font-mono">{chunks}</strong> })}{' '}
+          {canPublish ? t('publishWhenReady') : ''}
         </Notice>
       ) : null}
-      {publish.isSuccess ? <Notice tone="ok">Published. New instances can now use version {saved?.version.version}.</Notice> : null}
+      {publish.isSuccess ? <Notice tone="ok">{t('published', { version: saved?.version.version ?? '' })}</Notice> : null}
 
       <div className="grid gap-3 lg:grid-cols-[12.5rem_minmax(0,1fr)_22rem]">
         {/* palette */}
-        <aside aria-label="Resource palette" className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Resources</p>
-          <p className="text-[11px] text-fg-subtle">{readOnly ? 'Read-only.' : 'Drag onto a lane, or use Add.'}</p>
+        <aside aria-label={t('palette')} className="space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t('resources')}</p>
+          <p className="text-[11px] text-fg-subtle">{readOnly ? t('paletteReadOnly') : t('paletteHint')}</p>
           <ul className="grid grid-cols-2 gap-1.5 lg:grid-cols-1">
             {RESOURCE_TYPES.map((type) => {
-              const meta = RESOURCE_TYPE_META[type]!;
+              const label = typeLabel(type);
               return (
                 <li
                   key={type}
@@ -658,17 +665,17 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   className={cn('flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5', !readOnly && 'cursor-grab active:cursor-grabbing hover:border-border-strong')}
-                  aria-label={`${meta.label}${readOnly ? '' : ', draggable'}`}
+                  aria-label={readOnly ? label : t('draggable', { name: label })}
                 >
                   <ResourceIcon type={type} size={18} />
-                  <span className="min-w-0 flex-1 truncate text-xs">{meta.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs">{label}</span>
                   <button
                     type="button"
                     disabled={readOnly}
                     onClick={() => add(type)}
                     className="rounded p-0.5 text-fg-subtle hover:bg-surface-2 hover:text-fg disabled:opacity-40"
-                    aria-label={`Add ${meta.label}`}
-                    title={`Add ${meta.label}`}
+                    aria-label={t('add', { name: label })}
+                    title={t('add', { name: label })}
                   >
                     <Plus size={14} />
                   </button>
@@ -687,7 +694,7 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
             e.dataTransfer.dropEffect = 'copy';
           }}
           onDrop={onDrop}
-          aria-label="Template canvas. Placement slots are lanes; resources are nodes; drag between handles to connect."
+          aria-label={t('canvasLabel')}
         >
           <ReactFlow
             nodes={nodes}
@@ -716,17 +723,17 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
         </div>
 
         {/* inspector */}
-        <aside aria-label="Inspector" className="min-w-0 rounded-md border border-border bg-surface">
+        <aside aria-label={t('inspector')} className="min-w-0 rounded-md border border-border bg-surface">
           <Tabs
             idPrefix="builder"
-            label="Builder panels"
+            label={t('panels')}
             value={tab}
             onChange={setTab}
             className="px-2"
             tabs={[
-              { id: 'inspector', label: 'Inspector' },
-              { id: 'template', label: 'Template' },
-              { id: 'yaml', label: 'YAML' },
+              { id: 'inspector', label: t('tabs.inspector') },
+              { id: 'template', label: t('tabs.template') },
+              { id: 'yaml', label: t('tabs.yaml') },
             ]}
           />
           <div className="max-h-[580px] overflow-y-auto px-3 pb-3">
@@ -740,12 +747,12 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
                   <EdgeInspector key={selectedEdge.id} doc={doc} edge={selectedEdge} commit={commit} readOnly={readOnly} onDelete={deleteSelection} onToggleKind={() => commit(toggleEdgeKind(doc, selectedEdge as DraftEdge))} />
                 ) : (
                   <div className="space-y-2 text-xs text-fg-subtle">
-                    <p className="text-sm text-fg">Select something on the canvas.</p>
+                    <p className="text-sm text-fg">{t('emptySelection')}</p>
                     <ul className="list-disc space-y-1 pl-4">
-                      <li>Lanes are placement slots: each instance binds a slot to a cloud account and region.</li>
-                      <li>Drag a resource into a lane to place it there.</li>
-                      <li>Drag from a node’s right handle to another node to add a connection, dependency, ingress route or DNS target.</li>
-                      <li>Delete removes the selection; Ctrl+Z / Ctrl+Y undo and redo.</li>
+                      <li>{t('tips.lanes')}</li>
+                      <li>{t('tips.drag')}</li>
+                      <li>{t('tips.connect')}</li>
+                      <li>{t('tips.keys')}</li>
                     </ul>
                   </div>
                 )}
@@ -769,22 +776,22 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
       <section aria-labelledby="problems-heading" className="rounded-md border border-border bg-surface">
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <h2 id="problems-heading" className="text-sm font-semibold">
-            Problems
+            {t('problems')}
           </h2>
-          <Badge tone={errors.length ? 'danger' : 'neutral'}>{errors.length} errors</Badge>
-          <Badge tone={warnings.length ? 'warn' : 'neutral'}>{warnings.length} warnings</Badge>
-          <span className="ml-auto text-[11px] text-fg-subtle">Checked as you edit{planCode ? ` against the ${planCode} plan` : ''}.</span>
+          <Badge tone={errors.length ? 'danger' : 'neutral'}>{t('errors', { count: errors.length })}</Badge>
+          <Badge tone={warnings.length ? 'warn' : 'neutral'}>{t('warnings', { count: warnings.length })}</Badge>
+          <span className="ml-auto text-[11px] text-fg-subtle">{planCode ? t('checkedLivePlan', { plan: planCode }) : t('checkedLive')}</span>
         </div>
         {report.issues.length === 0 ? (
           <p className="flex items-center gap-1.5 px-3 py-2 text-sm text-ok-ink">
-            <CheckCircle2 size={14} aria-hidden /> No problems in the template.
+            <CheckCircle2 size={14} aria-hidden /> {t('noProblems')}
           </p>
         ) : (
           <ul className="max-h-48 divide-y divide-border overflow-y-auto">
             {report.issues.map((i, n) => (
               <li key={n}>
                 <button type="button" onClick={() => focusIssue(i)} className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2">
-                  <AlertTriangle size={14} className={cn('mt-0.5 shrink-0', i.severity === 'error' ? 'text-danger-ink' : 'text-warn-ink')} aria-label={i.severity} />
+                  <AlertTriangle size={14} className={cn('mt-0.5 shrink-0', i.severity === 'error' ? 'text-danger-ink' : 'text-warn-ink')} aria-label={statusLabel(i.severity)} />
                   <span className="min-w-0 flex-1">
                     {i.message}
                     {i.path ? <code className="ml-2 font-mono text-[11px] text-fg-subtle">{i.path}</code> : null}
@@ -799,14 +806,15 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
         {serverValidate.data ? (
           <div className="border-t border-border px-3 py-2 text-sm">
             <p className="mb-1 font-medium">
-              Server validation: {serverValidate.data.valid ? <span className="text-ok-ink">passed</span> : <span className="text-danger-ink">failed</span>}
-              <span className="ml-2 text-[11px] font-normal text-fg-subtle">Includes capability and policy checks the browser cannot run.</span>
+              {t('serverValidation')}{' '}
+              {serverValidate.data.valid ? <span className="text-ok-ink">{t('serverPassed')}</span> : <span className="text-danger-ink">{t('serverFailed')}</span>}
+              <span className="ml-2 text-[11px] font-normal text-fg-subtle">{t('serverHint')}</span>
             </p>
             <ul className="space-y-0.5 text-xs">
               {(serverValidate.data.issues ?? []).map((i, n) => (
                 <li key={n}>
                   <button type="button" onClick={() => focusIssue(i)} className="text-left hover:underline">
-                    <span className={i.severity === 'error' ? 'text-danger-ink' : 'text-warn-ink'}>{i.severity}</span> {i.message}
+                    <span className={i.severity === 'error' ? 'text-danger-ink' : 'text-warn-ink'}>{statusLabel(i.severity)}</span> {i.message}
                   </button>
                 </li>
               ))}
@@ -825,7 +833,7 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
         }}
       />
       {template ? (
-        <Dialog open={cloning} onClose={() => setCloning(false)} title={`Clone ${template.displayName}`} description="Creates an editable organization copy and opens it in the builder.">
+        <Dialog open={cloning} onClose={() => setCloning(false)} title={t('cloneTitle', { name: template.displayName })} description={t('cloneDescription')}>
           <CloneForm template={template} onDone={() => setCloning(false)} />
         </Dialog>
       ) : null}
@@ -834,11 +842,14 @@ function BuilderInner({ template, baseVersion, initialSource, readOnly, readOnly
 }
 
 function CloneForm({ template, onDone }: { template: TemplateDto; onDone: () => void }) {
+  const t = useTranslations('templates.cloneForm');
+  const tb = useTranslations('builder');
+  const tc = useTranslations('common');
   const router = useRouter();
   const qc = useQueryClient();
   const form = useForm({
-    resolver: zodResolver(cloneTemplateSchema),
-    defaultValues: { name: `${template.name}-copy`.slice(0, 63), displayName: `${template.displayName} (copy)`.slice(0, 80) },
+    resolver: useZodResolver(cloneTemplateSchema),
+    defaultValues: { name: `${template.name}-copy`.slice(0, 63), displayName: `${template.displayName} ${t('copySuffix')}`.slice(0, 80) },
   });
   const { errors } = form.formState;
   const clone = useMutation({
@@ -851,17 +862,17 @@ function CloneForm({ template, onDone }: { template: TemplateDto; onDone: () => 
   });
   return (
     <form onSubmit={form.handleSubmit((v) => clone.mutate(v))} className="space-y-4" noValidate>
-      <Field label="Name" htmlFor="bclone-name" hint="Lowercase identifier, unique in your organization." error={errors.name?.message} required>
+      <Field label={t('name')} htmlFor="bclone-name" hint={t('nameHint')} error={errors.name?.message} required>
         <Input id="bclone-name" className="font-mono" autoFocus {...describedBy('bclone-name', { hint: true, error: errors.name })} {...form.register('name')} />
       </Field>
-      <Field label="Display name" htmlFor="bclone-display" error={errors.displayName?.message} required>
+      <Field label={t('displayName')} htmlFor="bclone-display" error={errors.displayName?.message} required>
         <Input id="bclone-display" {...describedBy('bclone-display', { error: errors.displayName })} {...form.register('displayName')} />
       </Field>
       {clone.error ? <ErrorNotice error={clone.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={onDone}>{tc('cancel')}</Button>
         <Button type="submit" variant="primary" loading={clone.isPending}>
-          Clone and open
+          {tb('cloneSubmit')}
         </Button>
       </div>
     </form>

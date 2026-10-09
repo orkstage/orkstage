@@ -1,13 +1,13 @@
 'use client';
 
 import { createIncidentSchema, STATUS_STATES, type CreateIncidentInput, type IncidentDto, type Page } from '@co/contracts';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Siren } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'use-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,20 +21,25 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useFormat } from '@/i18n/format';
+import { useStatusLabel } from '@/i18n/labels';
+import { useZodResolver } from '@/i18n/zod';
 import { apiGet, apiSend, asItems, qs } from '@/lib/api';
 import { useCan, useMe } from '@/lib/ability';
 import { tenantNameMap, useInstances, useTenants } from '@/lib/queries';
-import { statusLabel } from '@/lib/status';
-import { durationBetween, formatDateTime, formatDuration } from '@/lib/utils';
+import { durationBetween } from '@/lib/utils';
 
 const FILTERS = [
-  { id: 'open', label: 'Open' },
-  { id: 'RESOLVED', label: 'Resolved' },
-  { id: '', label: 'All' },
-];
+  { id: 'open', label: 'open' },
+  { id: 'RESOLVED', label: 'resolved' },
+  { id: '', label: 'all' },
+] as const;
 
 export default function IncidentsPage() {
-  const [filter, setFilter] = useState('open');
+  const t = useTranslations('incidents');
+  const fmt = useFormat();
+  const statusLabel = useStatusLabel();
+  const [filter, setFilter] = useState<string>('open');
   const [creating, setCreating] = useState(false);
   const can = useCan();
   const tenants = useTenants();
@@ -53,17 +58,17 @@ export default function IncidentsPage() {
   return (
     <>
       <PageHeader
-        title="Incidents"
-        description="Disruptions your customers see on their status pages. Health checks open incidents automatically; you can declare one too."
+        title={t('title')}
+        description={t('description')}
         actions={
           can('create', 'Incident') ? (
             <Button variant="primary" onClick={() => setCreating(true)}>
-              <Plus size={14} aria-hidden /> Declare incident
+              <Plus size={14} aria-hidden /> {t('declare')}
             </Button>
           ) : null
         }
       />
-      <div className="mb-3 inline-flex rounded-md border border-border bg-surface p-0.5" role="group" aria-label="Filter incidents">
+      <div className="mb-3 inline-flex rounded-md border border-border bg-surface p-0.5" role="group" aria-label={t('filterLabel')}>
         {FILTERS.map((f) => (
           <button
             key={f.id}
@@ -72,7 +77,7 @@ export default function IncidentsPage() {
             onClick={() => setFilter(f.id)}
             className={`rounded px-3 py-1 text-xs font-medium ${filter === f.id ? 'bg-accent/10 text-accent-ink' : 'text-fg-muted hover:text-fg'}`}
           >
-            {f.label}
+            {t(`filters.${f.label}`)}
           </button>
         ))}
       </div>
@@ -82,19 +87,23 @@ export default function IncidentsPage() {
         ) : q.error ? (
           <ErrorNotice error={q.error} className="m-4" />
         ) : q.data.length === 0 ? (
-          <EmptyState icon={Siren} title={filter === 'open' ? 'All quiet on every stage' : 'No incidents'} description={filter === 'open' ? 'No open incidents. Health checks keep watch and open one automatically if something breaks.' : 'Incidents appear here when declared or detected.'} />
+          <EmptyState
+            icon={Siren}
+            title={filter === 'open' ? t('emptyOpenTitle') : t('emptyTitle')}
+            description={filter === 'open' ? t('emptyOpenBody') : t('emptyBody')}
+          />
         ) : (
           <Table>
             <THead>
               <tr>
-                <TH>Incident</TH>
-                <TH>Tenant</TH>
-                <TH>Status</TH>
-                <TH>Impact</TH>
-                <TH>Severity</TH>
-                <TH>Source</TH>
-                <TH>Opened</TH>
-                <TH>Duration</TH>
+                <TH>{t('table.incident')}</TH>
+                <TH>{t('table.tenant')}</TH>
+                <TH>{t('table.status')}</TH>
+                <TH>{t('table.impact')}</TH>
+                <TH>{t('table.severity')}</TH>
+                <TH>{t('table.source')}</TH>
+                <TH>{t('table.opened')}</TH>
+                <TH>{t('table.duration')}</TH>
               </tr>
             </THead>
             <TBody>
@@ -105,7 +114,7 @@ export default function IncidentsPage() {
                       {i.title}
                     </Link>
                   </TD>
-                  <TD className="text-fg-muted">{names.get(i.tenantId) ?? '—'}</TD>
+                  <TD className="text-fg-muted">{names.get(i.tenantId) ?? fmt.empty}</TD>
                   <TD>
                     <StatusBadge status={i.status} />
                   </TD>
@@ -113,20 +122,20 @@ export default function IncidentsPage() {
                     <StatusBadge status={i.impact} />
                   </TD>
                   <TD>
-                    <StatusBadge status={i.severity} label={i.severity} />
+                    <StatusBadge status={i.severity} />
                   </TD>
                   <TD>
                     <Badge tone={i.source === 'AUTOMATED' ? 'info' : 'neutral'}>{statusLabel(i.source)}</Badge>
                   </TD>
-                  <TD className="whitespace-nowrap text-xs text-fg-muted">{formatDateTime(i.openedAt)}</TD>
-                  <TD className="whitespace-nowrap text-xs tabular-nums text-fg-muted">{formatDuration(durationBetween(i.openedAt, i.resolvedAt))}</TD>
+                  <TD className="whitespace-nowrap text-xs text-fg-muted">{fmt.dateTime(i.openedAt)}</TD>
+                  <TD className="whitespace-nowrap text-xs tabular-nums text-fg-muted">{fmt.duration(durationBetween(i.openedAt, i.resolvedAt))}</TD>
                 </TR>
               ))}
             </TBody>
           </Table>
         )}
       </Card>
-      <Dialog open={creating} onClose={() => setCreating(false)} title="Declare incident" description="The incident is published on the tenant's status page and notifies subscribers." size="lg">
+      <Dialog open={creating} onClose={() => setCreating(false)} title={t('declare')} description={t('declareDescription')} size="lg">
         <CreateIncidentForm onDone={() => setCreating(false)} />
       </Dialog>
     </>
@@ -134,16 +143,19 @@ export default function IncidentsPage() {
 }
 
 function CreateIncidentForm({ onDone }: { onDone: () => void }) {
+  const t = useTranslations('incidents');
+  const tc = useTranslations('common');
+  const statusLabel = useStatusLabel();
   const qc = useQueryClient();
   const router = useRouter();
   const me = useMe();
   const tenants = useTenants();
   const tenantOptions = tenants.data?.length
-    ? tenants.data.map((t) => ({ id: t.id, name: t.name }))
+    ? tenants.data.map((tenant) => ({ id: tenant.id, name: tenant.name }))
     : (me.data?.memberships ?? []).map((m) => ({ id: m.tenantId, name: m.tenantName }));
 
   const form = useForm({
-    resolver: zodResolver(createIncidentSchema),
+    resolver: useZodResolver(createIncidentSchema),
     defaultValues: { tenantId: tenantOptions[0]?.id ?? '', title: '', impact: 'DEGRADED', severity: 'medium', message: '', componentIds: [] } as CreateIncidentInput,
   });
   const { errors } = form.formState;
@@ -162,19 +174,19 @@ function CreateIncidentForm({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={form.handleSubmit((v) => create.mutate(v))} className="space-y-4" noValidate>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Tenant" htmlFor="inc-tenant" error={errors.tenantId ? 'Choose a tenant.' : undefined} required>
+        <Field label={t('form.tenant')} htmlFor="inc-tenant" error={errors.tenantId ? t('form.chooseTenant') : undefined} required>
           <Select id="inc-tenant" {...form.register('tenantId')}>
-            <option value="">Select…</option>
-            {tenantOptions.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            <option value="">{t('form.select')}</option>
+            {tenantOptions.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Affected instance" htmlFor="inc-instance" hint="Optional.">
+        <Field label={t('form.instance')} htmlFor="inc-instance" hint={t('form.optional')}>
           <Select id="inc-instance" {...form.register('instanceId', { setValueAs: (v: unknown) => (v ? String(v) : undefined) })}>
-            <option value="">Whole tenant</option>
+            <option value="">{t('form.wholeTenant')}</option>
             {(instances.data ?? []).map((i) => (
               <option key={i.id} value={i.id}>
                 {i.name}
@@ -183,11 +195,11 @@ function CreateIncidentForm({ onDone }: { onDone: () => void }) {
           </Select>
         </Field>
       </div>
-      <Field label="Title" htmlFor="inc-title" error={errors.title?.message} required>
-        <Input id="inc-title" placeholder="Elevated API error rates" {...describedBy('inc-title', { error: errors.title })} {...form.register('title')} />
+      <Field label={t('form.title')} htmlFor="inc-title" error={errors.title?.message} required>
+        <Input id="inc-title" placeholder={t('form.titlePlaceholder')} {...describedBy('inc-title', { error: errors.title })} {...form.register('title')} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Impact" htmlFor="inc-impact" error={errors.impact?.message}>
+        <Field label={t('form.impact')} htmlFor="inc-impact" error={errors.impact?.message}>
           <Select id="inc-impact" {...form.register('impact')}>
             {STATUS_STATES.filter((s) => s !== 'UNKNOWN').map((s) => (
               <option key={s} value={s}>
@@ -196,24 +208,24 @@ function CreateIncidentForm({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
         </Field>
-        <Field label="Severity" htmlFor="inc-severity" error={errors.severity?.message}>
+        <Field label={t('form.severity')} htmlFor="inc-severity" error={errors.severity?.message}>
           <Select id="inc-severity" {...form.register('severity')}>
             {(['low', 'medium', 'high', 'critical'] as const).map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </Select>
         </Field>
       </div>
-      <Field label="First update" htmlFor="inc-message" hint="Shown publicly on the status page. Describe impact, not internal details." error={errors.message?.message} required>
+      <Field label={t('form.message')} htmlFor="inc-message" hint={t('form.messageHint')} error={errors.message?.message} required>
         <Textarea id="inc-message" rows={4} {...describedBy('inc-message', { hint: true, error: errors.message })} {...form.register('message')} />
       </Field>
       {create.error ? <ErrorNotice error={create.error} /> : null}
       <div className="flex justify-end gap-2 border-t border-border pt-3">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={onDone}>{tc('cancel')}</Button>
         <Button type="submit" variant="primary" loading={create.isPending}>
-          Declare incident
+          {t('declare')}
         </Button>
       </div>
     </form>

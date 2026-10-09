@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({
@@ -16,9 +19,10 @@ export function PageHeader({
   breadcrumb?: ReactNode;
   className?: string;
 }) {
+  const t = useTranslations('common');
   return (
     <div className={cn('mb-5 space-y-1', className)}>
-      {breadcrumb ? <nav aria-label="Breadcrumb" className="text-xs text-fg-subtle">{breadcrumb}</nav> : null}
+      {breadcrumb ? <nav aria-label={t('breadcrumb')} className="text-xs text-fg-subtle">{breadcrumb}</nav> : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-display text-[22px] font-semibold tracking-[-0.015em] text-fg">{title}</h1>

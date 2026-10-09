@@ -1,11 +1,11 @@
 'use client';
 
 import { createTemplateSchema, type TemplateDto, type ValidationIssueDto } from '@co/contracts';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'use-intl';
 import { IssuesList } from '@/components/plan-view';
 import { Workflow } from 'lucide-react';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Card, CardBody } from '@/components/ui/card';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { PageHeader } from '@/components/ui/page-header';
 import { Textarea } from '@/components/ui/textarea';
+import { useZodResolver } from '@/i18n/zod';
 import { apiSend, isApiError } from '@/lib/api';
 
 const STARTER = `apiVersion: platform/v1
@@ -57,14 +58,16 @@ spec:
 `;
 
 export default function NewTemplatePage() {
+  const t = useTranslations('templates');
+  const tc = useTranslations('common');
   const router = useRouter();
   const qc = useQueryClient();
-  const form = useForm({ resolver: zodResolver(createTemplateSchema), defaultValues: { source: STARTER } });
+  const form = useForm({ resolver: useZodResolver(createTemplateSchema), defaultValues: { source: STARTER } });
   const create = useMutation({
     mutationFn: (v: { source: string }) => apiSend<TemplateDto>('POST', '/templates', v),
-    onSuccess: (t) => {
+    onSuccess: (created) => {
       void qc.invalidateQueries({ queryKey: ['templates'] });
-      router.push(`/templates/${t.id}`);
+      router.push(`/templates/${created.id}`);
     },
   });
   const detailIssues = isApiError(create.error) && Array.isArray(create.error.details.issues) ? (create.error.details.issues as ValidationIssueDto[]) : [];
@@ -73,16 +76,16 @@ export default function NewTemplatePage() {
   return (
     <>
       <PageHeader
-        title="New template"
-        description="Forge a new blueprint. Paste YAML here, or start visually with the builder. It is saved as a draft; publish it when it validates."
+        title={t('newPage.title')}
+        description={t('newPage.description')}
         breadcrumb={
           <Link href="/templates" className="hover:underline">
-            Templates
+            {t('breadcrumb')}
           </Link>
         }
         actions={
           <ButtonLink href="/templates/new/builder" variant="primary">
-            <Workflow size={14} aria-hidden /> Start visually
+            <Workflow size={14} aria-hidden /> {t('newPage.startVisually')}
           </ButtonLink>
         }
       />
@@ -90,7 +93,7 @@ export default function NewTemplatePage() {
         <form onSubmit={form.handleSubmit((v) => create.mutate(v))} noValidate>
           <CardBody className="space-y-3">
             <label htmlFor="new-tpl-source" className="block text-xs font-medium text-fg-muted">
-              Template YAML
+              {t('newPage.yaml')}
             </label>
             <Textarea
               id="new-tpl-source"
@@ -100,13 +103,13 @@ export default function NewTemplatePage() {
               {...form.register('source')}
             />
             {err ? <p className="text-xs text-danger-ink">{err}</p> : null}
-            {create.error ? <ErrorNotice error={create.error} title="The template was not created" /> : null}
+            {create.error ? <ErrorNotice error={create.error} title={t('newPage.createFailed')} /> : null}
             {detailIssues.length > 0 ? <IssuesList issues={detailIssues} /> : null}
           </CardBody>
           <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
-            <Button onClick={() => router.push('/templates')}>Cancel</Button>
+            <Button onClick={() => router.push('/templates')}>{tc('cancel')}</Button>
             <Button type="submit" variant="primary" loading={create.isPending}>
-              Create draft
+              {t('newPage.createDraft')}
             </Button>
           </div>
         </form>

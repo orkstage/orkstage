@@ -2,20 +2,23 @@
 
 import type { EChartsOption } from 'echarts';
 import { useCallback } from 'react';
-import { formatNumber, formatTime } from '@/lib/utils';
+import { useTranslations } from 'use-intl';
+import { useFormat } from '@/i18n/format';
 import { axisStyle, baseOption, DataTable, EChart, seriesColor, tooltipRow, type ChartTokens } from './echart';
 
 export interface MetricSeries {
   id: string;
   label: string;
-  /** Fixed categorical slot (0–2), assigned when the series was selected: colour follows the entity. */
+  /** Fixed categorical slot (0 to 2), assigned when the series was selected: colour follows the entity. */
   slot: number;
   points: { t: number; v: number }[];
 }
 
 /** Time series with crosshair tooltip and zoom (wheel/pinch + slider). Up to three series. */
 export default function MetricsChart({ series, unit, metricLabel }: { series: MetricSeries[]; unit: string; metricLabel: string }) {
-  const fmt = useCallback((v: number) => `${formatNumber(v)}${unit}`, [unit]);
+  const t = useTranslations('charts');
+  const f = useFormat();
+  const fmt = useCallback((v: number) => `${f.number(v)}${unit}`, [unit, f]);
 
   const option = useCallback(
     (t: ChartTokens): EChartsOption => ({
@@ -38,10 +41,15 @@ export default function MetricsChart({ series, unit, metricLabel }: { series: Me
               return s ? tooltipRow(seriesColor(t, s.slot), s.label, fmt(p.value[1])) : '';
             })
             .join('');
-          return `<div style="margin-bottom:4px;opacity:.75">${at ? formatTime(new Date(at).toISOString()) : ''}</div>${rows}`;
+          return `<div style="margin-bottom:4px;opacity:.75">${at ? f.time(new Date(at).toISOString()) : ''}</div>${rows}`;
         },
       },
-      xAxis: { type: 'time', ...axisStyle(t), splitLine: { show: false }, axisLabel: { color: t['fg-subtle'], fontSize: 10, hideOverlap: true } },
+      xAxis: {
+        type: 'time',
+        ...axisStyle(t),
+        splitLine: { show: false },
+        axisLabel: { color: t['fg-subtle'], fontSize: 10, hideOverlap: true, formatter: (v: number) => f.shortTime(v) },
+      },
       yAxis: { type: 'value', scale: false, ...axisStyle(t), axisLine: { show: false }, axisLabel: { color: t['fg-subtle'], fontSize: 10, formatter: (v: number) => fmt(v) } },
       dataZoom: [
         { type: 'inside', filterMode: 'none' },
@@ -58,7 +66,7 @@ export default function MetricsChart({ series, unit, metricLabel }: { series: Me
           textStyle: { color: t['fg-subtle'], fontSize: 10 },
           dataBackground: { lineStyle: { color: t['border-strong'] }, areaStyle: { color: t['surface-2'] } },
           selectedDataBackground: { lineStyle: { color: t['fg-subtle'] }, areaStyle: { color: t['surface-2'] } },
-          labelFormatter: (v: number) => formatTime(new Date(v).toISOString()),
+          labelFormatter: (v: number) => f.time(new Date(v).toISOString()),
         },
       ],
       series: series.map((s) => ({
@@ -76,11 +84,11 @@ export default function MetricsChart({ series, unit, metricLabel }: { series: Me
         emphasis: { focus: 'series' },
       })),
     }),
-    [series, fmt],
+    [series, fmt, f],
   );
 
   const total = series.reduce((n, s) => n + s.points.length, 0);
-  if (total === 0) return <p className="py-8 text-center text-sm text-fg-subtle">No data points in this window.</p>;
+  if (total === 0) return <p className="py-8 text-center text-sm text-fg-subtle">{t('noPoints')}</p>;
 
   const latest = series.map((s) => ({ s, last: s.points[s.points.length - 1] }));
   return (
@@ -88,16 +96,16 @@ export default function MetricsChart({ series, unit, metricLabel }: { series: Me
       <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-fg-subtle">
         {latest.map(({ s, last }) => (
           <span key={s.id}>
-            {s.label} latest <strong className="text-fg">{last ? fmt(last.v) : '—'}</strong>
+            {t('latest', { label: s.label })} <strong className="text-fg">{last ? fmt(last.v) : f.empty}</strong>
           </span>
         ))}
       </div>
-      <EChart option={option} height={260} preserveZoom ariaLabel={`${metricLabel} over time for ${series.map((s) => s.label).join(', ')}`} />
+      <EChart option={option} height={260} preserveZoom ariaLabel={t('metricAria', { metric: metricLabel, resources: series.map((s) => s.label).join(', ') })} />
       <figcaption className="sr-only">{metricLabel}</figcaption>
       <DataTable
         caption={metricLabel}
-        columns={['Resource', 'Time', 'Value']}
-        rows={series.flatMap((s) => s.points.map((p) => [s.label, formatTime(new Date(p.t).toISOString()), Math.round(p.v * 100) / 100]))}
+        columns={[t('resource'), t('time'), t('value')]}
+        rows={series.flatMap((s) => s.points.map((p) => [s.label, f.time(new Date(p.t).toISOString()), f.number(p.v)]))}
       />
     </figure>
   );

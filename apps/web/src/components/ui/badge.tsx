@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import type { Tone } from '@/lib/status';
 import { cn } from '@/lib/utils';
 
@@ -28,9 +31,10 @@ export function Badge({ tone = 'neutral', children, className, title }: { tone?:
 
 /** Explicit marker for anything produced by the mock provider: never confuse it with real cloud. */
 export function SimulatedBadge({ simulates, className }: { simulates?: string | null; className?: string }) {
+  const t = useTranslations('common');
   return (
-    <Badge tone="accent" className={cn('uppercase tracking-wide', className)} title="Runs on the mock provider; no real cloud resources">
-      Simulated{simulates ? ` · ${simulates}` : ''}
+    <Badge tone="accent" className={cn('uppercase tracking-wide', className)} title={t('simulatedTitle')}>
+      {simulates ? t('simulatedWith', { provider: simulates }) : t('simulated')}
     </Badge>
   );
 }

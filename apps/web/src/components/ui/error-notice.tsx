@@ -1,12 +1,21 @@
+'use client';
+
 import { AlertTriangle } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
+import { useErrorMessage } from '@/i18n/labels';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-/** Shows an API error message, plus the correlation id in small print for support. */
+/**
+ * Shows an error: a translated text for stable API error codes, else the API message as sent,
+ * plus the code and correlation id in small print for support.
+ */
 export function ErrorNotice({ error, title, action, className }: { error: unknown; title?: string; action?: ReactNode; className?: string }) {
+  const t = useTranslations('errors');
+  const describe = useErrorMessage();
   if (!error) return null;
-  const message = error instanceof Error ? error.message : 'Something went wrong.';
+  const message = describe(error);
   const api = error instanceof ApiError ? error : null;
   return (
     <div role="alert" className={cn('flex items-start gap-2.5 rounded-md border border-danger/30 bg-danger/8 px-3 py-2.5 text-sm', className)}>
@@ -16,7 +25,7 @@ export function ErrorNotice({ error, title, action, className }: { error: unknow
         <p className="text-fg-muted">{message}</p>
         {api?.correlationId ? (
           <p className="mt-1 font-mono text-[11px] text-fg-subtle">
-            {api.code} · correlation id <span className="select-all">{api.correlationId}</span>
+            {api.code} · {t('correlationId')} <span className="select-all">{api.correlationId}</span>
           </p>
         ) : api ? (
           <p className="mt-1 font-mono text-[11px] text-fg-subtle">{api.code}</p>
