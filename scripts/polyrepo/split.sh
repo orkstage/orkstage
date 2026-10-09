@@ -13,7 +13,10 @@ cd "$ROOT"
 mkdir -p "$OUT_DIR"
 OUT_DIR=$(cd "$OUT_DIR" && pwd)
 HEAD_SHA=$(git rev-parse --short HEAD)
+# Commits made by this script use this repository's identity as author and committer; fresh
+# clones have no user config, and Git would otherwise invent one from the OS account.
 export GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-$(git config user.name)} GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-$(git config user.email)}
+export GIT_COMMITTER_NAME=${GIT_COMMITTER_NAME:-$GIT_AUTHOR_NAME} GIT_COMMITTER_EMAIL=${GIT_COMMITTER_EMAIL:-$GIT_AUTHOR_EMAIL}
 
 log() { printf '\n==> %s\n' "$*"; }
 
