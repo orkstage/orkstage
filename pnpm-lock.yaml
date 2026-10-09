@@ -303,8 +303,8 @@ importers:
         specifier: 6.0.0
         version: 6.0.0
       nodemailer:
-        specifier: 10.0.13
-        version: 10.0.13
+        specifier: 10.0.15
+        version: 10.0.15
       pino:
         specifier: 10.4.0
         version: 10.4.0
@@ -1916,8 +1916,8 @@ packages:
     resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
     hasBin: true
 
-  nodemailer@10.0.13:
-    resolution: {integrity: sha512-SzG86OlvcW/NNhUFC6uROMwRTL4n7MswfQqC/T8mhkmnY1YVa23zUEMYi4ijSeXSl9GLz9ZeTJDUatEDuY5FeQ==}
+  nodemailer@10.0.15:
+    resolution: {integrity: sha512-EUqp5PhtcsYXs9Fq/lS7s/8zlTrnBqmzZWzFFROrNikMiz+om/YRKMwqN907t+0A1KKyT8jd39CBUbFZmaZmcA==}
     engines: {node: '>=20.0.0'}
 
   oauth4webapi@3.8.8:
@@ -3900,7 +3900,7 @@ snapshots:
       detect-libc: 2.1.2
     optional: true
 
-  nodemailer@10.0.13: {}
+  nodemailer@10.0.15: {}
 
   oauth4webapi@3.8.8: {}
 
