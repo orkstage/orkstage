@@ -21,10 +21,7 @@
     "db:seed": "pnpm --filter @orkstage/database run seed",
     "local:up": "docker compose -f infra/local/docker-compose.yml up -d --wait",
     "local:aws": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator up -d --wait ministack",
-    "local:down": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator down",
-    "platform:up": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator up -d --build --wait",
-    "platform:logs": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator logs -f api worker web",
-    "platform:down": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator down"
+    "local:down": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator down"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -66,8 +66,7 @@ The OpenTofu modules use Apache-2.0 so that users can copy them into their own i
 code without friction. The AGPL protection matters for the control plane, not for the modules.
 
 All repositories start private and become public at launch, except `orkstage-licensing`, which
-stays private. The publishing script and the repository metadata are in
-[`scripts/polyrepo`](../scripts/polyrepo).
+stays private.
 
 ## 5. Contributions
 
@@ -100,7 +99,7 @@ policy (*draft*), similar to those of other open core projects.
 - [x] `GET /api/v1/license` and `402 ENTERPRISE_REQUIRED`
 - [x] First EE module: audit export (`ee/api`)
 - [ ] License headers and SPDX identifiers in source files (`SPDX-License-Identifier: AGPL-3.0-only`)
-- [x] CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and SUPPORT in the organization `.github` repository (`scripts/polyrepo/org-dotgithub`)
+- [x] CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and SUPPORT in the organization [`.github`](https://github.com/orkstage/.github) repository
 - [ ] CLA bot, CLA text and trademark policy (*legal review*)
 - [x] Console: edition badge
 - [ ] Console: upgrade states for EE features, license settings page

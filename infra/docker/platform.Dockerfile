@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# One image for the whole control plane (api, worker, web, migrate); each Compose service picks
+# One image for the control plane (api, worker, migrate); each Compose service picks
 # its command. Built from the repository root: docker build -f infra/docker/platform.Dockerfile .
 
 FROM node:24-alpine AS base

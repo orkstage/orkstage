@@ -4,29 +4,10 @@ name: cloud-orchestrator
 # Profiles:
 #   (none)         Postgres, Redis, Mailpit — run API/worker/web on the host (`pnpm dev`)
 #   aws-emulator   + MiniStack local AWS                                  (`pnpm local:aws`)
-#   platform       + migrate/seed, API, worker, web, OpenTofu runner image (`pnpm platform:up`)
-
-x-platform-env: &platform-env
-  # Local only: development mode enables the dev login and non-Secure cookies over http.
-  NODE_ENV: development
-  DATABASE_URL: postgresql://platform:platform@postgres:5432/platform
-  REDIS_URL: redis://redis:6379
-  API_PORT: '4000'
-  API_PUBLIC_URL: http://localhost:4000
-  WEB_PUBLIC_URL: http://localhost:3000
-  SESSION_SECRET: ${SESSION_SECRET:-local-compose-only-session-secret-0123456789}
-  AUTH_DEV_LOGIN_ENABLED: 'true'
-  SMTP_HOST: mailpit
-  SMTP_PORT: '1025'
-  EMAIL_FROM: OrkStage <noreply@example.local>
-  HEALTH_CHECK_INTERVAL_SECONDS: '30'
-  # Inside the compose network MiniStack is "ministack", not localhost.
-  AWS_EMULATOR_ENDPOINT: http://ministack:4566
-  LOG_LEVEL: info
-
-x-platform-image: &platform-image
-  image: orkstage/platform:local
-  profiles: ['platform']
+#
+# The full stack in containers (API, worker, console, OpenTofu runner) is defined in the
+# orkstage-dev workspace, which has every repository it builds from:
+# https://github.com/orkstage/orkstage-dev
 
 services:
   postgres:
@@ -85,104 +66,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ministack:/var/lib/ministack
 
-  # ── Full platform (profile: platform) ──────────────────────────────────────────────────────
-
-  # Builds the shared control-plane image once; the services below reuse it.
-  migrate:
-    <<: *platform-image
-    build:
-      context: ../..
-      dockerfile: infra/docker/platform.Dockerfile
-      target: runtime
-      args:
-        API_INTERNAL_URL: http://api:4000
-    user: orkstage
-    working_dir: /repo
-    # Idempotent: applies pending migrations, then upserts demo data.
-    command: ['sh', '-c', 'pnpm db:deploy && pnpm db:seed']
-    environment: *platform-env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: 'no'
-
-  # Builds the OpenTofu runner image (modules baked in). The worker starts containers from it.
-  tofu-runner:
-    image: orkstage/tofu-runner:local
-    profiles: ['platform']
-    build:
-      context: ../..
-      dockerfile: infra/docker/tofu-runner.Dockerfile
-    command: ['version']
-    restart: 'no'
-
-  api:
-    <<: *platform-image
-    user: orkstage
-    working_dir: /repo/apps/api
-    command: ['node', '--enable-source-maps', 'dist/main.js']
-    environment: *platform-env
-    ports:
-      - '4000:4000'
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/api/v1/readyz']
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-    restart: unless-stopped
-
-  worker:
-    <<: *platform-image
-    # Root only to reach the Docker socket that launches OpenTofu runner containers.
-    user: root
-    working_dir: /repo/apps/worker
-    command: ['node', '--enable-source-maps', 'dist/main.js']
-    environment:
-      <<: *platform-env
-      TOFU_IMAGE: orkstage/tofu-runner:local
-      TOFU_MODULES_IN_IMAGE: 'true'
-      TOFU_WORK_DIR: /var/lib/orkstage/tofu
-      TOFU_WORK_VOLUME: orkstage-tofu-work
-      TOFU_PLUGIN_CACHE_VOLUME: orkstage-tofu-plugins
-      TOFU_DOCKER_NETWORK: cloud-orchestrator_default
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - tofu-work:/var/lib/orkstage/tofu
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      tofu-runner:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  web:
-    <<: *platform-image
-    user: orkstage
-    working_dir: /repo/apps/web
-    command: ['node', 'node_modules/next/dist/bin/next', 'start', '--port', '3000']
-    environment:
-      API_INTERNAL_URL: http://api:4000
-    ports:
-      - '3000:3000'
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/login']
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-    restart: unless-stopped
-
   # Optional: OpenTelemetry collector that prints received telemetry to stdout.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
@@ -199,7 +82,3 @@ volumes:
   redisdata:
   ministack:
   # Fixed names: the worker passes them to the runner containers it starts.
-  tofu-work:
-    name: orkstage-tofu-work
-  tofu-plugins:
-    name: orkstage-tofu-plugins

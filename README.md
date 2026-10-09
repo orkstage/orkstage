@@ -108,13 +108,14 @@ spec:
 
 ## Quickstart
 
-Requirements: Docker with Compose v2 and about 6 GB of free memory. No cloud account needed.
+The whole platform runs from the [`orkstage-dev`](https://github.com/orkstage/orkstage-dev)
+workspace, which brings this repository together with the console and the OpenTofu modules.
+Requirements: Git, Docker with Compose v2 and about 6 GB of free memory. No cloud account needed.
 
 ```bash
-git clone https://github.com/orkstage/orkstage.git
-cd orkstage
-docker compose -f infra/local/docker-compose.yml \
-  --profile platform --profile aws-emulator up -d --build --wait
+git clone --recurse-submodules https://github.com/orkstage/orkstage-dev.git
+cd orkstage-dev
+docker compose --profile platform --profile aws-emulator up -d --build --wait
 ```
 
 | Service | URL |
@@ -129,10 +130,10 @@ Sign in with the development login as `admin@example.local` (platform owner),
 tenant). Open **Acme Staging (local AWS)**, check *Plan & cost*, deploy, and watch OpenTofu create
 a VPC, an ALB, RDS Postgres, Valkey, SQS and ECS services in MiniStack.
 
-Stop with `docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator down`
-(add `-v` to delete the data). This stack runs in development mode with the Docker socket
-mounted; it is for local evaluation only. The [quickstart guide](https://orkstage.io/docs/get-started/quickstart)
-walks through the first deployment, and [Connect AWS](https://orkstage.io/docs/self-hosting/connect-aws)
+Stop with `docker compose --profile platform --profile aws-emulator down` (add `-v` to delete the
+data). This stack runs in development mode with the Docker socket mounted; it is for local
+evaluation only. The [quickstart guide](https://orkstage.io/docs/get-started/quickstart) walks
+through the first deployment, and [Connect AWS](https://orkstage.io/docs/self-hosting/connect-aws)
 covers real accounts.
 
 ### Run from source
@@ -145,10 +146,11 @@ pnpm install
 pnpm local:up                  # Postgres, Redis and Mailpit in Docker
 pnpm build
 pnpm db:deploy && pnpm db:seed
-pnpm dev                       # API on :4000, worker, and the console on :3000 when present
+pnpm dev                       # API on :4000 and the worker
 ```
 
 `pnpm local:aws` adds MiniStack. `pnpm test` and `pnpm typecheck` run across the workspace.
+To work on the console or the modules at the same time, use the `orkstage-dev` workspace.
 The optional adapter contract test against the emulator runs with
 `MINISTACK_E2E=1 pnpm --filter @orkstage/cloud-aws test`.
 
