@@ -30,7 +30,7 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 24
