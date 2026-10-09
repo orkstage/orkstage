@@ -27,7 +27,7 @@
     "platform:down": "docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator down"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.4",
     "prettier": "3.9.9",
     "typescript": "7.0.2",
     "vitest": "5.0.3"
