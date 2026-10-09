@@ -106,7 +106,7 @@ if [ "$DRY_RUN" = false ]; then
 fi
 
 # ── Publish ──
-declare -A CREATED VISIBILITY_NOTE
+declare -A CREATED=() VISIBILITY_NOTE=()
 failures=()
 for name in "${TARGETS[@]}"; do
   IFS=$'\t' read -r _ dir visibility has_issues has_discussions open_source _ < <(awk -F '\t' -v n="$name" '$1 == n' <<< "$REPO_LINES")

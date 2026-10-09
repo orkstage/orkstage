@@ -97,9 +97,11 @@ rename_scope "$OUT_DIR/orkstage"
     node -e "const f='packages/$p/package.json',j=require('./'+f);delete j.private;j.publishConfig={registry:'https://npm.pkg.github.com',access:'public'};j.repository={type:'git',url:'https://github.com/orkstage/orkstage.git',directory:'packages/$p'};j.license='AGPL-3.0-only';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
   done
   printf '@orkstage:registry=https://npm.pkg.github.com\n' > .npmrc
-  # The scan engine is published by `orkstage-cli`; the API consumes the released package. Optional:
-  # a clone without access to it still installs, and file uploads answer 501 SCANNER_UNAVAILABLE.
-  node -e "const f='apps/api/package.json',j=require('./'+f);if(j.dependencies['@orkstage/scan']){delete j.dependencies['@orkstage/scan'];j.optionalDependencies={...(j.optionalDependencies??{}),'@orkstage/scan':'^0.1.0'}}require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+  # The scan engine (@orkstage/scan) is published by `orkstage-cli`. Until that package exists
+  # the core repo does not declare it, so its lockfile stays installable with --frozen-lockfile;
+  # the API loads it dynamically and answers 501 SCANNER_UNAVAILABLE without it. Once it is
+  # published, add it back: `pnpm --filter @orkstage/api add @orkstage/scan`.
+  node -e "const f='apps/api/package.json',j=require('./'+f);delete j.dependencies['@orkstage/scan'];require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
   sed -i '/scan-wasm/d;/@orkstage\/scan: the Rust scan engine/d' pnpm-workspace.yaml
   sed -i '/scan engine.s WebAssembly package/d;/^!cli\/dist\/scan-wasm$/d;/^cli\/target$/d;/^cli\/crates$/d;/^site$/d' .dockerignore
   # The monorepo lockfile still lists the removed workspaces; regenerate it so CI can install
