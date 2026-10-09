@@ -2,7 +2,7 @@
 # One image for the whole control plane (api, worker, web, migrate); each Compose service picks
 # its command. Built from the repository root: docker build -f infra/docker/platform.Dockerfile .
 
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 # openssl: Prisma schema engine (migrations). docker-cli: the worker launches OpenTofu runner containers.
 RUN apk add --no-cache openssl docker-cli \
  && npm install -g pnpm@12.5.1 \
