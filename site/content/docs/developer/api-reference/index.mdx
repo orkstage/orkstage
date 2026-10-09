@@ -1,27 +1,29 @@
 ---
 title: API reference
-description: Every operation of the OrkStage Control API v1, generated from the OpenAPI document the API serves at /api/docs-json.
+description: Every operation of the OrkStage Control API v1, with request and response schemas, generated from the OpenAPI document a running API serves.
 ---
 
-These pages are generated with `fumadocs-openapi` from `openapi/orkstage.json`, the document a
-running API serves at `/api/docs-json` (the interactive Swagger UI is at `/api/docs`). Read the
+`fumadocs-openapi` generates these pages from `openapi/orkstage.json`, the document a running API
+serves at `/api/docs-json`. The interactive Swagger UI is at `/api/docs`. Read the
 [REST API overview](/docs/developer/api-overview/) first for authentication, errors, pagination and
 correlation ids.
 
+## Sections
+
 <Cards>
-  <Card title="Authentication" href="/docs/developer/api-reference/auth/get-me/" description="Providers, OIDC login, development login, logout, the current principal." />
-  <Card title="Instances" href="/docs/developer/api-reference/instances/get-instances/" description="Create, preview, deploy, upgrade, destroy; logs and metrics." />
-  <Card title="Deployments" href="/docs/developer/api-reference/deployments/get-deployments/" description="Progress, events, approve, cancel, retry." />
-  <Card title="Templates" href="/docs/developer/api-reference/templates/get-templates/" description="Templates, versions, validation, publishing, cloning." />
-  <Card title="API keys and webhooks" href="/docs/developer/api-reference/api-keys/get-api-keys/" description="Automation credentials and outbound events." />
-  <Card title="CI/CD and imports" href="/docs/developer/api-reference/ci/post-templates-validate/" description="Stateless validation, image versions, IaC import." />
+  <Card title="Authentication" href="/docs/developer/api-reference/auth/get-me/" description="Providers, OIDC login, development login, logout and the current principal." />
+  <Card title="Instances" href="/docs/developer/api-reference/instances/get-instances/" description="Create, preview, deploy, upgrade and destroy instances; logs and metrics." />
+  <Card title="Deployments" href="/docs/developer/api-reference/deployments/get-deployments/" description="Progress, events, approval, cancellation and retry." />
+  <Card title="Templates" href="/docs/developer/api-reference/templates/get-templates/" description="Templates, versions, validation, publishing and cloning." />
+  <Card title="API keys and webhooks" href="/docs/developer/api-reference/api-keys/get-api-keys/" description="Credentials for automation and outbound events." />
+  <Card title="CI/CD and imports" href="/docs/developer/api-reference/ci/post-templates-validate/" description="Stateless validation, image versions and IaC import." />
 </Cards>
 
 ## Authentication in the reference
 
-The exported document declares the `co_session` cookie. The API also accepts API keys as
-`Authorization: Bearer ork_…` on every operation that declares a scope; the reference adds that
-scheme so examples show both.
+The document declares two security schemes: the `co_session` cookie and an API key sent as
+`Authorization: Bearer ork_…` (`apiKey`). A key works only on operations
+that declare a scope, as described in [API keys](/docs/developer/api-keys/).
 
 ## Refreshing
 
@@ -34,5 +36,5 @@ ORKSTAGE_API_URL=https://api.example.com pnpm openapi:refresh
 pnpm build                                 # regenerates these pages (prebuild step)
 ```
 
-After the repositories are split, the platform's CI publishes the OpenAPI file as a release asset
-and the site pins the version it documents.
+After the repositories are split, the platform's CI will publish the OpenAPI file as a release asset,
+and the site will pin the version it documents.

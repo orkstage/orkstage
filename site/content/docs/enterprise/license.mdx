@@ -1,11 +1,12 @@
 ---
 title: License
-description: How OrkStage is licensed, in plain words. The AGPL-3.0 core, the OrkStage Enterprise License for ee/ directories, the documentation and modules licenses, contributions and trademarks. Not legal advice.
+description: "How OrkStage is licensed: the AGPL-3.0 core, the Enterprise License for ee/ directories, other repositories, contributions and trademarks."
 ---
 
 <Callout type="warn" title="Not legal advice">
-  This page explains the licensing model in plain words. The license texts are what count; read them,
-  and ask your counsel when in doubt. The Enterprise License is still a **draft** under legal review.
+  This page explains the licensing model in plain words. The license texts are what count: read
+  them, and ask your counsel when in doubt. The Enterprise License is still a **draft** under legal
+  review.
 </Callout>
 
 ## The core: GNU AGPL-3.0
@@ -15,42 +16,44 @@ Everything outside `ee/` directories is licensed under the
 
 In practice:
 
-- You can use, study, modify and self-host OrkStage, including for commercial work and production,
-  at no cost.
+- You can use, study and modify OrkStage and run it on your own infrastructure, including for
+  commercial work and production, at no cost.
 - If you **modify** OrkStage and let users interact with your modified version **over a network**,
   you must offer those users the source code of your modified version under the AGPL.
-- Running an unmodified OrkStage for your own environments does not require you to publish anything.
-- The infrastructure OrkStage creates in your accounts, and your templates, are yours; the license
-  covers OrkStage's code, not what you deploy with it.
+- Running an unmodified OrkStage for your own environments does not require you to publish
+  anything.
+- Your templates and the infrastructure OrkStage creates in your accounts belong to you. The
+  license covers the code of OrkStage, not what you deploy with it.
 
 ## Enterprise features: OrkStage Enterprise License
 
-Files in directories named `ee/` are **source-available** under the OrkStage Enterprise License
-(draft):
+Files in directories named `ee/` are published with their source, but under the OrkStage Enterprise
+License (draft), not the AGPL:
 
-- you may use and modify them for development and testing, and evaluate them for up to 30 days,
-  without a subscription;
-- **production use requires a subscription**; a license key enables the features you subscribed to;
-- modified versions stay under the same license, and license checks must not be removed or
-  circumvented;
-- you may not resell, sublicense or offer the Enterprise features as a hosted service to third
-  parties.
+- You may use and modify them for development and testing, and evaluate them for up to 30 days,
+  without a subscription.
+- **Production use requires a subscription.** A license key turns on the features you subscribed
+  to.
+- Modified versions stay under the same license. You must not remove or circumvent the license
+  checks.
+- You may not resell or sublicense the Enterprise features, or offer them to third parties as a
+  hosted service.
 
-Without a key you run the full Community edition; Enterprise code is present but inactive.
+Without a key, you run the full Community edition. The Enterprise code is present but inactive.
 
 ## Other repositories
 
 | Repository | License |
 |---|---|
 | `orkstage` (platform), `orkstage-console`, `orkstage-cli` | AGPL-3.0, with `ee/` under the Enterprise License where present |
-| `orkstage-modules` (OpenTofu modules) | Apache-2.0 is recommended, so you can reuse modules in your own infrastructure |
-| `orkstage-site` (this website) | Code MIT, content CC BY 4.0 |
+| `orkstage-modules` (OpenTofu modules) | Apache-2.0 is the recommended license, so you can reuse the modules in your own infrastructure |
+| `orkstage-site` (this website) | MIT for the code, CC BY 4.0 for the content |
 
 ## Contributions
 
-Contributions are accepted under a Contributor License Agreement (CLA). Because the project is
-offered under both the AGPL and a commercial license, it needs the right to relicense contributions;
-a Developer Certificate of Origin alone does not grant that. The CLA text is being drafted.
+OrkStage accepts contributions under a Contributor License Agreement (CLA). The project is offered
+under both the AGPL and a commercial license, so it needs the right to relicense contributions. A
+Developer Certificate of Origin alone does not grant that right. The CLA text is being drafted.
 
 ## Trademarks
 

@@ -21,10 +21,10 @@ function Themed({ base, height, ratio, alt, forceDark }: { base: 'logo' | 'mark'
 }
 
 /** Complete logo. `forceDark` for surfaces that are always dark (the landing page). */
-export function Logo({ height = 32, forceDark, className }: { height?: number; forceDark?: boolean; className?: string }) {
+export function Logo({ height = 32, forceDark, className, alt = 'OrkStage' }: { height?: number; forceDark?: boolean; className?: string; alt?: string }) {
   return (
     <span className={`inline-flex shrink-0 items-center ${className ?? ''}`}>
-      <Themed base="logo" height={height} ratio={LOGO_RATIO} alt="OrkStage" forceDark={forceDark} />
+      <Themed base="logo" height={height} ratio={LOGO_RATIO} alt={alt} forceDark={forceDark} />
     </span>
   );
 }

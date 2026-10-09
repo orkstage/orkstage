@@ -1,91 +1,95 @@
 ---
 title: OpenTofu runner and state
-description: How OrkStage runs OpenTofu. Isolated throwaway runner containers, one state per resource in S3 with lockfile locking, no secrets in state, provider plans before apply, the approval escalation, drift scans and self-healing.
+description: How OrkStage runs OpenTofu in throwaway containers, keeps one S3 state per resource without secrets, plans before apply and scans for drift.
 ---
 
-OrkStage provisions AWS with OpenTofu modules (`infra/tofu/modules/aws/*`, one per logical resource
-type). The design is recorded in
-[ADR 0005](/docs/contributing/architecture-decisions/#0005-opentofu-execution-and-state).
+OrkStage provisions AWS with OpenTofu modules in `infra/tofu/modules/aws/*`, one module per logical
+resource type.
+[ADR 0005](/docs/contributing/architecture-decisions/#0005-opentofu-execution-and-state) records the
+design.
 
 ## The isolated runner
 
-- The worker never runs IaC in-process. Every `tofu` command runs in a **throwaway container**
-  (`ghcr.io/opentofu/opentofu:1.12.7`, pinned, or the `tofu-runner` image with the modules baked in).
-- The module library is mounted read-only (or baked in); providers come from a shared plugin cache
-  volume.
-- Credentials are passed as environment variables **to that one container only**: never in files,
-  command lines or state.
-- Each command has a hard timeout (`TOFU_TIMEOUT_MINUTES`, default 45) and can be cancelled.
+- The worker never runs OpenTofu in its own process. Every `tofu` command runs in a **throwaway
+  container**: the pinned `ghcr.io/opentofu/opentofu:1.12.7` image, or the `tofu-runner` image with
+  the modules baked in.
+- The module library is mounted read only, or baked into the image. Providers come from a plugin
+  cache volume that all runners share.
+- Credentials reach **that one container only**, as environment variables. They never appear in
+  files, command lines or state.
+- Each command has a hard timeout (`TOFU_TIMEOUT_MINUTES`, 45 by default) and can be cancelled.
 
-<Callout type="warn" title="Production follow-up">
+<Callout type="warn" title="Planned before production">
   Today the worker starts runners through the Docker socket, which gives it control of the host's
-  Docker daemon. Running the runner as an ECS RunTask or a Kubernetes Job with a scoped role is on the
+  Docker daemon. A runner that uses ECS RunTask or a Kubernetes Job with a scoped role is on the
   roadmap.
 </Callout>
 
 ## One state per resource
 
-State key: `orkstage/<physical-name>.tfstate`, not one state per instance or slot.
+The state key is `orkstage/<physical-name>.tfstate`. There is one state for each resource, not one
+for each instance or placement slot. This design:
 
-- Keeps the platform's own DAG, per-resource progress, retries and failure isolation.
-- Limits the blast radius of a damaged state to one resource.
-- Dependencies flow through module outputs passed as inputs; every module emits a `kind` output so
-  the adapter wires them by type.
-- The exact root configuration is stored next to the state (`.config.json`), so destroy never
-  depends on a template that changed since.
+- keeps the platform's own DAG, with progress, retries and failure isolation for each resource;
+- limits the damage of a broken state file to one resource;
+- passes dependencies as module outputs that become inputs of the next module. Every module emits a
+  `kind` output, so the adapter wires them by type;
+- stores the exact root configuration next to the state (`.config.json`), so a destroy never depends
+  on a template that has changed since.
 
-**Backend**: S3 with `use_lockfile` locking and encryption. On real AWS the bucket is pre-provisioned,
-versioned and encrypted, and validated before use (see
-[Connecting an AWS account](/docs/self-hosting/connect-aws/#prepare-the-state-bucket)). On an emulator
-it is created on first use.
+**Backend**: S3, with `use_lockfile` for locking, and encryption. On real AWS, you create the bucket
+in advance with versioning and encryption, and OrkStage validates it before use (see
+[Connecting an AWS account](/docs/self-hosting/connect-aws/#prepare-the-state-bucket)). On an
+emulator, OrkStage creates the bucket on first use.
 
 ## No secrets in state
 
-RDS master passwords are generated with an OpenTofu `ephemeral` resource and written through
-write-only attributes (`password_wo`, `secret_string_wo`). Services receive the Secrets Manager ARN as
-an ECS secret. Verified: state holds `password: null`.
+An OpenTofu `ephemeral` resource generates each RDS master password, and the module writes it
+through write only attributes (`password_wo`, `secret_string_wo`). Services receive the ARN of the
+Secrets Manager secret as an ECS secret. We verified that the state holds `password: null`.
 
 ## Provider plan before apply
 
-In the **Generate plan** phase, for every **existing** resource whose desired state changed, the
-worker runs a real `tofu plan` and writes a summary per resource to the deployment's event log:
+In the **Generate plan** phase, the worker runs a real `tofu plan` for every **existing** resource
+whose desired state changed. It writes a summary for each resource to the deployment's event log:
 
 ```text
 INFO  [phase:plan] api: 0 to add, 1 to change, 0 to destroy
 WARN  [phase:plan] ingress: 1 to add, 0 to change, 1 to destroy — replace aws_lb_target_group.route[0]
 ```
 
-- Deletions and replacements make the deployment **high risk**. Routine ECS task definition revisions
-  (a new image digest) do not.
+- A deletion or replacement makes the deployment **high risk**. A routine new revision of an ECS task
+  definition (for a new image digest) does not.
 - For a `production` instance, high risk **escalates** the deployment to `AWAITING_APPROVAL`, even
-  when the platform's own diff only predicted an update.
-- When nothing is destructive the approval step is marked skipped with the reason.
-- The provider plans are stored on the deployment (`plan.providerPlans`) for review.
+  when the platform's own diff predicted only an update.
+- When no change is destructive, the approval step is marked skipped, with the reason.
+- The deployment stores the provider plans (`plan.providerPlans`) for review.
 
 ## Drift scans
 
-Every `DRIFT_CHECK_INTERVAL_MINUTES` (default 360, `0` disables) the worker re-plans each applied
-resource on real providers from the snapshot it was deployed with. Any planned action means a change
-made outside OrkStage: the resource becomes `DRIFT_DETECTED`, an audit event is written and
-`instance.drift_detected` is sent. Resources with pending changes are skipped. Redeploying restores
-the template's configuration.
+Every `DRIFT_CHECK_INTERVAL_MINUTES` (360 by default, `0` turns scans off), the worker plans each
+applied resource on real providers again, from the snapshot it was deployed with. Any planned action
+means someone changed the resource outside OrkStage. The resource then becomes `DRIFT_DETECTED`,
+OrkStage writes an audit event and sends `instance.drift_detected`. The scan skips resources with
+pending changes. A new deployment restores the configuration from the template.
 
-## Self-healing
+## Recovery from deleted resources
 
-When a resource is deleted outside OrkStage, its recorded state outlives it. The AWS adapter has a
-**live existence probe**:
+When someone deletes a resource outside OrkStage, its recorded state outlives it. The AWS adapter
+has a **live existence probe** for this case:
 
-- during **verification**, a resource that is not healthy is probed; if it no longer exists the step
-  fails immediately with "Resource no longer exists at the provider. Redeploy to re-create it." instead
-  of waiting;
-- verification uses **one 5-minute settle window per deployment**, not one per resource, so a slow
-  service does not multiply the wait;
-- on the **next deployment** the executor asks the provider whether converged resources still exist;
-  missing ones are re-created instead of being skipped as unchanged.
+- During **verification**, OrkStage probes any resource that is not healthy. If the resource no
+  longer exists, the step fails at once with
+  `Resource no longer exists at the provider. Redeploy to re-create it.` instead of waiting.
+- Verification waits in **one settle window of 5 minutes per deployment**, not one per resource, so a
+  slow service does not multiply the wait.
+- On the **next deployment**, the executor asks the provider whether converged resources still exist.
+  It recreates the missing ones instead of skipping them as unchanged.
 
 ## Verified against MiniStack
 
-VPC, subnets and security groups, ECR, SQS with DLQ, S3, Secrets Manager, RDS Postgres (real
-container), ElastiCache Valkey replication group (real container), ALB with target groups and listener
-rules (live data plane at `/_alb/<name>/`), an ECS Fargate service (real container, registered in the
-target group and healthy), Route 53 and ACM. The adapter contract suite passes against it.
+The AWS adapter has been tested end to end against MiniStack with: VPC, subnets and security groups,
+ECR, SQS with a dead letter queue, S3, Secrets Manager, RDS Postgres (real container), an ElastiCache
+Valkey replication group (real container), an ALB with target groups and listener rules (live data
+plane at `/_alb/<name>/`), an ECS Fargate service (real container, registered in the target group and
+healthy), Route 53 and ACM. The adapter contract suite passes against it.

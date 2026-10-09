@@ -47,7 +47,7 @@ function Group({ x, y, w, h, title, note }: { x: number; y: number; w: number; h
   );
 }
 
-export function Topology() {
+export function Topology({ title, description }: { title: string; description: string }) {
   return (
     <figure className="overflow-hidden rounded-lg border border-hairline bg-slate-1">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-2.5 font-mono text-[12px] text-ink-subtle">
@@ -61,11 +61,8 @@ export function Topology() {
           role="img"
           aria-labelledby="topo-title topo-desc"
         >
-          <title id="topo-title">Topology of one instance across AWS, Azure and OCI</title>
-          <desc id="topo-desc">
-            AWS slot primary holds dns, ingress, api, worker, registry and network. Azure slot data holds the PostgreSQL database. OCI slot storage holds object
-            storage. api and worker reach the database over TLS with a source allowlist; api reaches storage over TLS.
-          </desc>
+          <title id="topo-title">{title}</title>
+          <desc id="topo-desc">{description}</desc>
           <defs>
             <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0 0 8 4 0 8z" fill="#626a7b" />

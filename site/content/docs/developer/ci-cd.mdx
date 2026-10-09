@@ -1,38 +1,43 @@
 ---
 title: CI/CD intake
-description: Connect your pipelines to OrkStage. Publish immutable application image versions by digest, validate templates statelessly, deploy an instance and wait for the result, with GitHub Actions examples.
+description: Connect pipelines to OrkStage. Register applications, publish image versions by digest, validate templates in pull requests, then deploy and wait.
 ---
 
-Three endpoints are designed for pipelines, plus the regular deploy and deployment endpoints.
+Three endpoints exist for pipelines. Pipelines also use the regular deploy and deployment
+endpoints.
 
-| Method | Path | Scope | Body |
+| Method | Path | Scope | Body and result |
 |---|---|---|---|
 | `PUT` | `/api/v1/applications/:name` | `applications:write` | `{ displayName, repository, port, registryKind?, healthPath?, readinessPath? }` |
 | `POST` | `/api/v1/applications/:name/versions` | `applications:write` | `{ version, imageUri, digest: "sha256:…", architectures? }` |
-| `POST` | `/api/v1/templates/validate` | `templates:read` | `{ source, planCode? }` → validation report |
-| `POST` | `/api/v1/instances/:id/deploy` | `instances:deploy` | `{}` → `202` deployment summary |
-| `GET` | `/api/v1/deployments/:id/events?after=` | `instances:read` | progress events |
+| `POST` | `/api/v1/templates/validate` | `templates:read` | `{ source, planCode? }`, returns a validation report |
+| `POST` | `/api/v1/instances/:id/deploy` | `instances:deploy` | `{}`, returns `202` and a deployment summary |
+| `GET` | `/api/v1/deployments/:id/events?after=` | `instances:read` | Progress events |
 
-## Register the application (once, idempotent)
+## Register the application
 
-Versions belong to a catalog application. Create it from the pipeline before the first publish;
-sending the same body again changes nothing, so it is safe to run on every build.
+Every image version belongs to an application in the catalog. Create the application from the
+pipeline before the first publish. The call is idempotent: the same body sent again changes nothing,
+so you can run it on every build.
 
 ```bash
 curl -fsS -X PUT "$ORK_API_URL/api/v1/applications/orders-api"   -H "Authorization: Bearer $ORK_TOKEN" -H "Content-Type: application/json"   -d '{ "displayName": "Orders API", "repository": "123456789012.dkr.ecr.us-east-1.amazonaws.com/orders-api", "port": 8080, "healthPath": "/health" }'
 ```
 
-- Names are lowercase letters, digits and dashes (2–63), starting with a letter (`422 INVALID_NAME`).
-- `registryKind`: `ecr` (default), `acr`, `ocir`, `gar`, `dockerhub`, `ghcr` or `other`.
-- The response says `"created": true` the first time; changes are audited (`CREATE`/`UPDATE` on `Application`).
-- Requires a platform-level key (role `PlatformAdmin`) with `applications:write`: the catalog is
-  shared by all tenants.
+- A name has 2 to 63 characters: lowercase letters, digits and dashes, starting with a letter.
+  Other names get `422 INVALID_NAME`.
+- `registryKind` is `ecr` (the default), `acr`, `ocir`, `gar`, `dockerhub`, `ghcr` or `other`.
+  `healthPath` defaults to `/health`.
+- The response contains `"created": true` the first time. Every change is audited as `CREATE` or
+  `UPDATE` on `Application`.
+- The catalog is shared by all tenants, so the call needs an organization key with the
+  `PlatformAdmin` role and the `applications:write` scope.
 
 ## Publish an image version
 
-Templates reference images through the application catalog (`image: catalog://orders-api`). When an
-instance is compiled, each reference resolves to the **most recently published version** of that
-application, by digest, so a deployment always runs an immutable image.
+Templates refer to images through the application catalog (`image: catalog://orders-api`). When
+OrkStage compiles an instance, each reference resolves to the **most recently published version** of
+that application, by digest. A deployment therefore always runs an immutable image.
 
 ```bash
 curl -fsS -X POST "$ORK_API_URL/api/v1/applications/orders-api/versions" \
@@ -45,14 +50,17 @@ curl -fsS -X POST "$ORK_API_URL/api/v1/applications/orders-api/versions" \
   }'
 ```
 
-- `digest` must be `sha256:` followed by 64 hex characters.
-- Versions are immutable. Publishing the same version with the **same** digest is idempotent
-  (`"idempotent": true`); with a different digest it fails with `409 VERSION_EXISTS`.
-- Every publish is audited (`PUBLISH` on `ApplicationVersion`).
+- `digest` must be `sha256:` followed by 64 lowercase hex characters.
+- `architectures` defaults to `["amd64"]`.
+- Versions are immutable. Publishing a version again with the **same** digest is idempotent (the
+  response has `"idempotent": true`). With a different digest it fails with `409 VERSION_EXISTS`.
+- Every publish is audited as `PUBLISH` on `ApplicationVersion`.
+- Publishing needs the same organization key as registration: role `PlatformAdmin`, scope
+  `applications:write`.
 
 ## Validate a template in a pull request
 
-Stateless: no template id, nothing stored.
+The validation endpoint is stateless. It needs no template id and stores nothing.
 
 ```bash
 jq -Rs '{source: ., planCode: "GROWTH"}' < .ork/template.yaml \
@@ -61,7 +69,7 @@ jq -Rs '{source: ., planCode: "GROWTH"}' < .ork/template.yaml \
   | tee report.json | jq -e '.valid'
 ```
 
-The report lists every issue with `stage`, `severity`, `code`, `message` and `path`.
+The report lists every issue with its `stage`, `severity`, `code`, `message` and `path`.
 
 ## Deploy and wait
 
@@ -80,8 +88,8 @@ while :; do
 done
 ```
 
-A second deploy while one is running answers `409 INSTANCE_BUSY`; treat it as "try later", not as a
-failure of your build.
+If you deploy while another operation is running, the API answers `409 INSTANCE_BUSY`. Treat it as
+"try again later", not as a failed build.
 
 ## GitHub Actions
 
@@ -99,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ORK_API_URL: https://orkstage.example.com
-      ORK_TOKEN: ${{ secrets.ORK_TOKEN }}   # preset "CI/CD deploy" + applications:write
+      ORK_TOKEN: ${{ secrets.ORK_TOKEN }}   # organization key (PlatformAdmin): preset "CI/CD deploy" + applications:write
     steps:
       - uses: actions/checkout@v5
       # … build and push the image, capture its digest in steps.push.outputs.digest …
@@ -111,6 +119,10 @@ jobs:
       - name: Deploy staging
         run: ./scripts/orkstage-deploy.sh "${{ vars.STAGING_INSTANCE_ID }}"
 ```
+
+To keep publishing and deploying apart, use two keys: an organization key with the **Image
+publishing** preset for the publish step, and a tenant key with the **CI/CD deploy** preset for the
+deploy step.
 
 </Tab>
 <Tab value="ork CLI (Preview)">
@@ -125,8 +137,9 @@ jobs:
     ork deploy --instance shop-staging --wait   # non-zero exit if the deployment fails
 ```
 
-The CLI is not released as binaries yet; build it in a previous step or use a container image you
-build from source. See [the ork CLI](/docs/developer/cli/).
+There are no released `ork` binaries yet. Build the CLI in an earlier step, or use a container image
+you build from source. `ork template push` needs an organization key, as described in
+[API keys](/docs/developer/api-keys/). See [the ork CLI](/docs/developer/cli/) for the rest.
 
 </Tab>
 </Tabs>
@@ -134,4 +147,5 @@ build from source. See [the ork CLI](/docs/developer/cli/).
 ## Notifications instead of polling
 
 Subscribe a [webhook](/docs/developer/webhooks/) to `deployment.succeeded`, `deployment.failed` and
-`deployment.awaiting_approval` to react without keeping a job running.
+`deployment.awaiting_approval`. Your systems then react to the result without a job that keeps
+polling.

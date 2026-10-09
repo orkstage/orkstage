@@ -1,6 +1,6 @@
 {
   "title": "Enterprise",
-  "description": "Editions, license and contact",
+  "description": "Editions, licensing and how to contact us",
   "root": true,
   "pages": ["index", "editions", "license", "contact"]
 }

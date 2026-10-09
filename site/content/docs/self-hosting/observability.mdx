@@ -1,45 +1,45 @@
 ---
 title: Observability
-description: Observe a self-hosted OrkStage installation. Structured logs with correlation ids, health and readiness endpoints, deployment events and the audit log, plus what is planned for metrics and tracing.
+description: Follow an OrkStage installation through JSON logs with correlation ids, health endpoints, deployment events and the audit log. Metrics and tracing are planned.
 ---
 
 ## Logs
 
-The API and the worker write structured JSON logs (Pino) to stdout, with `service` and `context`
-fields and the request's **correlation id**. Tokens, secrets, cookies and authorization headers are
-redacted. Set the level with `LOG_LEVEL` (`info` by default).
+The API and the worker write structured JSON logs (Pino) to stdout. Each line carries `service` and
+`context` fields and the **correlation id** of the request. Tokens, secrets, cookies and
+authorization headers are redacted. `LOG_LEVEL` sets the level (`info` by default).
 
 ```bash
 docker compose -f infra/local/docker-compose.yml --profile platform logs -f api worker
 ```
 
-A correlation id travels from the HTTP request (`x-correlation-id`) into the deployment, the OpenTofu
-runs, audit events and webhook deliveries. Search your log store by it to follow one operation end to
-end.
+The correlation id starts at the HTTP request (`x-correlation-id`) and travels into the deployment,
+the OpenTofu runs, the audit events and the webhook deliveries. Search your log store for it to
+follow one operation end to end.
 
 ## Health endpoints
 
 | Endpoint | Meaning |
 |---|---|
 | `GET /api/v1/healthz` | Liveness: the API process answers. |
-| `GET /api/v1/readyz` | Readiness: Postgres and Redis are reachable. The compose health check uses it. |
+| `GET /api/v1/readyz` | Readiness: Postgres and Redis are reachable. The Compose health check calls it. |
 
 ## Operational data in the product
 
-- **Deployments**: every step, its duration, attempts and failure class; the event log; the Gantt
-  timeline.
-- **Overview**: instances, deployments, failures and incidents with trends.
-- **Audit log**: every change, filterable by tenant (`GET /audit`).
-- **Webhook deliveries**: status, attempts and last error per endpoint.
+- **Deployments**: every step with its duration, attempts and failure class, plus the event log and
+  the Gantt timeline.
+- **Overview**: instances, deployments, failures and incidents, with trends.
+- **Audit log**: every change, filtered by tenant (`GET /audit`).
+- **Webhook deliveries**: status, attempts and the last error of each endpoint.
 
 ## Metrics and tracing
 
-| | Status |
+| Item | Status |
 |---|---|
-| OpenTelemetry SDK in the API and worker (traces, metrics) | Planned |
+| OpenTelemetry SDK in the API and the worker (traces, metrics) | Planned |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Accepted by the configuration, not used yet |
-| An OpenTelemetry collector for local testing | Available: `--profile observability` in the compose file prints received telemetry |
-| Control-plane dashboards and SLO alerts | Planned |
+| OpenTelemetry collector for local testing | Available. The `observability` Compose profile prints the telemetry it receives. |
+| Dashboards and SLO alerts for the control plane | Planned |
 
-Until then, alert on `readyz`, on container restarts, on `deployment.failed` webhooks and on error
-rates in the logs.
+Until these exist, alert on `readyz`, on container restarts, on `deployment.failed` webhooks and on
+error rates in the logs.

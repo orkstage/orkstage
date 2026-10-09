@@ -14,8 +14,12 @@
     "dev": "next dev --port 3100",
     "prebuild": "node scripts/generate-api-reference.mjs",
     "build": "next build",
+    "postbuild": "node scripts/fix-segment-files.mjs",
     "pretypecheck": "node scripts/generate-api-reference.mjs",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit && pnpm run check:i18n && pnpm run check:prose",
+    "check:i18n": "node --no-warnings scripts/check-i18n.mjs",
+    "check:prose": "node scripts/check-prose.mjs",
+    "check:site": "node scripts/check-site.mjs",
     "serve": "node scripts/serve.mjs",
     "openapi:refresh": "node scripts/refresh-openapi.mjs && node scripts/generate-api-reference.mjs"
   },

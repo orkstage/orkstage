@@ -39,15 +39,21 @@ pnpm install
 pnpm dev            # http://localhost:3100
 pnpm build          # regenerates the API reference, then exports to out/
 pnpm serve          # serves out/ the way S3 and CloudFront do, http://localhost:4321
-pnpm typecheck
+pnpm typecheck      # types, plus check:i18n and check:prose
+pnpm check:i18n     # English and Portuguese dictionaries: same keys, writing rules, lengths
 pnpm check:prose    # writing rules for every handwritten docs page
+pnpm check:site     # after a build: links, anchors, sitemap, hreflang, canonical, JSON-LD, headings
 ```
 
 ## Layout
 
 | Path | What it holds |
 |---|---|
-| `app/` | Landing page, docs layout and page renderer, search index, sitemap, robots, Open Graph image. |
+| `app/(en)/` | English root layout (`lang="en"`): the landing page at `/`, the docs at `/docs`, the English Open Graph image. |
+| `app/(pt)/pt-br/` | Brazilian Portuguese root layout (`lang="pt-BR"`): the landing page at `/pt-br/` and its Open Graph image. Docs stay in English. |
+| `app/` | Search index, sitemap (with hreflang alternates), robots and the bilingual 404 page. |
+| `lib/i18n/` | Locale config and the typed message dictionaries (`messages/en.ts`, `messages/pt-br.ts`). |
+| `lib/seo.ts` | Titles, descriptions, canonical URLs, hreflang, Open Graph and Twitter metadata, JSON-LD. |
 | `content/docs/<section>/` | MDX pages. Each section's `meta.json` has `"root": true`, which makes it a sidebar tab. |
 | `content/docs/developer/api-reference/` | Generated from `openapi/orkstage.json` (except `index.mdx`). |
 | `openapi/orkstage.json` | The OpenAPI document exported by the API (`/api/docs-json`). |

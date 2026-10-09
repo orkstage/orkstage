@@ -15,6 +15,8 @@ const config = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: { unoptimized: true },
+  // Two root layouts (app/(en) and app/(pt)) need one global 404 page: app/global-not-found.tsx.
+  experimental: { globalNotFound: true },
 };
 
 export default withMDX(config);

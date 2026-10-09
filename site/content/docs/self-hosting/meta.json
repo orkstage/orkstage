@@ -1,6 +1,6 @@
 {
-  "title": "DevOps & self-hosting",
-  "description": "Run, configure, secure and operate the platform",
+  "title": "DevOps and hosting",
+  "description": "Run, configure, secure and operate OrkStage on your own infrastructure",
   "root": true,
   "pages": [
     "architecture",

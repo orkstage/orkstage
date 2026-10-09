@@ -4,22 +4,22 @@ description: Run the full OrkStage platform locally with Docker Compose, sign in
 ---
 
 This guide runs everything in containers: the API, the worker, the console, Postgres, Redis, a mail
-catcher, the OpenTofu runner image and MiniStack (a local AWS emulator). You need **only Docker**; no
-cloud account, no Node.js on the host.
+catcher, the OpenTofu runner image and MiniStack (a local AWS emulator). **Docker is the only
+requirement.** You need no cloud account and no Node.js on the host.
 
 <Callout title="Local evaluation only" type="warn">
-  The compose stack runs in `NODE_ENV=development`: the development login is on, cookies are not
-  `Secure`, and the worker mounts the Docker socket to start OpenTofu containers. Do not expose it to
-  a network. For production see [Docker Compose deployment](/docs/self-hosting/docker-compose/) and
-  [Security hardening](/docs/self-hosting/security/).
+  The compose stack runs with `NODE_ENV=development`. The development login is on, cookies are not
+  `Secure`, and the worker mounts the Docker socket to start OpenTofu containers. Do not expose this
+  stack to a network. For production, see [Docker Compose deployment](/docs/self-hosting/docker-compose/)
+  and [Security hardening](/docs/self-hosting/security/).
 </Callout>
 
 ## Requirements
 
-- Docker Engine or Docker Desktop with Compose v2, about 6 GB of free memory for the full stack
-  (MiniStack starts real containers for RDS, ElastiCache and ECS tasks).
-- Free ports: `3000` (console), `4000` (API), `4566` (MiniStack), `5432` (Postgres), `6379` (Redis),
-  `1025`/`8025` (Mailpit).
+- Docker Engine or Docker Desktop with Compose v2, and about 6 GB of free memory for the full stack.
+  MiniStack starts real containers for RDS, ElastiCache and ECS tasks.
+- These free ports: `3000` (console), `4000` (API), `4566` (MiniStack), `5432` (Postgres), `6379`
+  (Redis), `1025` and `8025` (Mailpit).
 
 ## Run the platform
 
@@ -43,11 +43,15 @@ docker compose -f infra/local/docker-compose.yml \
   --profile platform --profile aws-emulator up -d --build --wait
 ```
 
-The first run builds two images: `orkstage/platform:local` (API, worker, console and the one-shot
-`migrate` job share it) and `orkstage/tofu-runner:local` (OpenTofu 1.12.7 with the modules baked in).
-`migrate` applies database migrations and loads idempotent demo data, then exits.
+The first run builds two images:
 
-With pnpm installed, `pnpm platform:up` runs the same command.
+- `orkstage/platform:local`, shared by the API, the worker, the console and the `migrate` job.
+- `orkstage/tofu-runner:local`, which contains OpenTofu 1.12.7 and the OpenTofu modules.
+
+The `migrate` job runs once. It applies the database migrations, loads the demo data and exits. Running
+it again is safe: the seed updates existing records instead of duplicating them.
+
+If you have pnpm installed, `pnpm platform:up` runs the same command.
 
 </Step>
 <Step>
@@ -65,8 +69,8 @@ Sign in with the **development login**. The seed creates three users:
 
 | Email | Role |
 |---|---|
-| `admin@example.local` | Platform owner: everything, including cloud targets and settings |
-| `operator@example.local` | Platform operator: deploys, approves, manages incidents |
+| `admin@example.local` | Platform owner: full access, including cloud targets and settings |
+| `operator@example.local` | Platform operator: deploys, approves and manages incidents |
 | `customer@example.local` | Customer owner of the tenant *Acme Corp* |
 
 </Step>
@@ -75,25 +79,27 @@ Sign in with the **development login**. The seed creates three users:
 ### Deploy the reference instance
 
 The seed registers simulated AWS, Azure and OCI targets and an instance called **Acme Production**,
-built from the `multicloud-reference` template: the API on (simulated) AWS ECS Fargate behind an ALB
-with ECR and Route 53, Postgres on (simulated) Azure Flexible Server, object storage on (simulated) OCI.
+built from the `multicloud-reference` template. Its API runs on simulated AWS ECS Fargate behind an
+ALB, with ECR and Route 53. Its Postgres database runs on simulated Azure Flexible Server, and its
+object storage on simulated OCI.
 
-1. Open **Instances → Acme Production**.
-2. Open the **Plan & cost** tab: the resolved resources grouped by provider, the policy results, the
-   cross-cloud links and the approximate monthly cost.
-3. Click **Deploy**. Acme Production is a `production` instance, so an approval step is part of the
-   deployment; it is skipped with a reason when nothing high-risk is planned.
-4. Follow the steps and the event log live, or open **Deployments** for the timeline.
+1. Open **Instances**, then **Acme Production**.
+2. Open the **Plan & cost** tab. It shows the resolved resources grouped by provider, the policy
+   results, the links between clouds and the approximate monthly cost.
+3. Click **Deploy**. Acme Production is a `production` instance, so the deployment includes an
+   approval step. The step is skipped, with a recorded reason, when the plan has no high risk or
+   destructive changes.
+4. Follow the steps and the event log as they update, or open **Deployments** for the timeline.
 
 </Step>
 <Step>
 
 ### Try the operations loop
 
-On a resource of a simulated instance, use **Simulate** to mark it unhealthy. Within a health tick
-(30 seconds in the compose file) the instance degrades, an incident opens, an email arrives in
-Mailpit and the private status page changes. Set the resource healthy again and the incident
-resolves on its own.
+On a resource of a simulated instance, open **Simulate** and choose **Mark unhealthy**. Within one
+health check interval (30 seconds in the compose file), the instance becomes degraded, an incident
+opens, an email arrives in Mailpit and the private status page changes. Choose **Mark healthy** and
+the incident resolves on its own.
 
 </Step>
 </Steps>
@@ -101,9 +107,9 @@ resolves on its own.
 ## Deploy real AWS resources locally
 
 The seed also creates the target **Local AWS (MiniStack)** and the instance **Acme Staging (local
-AWS)** from `starter-standard`: VPC, ECR, ALB, RDS Postgres, Valkey, SQS, two ECS Fargate services,
-Route 53 and ACM. Deploying it runs OpenTofu for real against MiniStack. Continue with
-[Local AWS with MiniStack](/docs/get-started/local-aws/).
+AWS)**, built from `starter-standard`. That instance contains a VPC, ECR, an ALB, RDS Postgres,
+Valkey, SQS, two ECS Fargate services, Route 53 and ACM. Deploying it runs OpenTofu for real against
+MiniStack. Continue with [Local AWS with MiniStack](/docs/get-started/local-aws/).
 
 ## Logs, rebuilds and shutdown
 
@@ -121,8 +127,8 @@ docker compose -f infra/local/docker-compose.yml --profile platform --profile aw
 
 ## Alternative: run the apps on the host
 
-For hot reload while developing, run only the infrastructure in Docker and the apps with Node.js 24
-and pnpm 12:
+For hot reload during development, run only the infrastructure in Docker. Run the apps on the host
+with Node.js 24 and pnpm 12:
 
 ```bash
 cp .env.example .env
@@ -140,7 +146,7 @@ See [Development setup](/docs/contributing/development-setup/) for details.
 ## Next steps
 
 <Cards>
-  <Card title="Core concepts" href="/docs/get-started/core-concepts/" description="The vocabulary used everywhere else in these docs." />
-  <Card title="Create an instance" href="/docs/user-guide/create-instance/" description="Walk through the six-step wizard." />
+  <Card title="Core concepts" href="/docs/get-started/core-concepts/" description="The vocabulary used across these docs." />
+  <Card title="Create an instance" href="/docs/user-guide/create-instance/" description="Go through the six steps of the instance wizard, from tenant to review." />
   <Card title="Connect an AWS account" href="/docs/self-hosting/connect-aws/" description="Deployment role with an external id, state bucket and validation." />
 </Cards>

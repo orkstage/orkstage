@@ -1,10 +1,10 @@
 ---
 title: Release process
-description: How OrkStage is built and checked today, and how releases will work after the polyrepo split. CI checks, versioning, images, signed CLI binaries, modules, the compatibility matrix and this site.
+description: The CI checks that run on OrkStage today, and the planned release flow for images, packages, signed CLI binaries, modules and this site.
 ---
 
 <Callout type="warn" title="No tagged releases yet">
-  OrkStage is developed on `main` and has not published versioned releases. This page describes the
+  OrkStage is developed on `main` and has not published a versioned release. This page lists the
   checks that run today and the release flow being prepared.
 </Callout>
 
@@ -12,27 +12,29 @@ description: How OrkStage is built and checked today, and how releases will work
 
 | Repository part | Checks |
 |---|---|
-| Platform (`.github/workflows/ci.yml`) | `pnpm install --frozen-lockfile`, build, typecheck, tests; migrations apply cleanly on Postgres and the seed is idempotent; `pnpm audit --audit-level high` |
-| CLI (`cli/.github/workflows/ci.yml`) | `cargo fmt`, `clippy -D warnings`, tests; the committed WASM package is up to date and smoke-tested; release builds per target, with Authenticode (Windows) and Developer ID notarization (macOS) steps that run when signing secrets are configured |
+| Platform (`.github/workflows/ci.yml`) | `pnpm install --frozen-lockfile`, build, type check and tests. Migrations apply cleanly on Postgres, and the seed runs twice to prove it is idempotent. `pnpm audit --audit-level high` reports vulnerable dependencies but does not fail the build yet. |
+| CLI (`cli/.github/workflows/ci.yml`) | `cargo fmt`, `clippy -D warnings` and tests on Linux, macOS and Windows. The committed WASM package must match a fresh build and pass a smoke test. Release builds run for 8 targets. On tags, and only when the signing secrets are configured, Windows binaries get Authenticode signatures and macOS binaries get Developer ID signing and notarization. |
 
 ## Planned release flow
 
-1. **Versioning.** Semantic versions per repository. Breaking API changes get a new `/api/v2` route
-   group; the template schema has its own version (`platform/v1`).
+1. **Versioning.** Each repository uses semantic versions. A breaking API change gets a new
+   `/api/v2` route group. The template schema has its own version (`platform/v1`).
 2. **Platform.** A tag builds and publishes `ghcr.io/orkstage/platform:<version>` and the shared
-   packages (`@orkstage/contracts`, `/authorization`, `/templates`, `/domain`), and attaches the
-   exported OpenAPI document to the release.
-3. **Console.** `ghcr.io/orkstage/console:<version>`, pinned to a compatible contracts range.
-4. **CLI.** Signed `ork` binaries for Linux (glibc and musl), macOS and Windows on x86-64 and arm64,
-   `@orkstage/scan` on npm, then Homebrew, Scoop and winget manifests.
-5. **Modules.** Git tags `vX.Y.Z` and `ghcr.io/orkstage/tofu-runner:<tag>`; the platform pins the
-   runner tag so module changes are explicit upgrades.
-6. **Compatibility matrix.** `orkstage-dev/COMPATIBILITY.md` lists the tested combination of
-   versions; its CI runs the end-to-end suite against it.
+   packages (`@orkstage/contracts`, `/authorization`, `/templates` and `/domain`). The exported
+   OpenAPI document is attached to the release.
+3. **Console.** A tag publishes `ghcr.io/orkstage/console:<version>`, pinned to a compatible range
+   of the contracts package.
+4. **CLI.** A tag publishes signed `ork` binaries for Linux (glibc and musl), macOS and Windows on
+   `x86_64` and `arm64`, then `@orkstage/scan` on npm, then manifests for Homebrew, Scoop and
+   winget.
+5. **Modules.** Git tags `vX.Y.Z` publish `ghcr.io/orkstage/tofu-runner:<tag>`. The platform pins
+   the runner tag, so a module change is always an explicit upgrade.
+6. **Compatibility matrix.** `orkstage-dev/COMPATIBILITY.md` lists the combination of versions
+   that was tested together. Its CI runs the end to end suite against that combination.
 7. **Site.** This site refreshes the API reference from the release's OpenAPI file and deploys to
-   S3 + CloudFront.
+   S3 and CloudFront.
 
 ## Changelog and security fixes
 
-Each repository will keep a changelog per release. Security fixes are released as patch versions;
-Enterprise customers are planned to receive advisories ahead of public disclosure.
+Each repository will keep a changelog per release. Security fixes ship as patch versions. The plan
+is for Enterprise customers to receive security advisories before public disclosure.

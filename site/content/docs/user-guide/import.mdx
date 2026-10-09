@@ -1,23 +1,24 @@
 ---
 title: Importing infrastructure in the console
-description: Turn existing Terraform, CloudFormation, Kubernetes or Docker Compose files into a draft OrkStage template from the console, review the evidence and create the template.
+description: Turn Terraform, CloudFormation, Kubernetes or Docker Compose files into a draft OrkStage template, review the evidence and create the template.
 ---
 
-**Templates → Import** turns existing infrastructure code into a draft template. Detection and
-mapping are done by the OrkStage scan engine, the same one the `ork` CLI uses.
+**Templates**, then **Import**, turns existing infrastructure code into a draft template. The
+OrkStage scan engine detects and maps the resources. It is the same engine the `ork` CLI uses.
 
 ## Two ways in
 
 <Tabs items={['Upload files', 'Open a CLI import']}>
 <Tab value="Upload files">
 
-Choose a folder or files. The console keeps only text files the engine understands (`.tf`,
-`.tf.json`, YAML, JSON, TOML, `Dockerfile`, `package.json`, `go.mod`, `requirements.txt`,
-`Chart.yaml`, …), skips `node_modules`, `.git`, `.terraform`, `target`, `vendor`, `dist` and `build`,
-and enforces 512 KiB per file and 5 MB in total. The server scans them with the engine compiled to
-WebAssembly (`@orkstage/scan`).
+Choose a folder or individual files. The console keeps only the text files the engine understands,
+such as `.tf`, `.tf.json`, YAML, JSON, TOML, `Dockerfile`, `package.json`, `go.mod`,
+`requirements.txt` and `Chart.yaml`. It skips the `node_modules`, `.git`, `.terraform`, `.next`,
+`target`, `vendor`, `dist` and `build` folders. Each file can be at most 512 KiB, and the upload at
+most 5 MB in total. The server scans the files with the engine compiled to WebAssembly
+(`@orkstage/scan`).
 
-If the server answers `501 SCANNER_UNAVAILABLE`, scanning is not installed on that server: scan
+If the server answers `501 SCANNER_UNAVAILABLE`, scanning is not installed on that server. Scan
 locally with the CLI instead.
 
 </Tab>
@@ -31,27 +32,31 @@ Template: valid
 Console: https://orkstage.example.com/templates/import?importId=5d2f7c0e-…
 ```
 
-Open the link; the page loads that import directly. The CLI is a <Badge>Preview</Badge>.
+Open the link and the page loads that import directly. The CLI is in <Badge>Preview</Badge>.
 
 </Tab>
 </Tabs>
 
 ## Reviewing the result
 
-The import page shows:
+The import page shows five things:
 
 - **Resources**: each detected resource with its OrkStage type, provider, implementation,
-  confidence (`high`, `medium`, `low`) and the source evidence (`main.tf:12 aws_db_instance.main`).
+  confidence (`high`, `medium` or `low`) and the source evidence, such as
+  `main.tf:12 aws_db_instance.main`.
 - **Connections** inferred from references, for example a task definition that reads the database
   address.
-- **Unmapped** items the engine saw but cannot express in a template, with the reason.
+- **Unmapped** items: what the engine saw but cannot express in a template, with the reason.
 - **Warnings** and the **validation** result of the generated template.
 - The generated **template YAML**.
 
 ## Creating the template
 
-Give it a name and a display name and click **Create template**. OrkStage creates a `DRAFT` template
-at version `0.1.0`; open it in the builder, fix what the validation reported, then publish. An import
-can produce one template.
+Give the template a name and a display name, then click **Create draft and open builder**.
+OrkStage creates a `DRAFT` template at version `0.1.0` and opens it in the builder. Fix what the
+validation reported, then publish it.
+
+Each import produces at most one template. Only platform owners and admins can create templates.
+Other users see a note asking them to share the import id with a platform admin.
 
 See [Importing IaC](/docs/developer/import/) for supported sources, mapping rules and the API.

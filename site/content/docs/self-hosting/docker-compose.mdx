@@ -1,19 +1,19 @@
 ---
 title: Docker Compose deployment
-description: How the OrkStage Docker Compose stack is wired, its profiles, services, volumes and networks, how the worker starts OpenTofu runner containers, and what to change before running it anywhere but your machine.
+description: Profiles, services, volumes and networks of the OrkStage Compose stack, how the worker starts OpenTofu runners, and what to change before you share it.
 ---
 
 `infra/local/docker-compose.yml` runs the whole platform from one shared image. It is the supported
-way to evaluate OrkStage and the base for a single-host installation.
+way to evaluate OrkStage and the starting point for an installation on a single host.
 
 ## Profiles
 
 | Profile | Adds | Shortcut |
 |---|---|---|
-| *(none)* | Postgres 18, Redis 8, Mailpit | `pnpm local:up` (apps then run on the host) |
-| `aws-emulator` | MiniStack, local AWS on `:4566` | `pnpm local:aws` |
-| `platform` | `migrate`, `api`, `worker`, `web`, `tofu-runner` | `pnpm platform:up` (with `aws-emulator`) |
-| `observability` | An OpenTelemetry collector that prints telemetry (`:4317`, `:4318`) | |
+| *(none)* | Postgres 18, Redis 8, Mailpit | `pnpm local:up` (you then run the apps on the host) |
+| `aws-emulator` | MiniStack, a local AWS on port `4566` | `pnpm local:aws` |
+| `platform` | `migrate`, `api`, `worker`, `web`, `tofu-runner` | `pnpm platform:up` (also starts `aws-emulator`) |
+| `observability` | An OpenTelemetry collector that prints the telemetry it receives (ports `4317` and `4318`) | |
 
 ```bash
 docker compose -f infra/local/docker-compose.yml --profile platform --profile aws-emulator up -d --build --wait
@@ -23,76 +23,78 @@ docker compose -f infra/local/docker-compose.yml --profile platform --profile aw
 
 | Service | Image | Notes |
 |---|---|---|
-| `migrate` | `orkstage/platform:local` | One-shot: `prisma migrate deploy` and the idempotent seed. Others wait for it. |
-| `api` | `orkstage/platform:local` | Port 4000. Health check on `/api/v1/readyz` (database and Redis). |
-| `worker` | `orkstage/platform:local` | Runs as root only to reach the Docker socket that starts OpenTofu containers. |
-| `web` | `orkstage/platform:local` | Port 3000. Talks to the API at `API_INTERNAL_URL=http://api:4000`. |
-| `tofu-runner` | `orkstage/tofu-runner:local` | Build-only: OpenTofu 1.12.7 with the modules baked in. |
-| `postgres`, `redis`, `mailpit` | upstream images | Data in the `pgdata` and `redisdata` volumes. |
-| `ministack` | `ministackorg/ministack` (pinned digest) | Needs the Docker socket; state in the `ministack` volume. |
+| `migrate` | `orkstage/platform:local` | Runs once: `prisma migrate deploy`, then the idempotent seed. The other platform services wait for it. |
+| `api` | `orkstage/platform:local` | Port 4000. Its health check calls `/api/v1/readyz`, which tests the database and Redis. |
+| `worker` | `orkstage/platform:local` | Runs as root only so it can use the Docker socket to start OpenTofu containers. |
+| `web` | `orkstage/platform:local` | Port 3000. Reaches the API at `API_INTERNAL_URL=http://api:4000`. |
+| `tofu-runner` | `orkstage/tofu-runner:local` | Built, never left running: OpenTofu 1.12.7 with the modules baked in. |
+| `postgres`, `redis`, `mailpit` | Upstream images | Data lives in the `pgdata` and `redisdata` volumes. |
+| `ministack` | `ministackorg/ministack` (pinned by digest) | Needs the Docker socket. Its state lives in the `ministack` volume. |
 
-One image (`infra/docker/platform.Dockerfile`) contains the API, the worker, the console and the
-migration tooling; each service runs a different command.
+One image (`infra/docker/platform.Dockerfile`) holds the API, the worker, the console and the
+migration tooling. Each service starts it with a different command.
 
 ## How the worker runs OpenTofu
 
-The worker reaches Docker through `/var/run/docker.sock` and launches `orkstage/tofu-runner:local`
-containers on the compose network:
+The worker reaches Docker through `/var/run/docker.sock` and starts `orkstage/tofu-runner:local`
+containers on the Compose network. These variables wire it up:
 
-| Variable | Value in compose | Why |
+| Variable | Value in Compose | Why |
 |---|---|---|
-| `TOFU_IMAGE` | `orkstage/tofu-runner:local` | Runner image with modules baked in. |
+| `TOFU_IMAGE` | `orkstage/tofu-runner:local` | Runner image with the modules baked in. |
 | `TOFU_MODULES_IN_IMAGE` | `true` | Do not mount modules from the worker's filesystem. |
-| `TOFU_WORK_DIR` | `/var/lib/orkstage/tofu` | Working directories, inside the worker. |
-| `TOFU_WORK_VOLUME` | `orkstage-tofu-work` | The same directory as a named volume, because the Docker daemon cannot see paths inside the worker container. |
-| `TOFU_PLUGIN_CACHE_VOLUME` | `orkstage-tofu-plugins` | Shared provider plugin cache. |
+| `TOFU_WORK_DIR` | `/var/lib/orkstage/tofu` | Location of the working directories inside the worker. |
+| `TOFU_WORK_VOLUME` | `orkstage-tofu-work` | The same directory as a named volume. The Docker daemon cannot see paths inside the worker container, so runners mount the volume instead. |
+| `TOFU_PLUGIN_CACHE_VOLUME` | `orkstage-tofu-plugins` | Provider plugin cache shared by all runners. |
 | `TOFU_DOCKER_NETWORK` | `cloud-orchestrator_default` | Lets runners reach MiniStack by name. |
 
-Inside the network MiniStack is `http://ministack:4566` (`AWS_EMULATOR_ENDPOINT`); links in the
-console keep `http://localhost:4566`.
+Inside the network, MiniStack answers at `http://ministack:4566` (`AWS_EMULATOR_ENDPOINT`). Links in
+the console still point to `http://localhost:4566`.
 
 <Callout title="Names kept on purpose">
-  The compose project is still named `cloud-orchestrator` (the platform's working name before the
-  OrkStage rebrand), so existing volumes and the `cloud-orchestrator_default` network stay attached.
+  The Compose project is still named `cloud-orchestrator`, the working name of the platform before the
+  OrkStage rebrand. Keeping it leaves existing volumes and the `cloud-orchestrator_default` network
+  attached.
 </Callout>
 
 ## Before running it beyond your machine
 
-The compose file is configured for local use. For anything shared, change at least:
+The Compose file is set up for local use. Before other people use the installation, change at least
+the following.
 
 <Steps>
 <Step>
 
 ### Production mode
 
-Set `NODE_ENV=production`, `AUTH_DEV_LOGIN_ENABLED=false` and configure an
-[OIDC provider](/docs/self-hosting/configuration/#single-sign-on-oidc). Startup refuses the dev login
-in production.
+Set `NODE_ENV=production` and `AUTH_DEV_LOGIN_ENABLED=false`, and configure an
+[OIDC provider](/docs/self-hosting/configuration/#single-sign-on-oidc). In production, the API and the
+worker refuse to start while the dev login is enabled.
 
 </Step>
 <Step>
 
 ### Secrets
 
-Generate `SESSION_SECRET` (32+ random bytes) and `ENCRYPTION_KEY` (32 bytes, base64:
-`openssl rand -base64 32`), and pass them from your secret store, not the compose file. Startup fails
-without them in production.
+Generate `SESSION_SECRET` (at least 32 random characters) and `ENCRYPTION_KEY` (32 bytes, base64:
+`openssl rand -base64 32`). Pass both from your secret store, not from the Compose file. In
+production, startup fails without them.
 
 </Step>
 <Step>
 
 ### Postgres and Redis
 
-Point `DATABASE_URL` and `REDIS_URL` at managed or backed-up instances, and plan
-[backups](/docs/self-hosting/backups/).
+Point `DATABASE_URL` and `REDIS_URL` at managed instances, or at instances you back up yourself, and
+plan your [backups](/docs/self-hosting/backups/).
 
 </Step>
 <Step>
 
 ### TLS and public URLs
 
-Put the console and the API behind a TLS-terminating proxy, set `WEB_PUBLIC_URL` and
-`API_PUBLIC_URL` to their `https://` addresses (cookies become `Secure`).
+Put the console and the API behind a proxy that terminates TLS. Set `WEB_PUBLIC_URL` and
+`API_PUBLIC_URL` to their `https://` addresses. In production mode, cookies are marked `Secure`.
 
 </Step>
 <Step>
@@ -107,11 +109,11 @@ Drop the `aws-emulator` profile and [connect real AWS accounts](/docs/self-hosti
 ### Isolate the runner
 
 The Docker socket gives the worker control of the host's Docker daemon. Run the worker on a dedicated
-host, or wait for the ECS RunTask / Kubernetes Job runner on the roadmap.
+host. A runner based on ECS RunTask or Kubernetes Jobs is on the roadmap.
 
 </Step>
 </Steps>
 
 Published images (`ghcr.io/orkstage/platform`, `ghcr.io/orkstage/console`,
-`ghcr.io/orkstage/tofu-runner`) and infrastructure code for running the control plane itself on AWS
-(ECS Fargate, RDS, ElastiCache, ALB) are planned; today you build the images from source.
+`ghcr.io/orkstage/tofu-runner`) are planned, and so is infrastructure code that runs the control plane
+itself on AWS (ECS Fargate, RDS, ElastiCache, ALB). Today you build the images from source.

@@ -1,53 +1,56 @@
 ---
 title: REST API overview
-description: Conventions of the OrkStage Control API v1. Base path, session and API key authentication, the CSRF header, errors, pagination, correlation ids, idempotency, long-running operations and rate limits.
+description: How the OrkStage Control API v1 works. Base path, API keys and sessions, the CSRF header, errors, pagination, correlation ids, idempotency and rate limits.
 ---
 
-The Control API is the only way into the platform; the console uses it too. Base path:
-**`/api/v1`**. The API serves an OpenAPI UI at `/api/docs` and the document at `/api/docs-json`;
-the [API reference](/docs/developer/api-reference/) in these docs is generated from it.
+The Control API is the only way into the platform, and the console uses it too. The base path is
+**`/api/v1`**. A running API serves an OpenAPI UI at `/api/docs` and the OpenAPI document at
+`/api/docs-json`. The [API reference](/docs/developer/api-reference/) in these docs is generated from
+that document.
 
 ## Authentication
 
 <Tabs items={['API key (automation)', 'Session (browser)']}>
 <Tab value="API key (automation)">
 
-Send an [API key](/docs/developer/api-keys/) as a bearer token. No cookie and no CSRF header are
-needed.
+Send an [API key](/docs/developer/api-keys/) as a bearer token. You need no cookie and no CSRF
+header.
 
 ```bash
 curl https://orkstage.example.com/api/v1/me \
   -H "Authorization: Bearer ork_live_7f3a9c21_…"
 ```
 
-Keys only reach endpoints that declare a scope. Endpoints without one (for example API key
-management) answer `403 API_KEY_NOT_ALLOWED` to keys.
+A key reaches only the endpoints that declare a scope. Endpoints without a scope, such as API key
+management, answer `403 API_KEY_NOT_ALLOWED` to a key.
 
 </Tab>
 <Tab value="Session (browser)">
 
-The console signs in through OIDC (or the development login locally) and receives an opaque session
-token in the `co_session` cookie: `httpOnly`, `SameSite=Lax`, `Secure` in production, 12-hour
-expiry. Only its SHA-256 is stored server side, and logout revokes it.
+The console signs in through OIDC (or the development login when you run locally) and receives an
+opaque session token in the `co_session` cookie. The cookie is `httpOnly` and `SameSite=Lax`, is
+`Secure` in production, and expires after 12 hours. The server stores only the SHA-256 hash of the
+token, and logout revokes it.
 
-Every state-changing request (`POST`, `PATCH`, `PUT`, `DELETE`) made with a session must send:
+Every request that changes state (`POST`, `PATCH`, `PUT`, `DELETE`) and uses a session must send
+this header:
 
 ```http
 x-co-csrf: 1
 ```
 
-Browsers cannot add a custom header cross-site without a CORS preflight, and the API grants no
-cross-origin access, so other sites cannot forge requests.
+A browser cannot add a custom header to a request for another site without a CORS preflight, and the
+API allows no CORS requests from other origins. Other sites therefore cannot forge requests.
 
 </Tab>
 </Tabs>
 
-`GET /me` returns the caller, memberships and the authorization rules; with an API key it also
-returns `apiKey: { id, name, prefix, scopes }`.
+`GET /me` returns the caller, their memberships and the authorization rules. When you call it with an
+API key, it also returns `apiKey: { id, name, prefix, scopes }`.
 
 ## Errors
 
-Errors never contain stack traces:
+Error responses never contain stack traces. They all have this shape:
 
 ```json
 {
@@ -63,25 +66,25 @@ Errors never contain stack traces:
 
 | Status | Typical codes |
 |---|---|
-| 400 | `VALIDATION_ERROR` with the failing fields in `details` |
+| 400 | `VALIDATION_ERROR`, with the failing fields in `details` |
 | 422 | Domain rules: `TEMPLATE_INVALID`, `UNSAFE_WEBHOOK_URL`, `INVALID_REPORT`, `ROLE_TOO_HIGH` |
 | 401 | `UNAUTHENTICATED`, `INVALID_API_KEY` |
-| 402 | `ENTERPRISE_REQUIRED` (an Enterprise feature without a license that covers it) |
+| 402 | `ENTERPRISE_REQUIRED` (an Enterprise feature and no license that covers it) |
 | 403 | `CSRF_REJECTED`, `API_KEY_NOT_ALLOWED`, `API_KEY_SCOPE`, missing permission |
 | 404 | Not found, **including records of other tenants** |
 | 409 | `INSTANCE_BUSY`, `VERSION_EXISTS`, `ALREADY_CONVERTED`, `TEMPLATE_EXISTS` |
 | 429 | Rate limited |
-| 501 | `SCANNER_UNAVAILABLE` (server-side IaC scanning not installed) |
+| 501 | `SCANNER_UNAVAILABLE` (the API was built without the IaC scan engine) |
 
 ## Correlation ids
 
 Send `x-correlation-id` to tie your logs to ours. Every response carries `x-correlation-id` and
-`x-request-id`, and the correlation id follows the request into deployments, OpenTofu runs, audit
-events and webhook deliveries. Quote it when you report a problem.
+`x-request-id`. The correlation id follows the request into deployments, OpenTofu runs, audit events
+and webhook deliveries, so quote it when you report a problem.
 
 ## Pagination
 
-List endpoints that can grow use cursors, newest first:
+List endpoints that can grow use cursors and return the newest items first:
 
 ```http
 GET /api/v1/deployments?limit=25&cursor=<id>
@@ -93,35 +96,50 @@ GET /api/v1/deployments?limit=25&cursor=<id>
 
 Pass `nextCursor` as `cursor` until it is `null`.
 
-## Long-running operations
+## Long running operations
 
-Deploy and destroy return **`202 Accepted`** with a deployment summary. Nothing long runs inside a
-request; follow progress with:
+Deploy and destroy return **`202 Accepted`** with a deployment summary. The work never runs inside the
+request. Follow its progress with these endpoints:
 
 ```http
 GET /api/v1/deployments/:id
 GET /api/v1/deployments/:id/events?after=<eventId>   # poll every 1–2 s
 ```
 
-Or subscribe to [webhooks](/docs/developer/webhooks/) (`deployment.succeeded`, `deployment.failed`,
-`deployment.awaiting_approval`).
+You can also subscribe to [webhooks](/docs/developer/webhooks/) for `deployment.succeeded`,
+`deployment.failed` and `deployment.awaiting_approval`.
 
 ## Idempotency
 
-Deployments are keyed by tenant, instance and desired-state hash. While an instance has an active
-operation, further deploy or destroy requests get `409 INSTANCE_BUSY`, and the worker never
-re-creates converged resources. An `Idempotency-Key` header is accepted and currently ignored.
+Deployments are keyed by tenant, instance and a hash of the desired state. While an instance has an
+operation in progress, further deploy or destroy requests get `409 INSTANCE_BUSY`, and the worker
+never recreates resources that have already converged. The API accepts an `Idempotency-Key` header
+but ignores it for now.
 
 ## Tenancy
 
-Tenant-owned reads are filtered by the caller's memberships, and every write is checked against the
-loaded record. A `tenantId` in a request is never trusted on its own.
+Reads of tenant records are filtered by the caller's memberships, and every write is checked against
+the record loaded from the database. The API never trusts a `tenantId` in a request on its own.
 
 ## Rate limits
 
-A global per-client ceiling applies, with stricter limits on login, deploy, destroy, target
-validation, template publish, API key creation, imports and webhook tests. A `429` means wait and
-retry with backoff.
+Limits are counted per client IP address and per endpoint, over a 60 second window. An endpoint
+accepts 600 requests per minute from one client unless it has a lower limit:
+
+| Endpoint | Requests per minute |
+|---|---|
+| Development login | 10 |
+| OIDC login and callback | 20 each |
+| Deploy | 10 |
+| Destroy | 5 |
+| Cloud target validation | 10 |
+| Template version publishing | 10 |
+| API key creation | 20 |
+| Import creation | 20 |
+| Webhook creation | 20 |
+| Webhook test | 10 |
+
+`GET /healthz` and `GET /readyz` have no limit. A `429` response means wait and retry with backoff.
 
 ## Endpoint map
 
@@ -135,8 +153,8 @@ retry with backoff.
 | Instances | list, create, get, update, `preview`, `deploy`, `upgrade`, `destroy`, deployments, logs, metrics |
 | Deployments | list, get, `events`, `approve`, `cancel`, `retry` |
 | Operations | overview, status page, notifications, audit, incidents |
-| Integrations | `api-keys`, `webhooks`, `POST /templates/validate`, `POST /applications/:name/versions`, `imports` |
+| Integrations | `api-keys`, `webhooks`, `POST /templates/validate`, `PUT /applications/:name`, `POST /applications/:name/versions`, `imports` |
 | License and Enterprise | `GET /license`, `GET /audit/export` (Enterprise) |
 
-Request and response shapes live in the `contracts` package of the platform; the generated
+Request and response shapes are defined in the platform's `contracts` package. The generated
 [API reference](/docs/developer/api-reference/) lists every operation.

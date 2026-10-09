@@ -1,25 +1,26 @@
 ---
 title: Navigating the console
-description: A tour of the OrkStage web console for operators, tenant users and engineering managers. Navigation per role, the overview, instances, deployments, incidents, status and settings.
+description: A tour of the OrkStage web console. How to sign in, what each role sees, the overview, instance tabs, deployments, incidents and the theme.
 ---
 
-The console is a Next.js application served next to the API. It talks to the API through its own
-origin, so session cookies stay first-party and no cross-origin requests are needed.
+The console is a Next.js application served next to the API. It calls the API through its own
+origin, so session cookies stay first party and no cross origin requests are needed.
 
 ## Signing in
 
-- **Single sign-on**: providers configured with OIDC appear on the login page (Microsoft Entra ID is
-  the reference; any OIDC provider can be added by configuration, see
-  [Configuration](/docs/self-hosting/configuration/#single-sign-on-oidc)).
-- **Development login**: an email-only login for local installs. It is refused when
+- **Single sign on**: every provider configured with OIDC appears on the login page. Microsoft Entra
+  ID is the reference provider, and you can add any other OIDC provider through configuration. See
+  [Configuration](/docs/self-hosting/configuration/#single-sign-on-oidc).
+- **Development login**: an email only login for local installs. It is off unless
+  `AUTH_DEV_LOGIN_ENABLED=true`, and the API refuses to start with it on when
   `NODE_ENV=production`.
 
-Sessions last 12 hours and are revoked on sign-out.
+A session lasts 12 hours. Signing out revokes it.
 
 ## Navigation
 
-What you see depends on your [role](/docs/user-guide/roles/). The console hides what you cannot do,
-but the API re-checks every action, so a hidden button is never the only protection.
+The menu depends on your [role](/docs/user-guide/roles/). The console hides actions you cannot
+perform, but the API checks every action again, so a hidden button is never the only protection.
 
 | Platform staff (owner, admin, operator) | Tenant members (owner, admin, developer, viewer) |
 |---|---|
@@ -36,8 +37,8 @@ but the API re-checks every action, so a hidden button is never the only protect
 
 ## The overview
 
-The overview shows instance and deployment counts, health, open incidents and trends. A new
-installation shows an **onboarding checklist**:
+The overview shows instance and deployment counts, health, open incidents and trends. On a new
+installation it also shows an **onboarding checklist**:
 
 1. Connect or validate a cloud target.
 2. Pick or forge a template.
@@ -47,27 +48,29 @@ installation shows an **onboarding checklist**:
 
 ## Instances
 
-The instance list shows status, health, environment, template version and tenant. An instance page
-has five tabs:
+The instance list shows the status, health, environment, template version and tenant of each
+instance. An instance page has five tabs:
 
 | Tab | What it shows |
 |---|---|
 | Overview | Details, variables, the topology diagram, resources with their placement, outputs and health |
 | Plan & cost | A fresh preview: resolved resources, policies, connectivity, cost estimate and the diff |
-| Deployments | Every deployment of this instance with status and duration |
+| Deployments | Every deployment of this instance, with status and duration |
 | Logs | Recent log lines per resource (CloudWatch Logs on AWS, simulated elsewhere) |
 | Metrics | CPU, memory, requests, latency and errors per resource |
 
-Actions in the header: **Deploy**, **Upgrade template** and **Destroy**, each shown only when your
-role allows it.
+The page header holds three actions: **Deploy**, **Upgrade template** and **Destroy**. Each one
+appears only when your role allows it.
 
 ## Deployments and incidents
 
-**Deployments** lists every deployment across the instances you can see; a deployment page has the
-step list, a Gantt timeline, the plan, the event log and, when needed, **Approve**, **Cancel** and
-**Retry**. **Incidents** lists open and resolved incidents with their updates.
+**Deployments** lists every deployment across the instances you can see. A deployment page shows
+the step list, a Gantt timeline, the plan and the event log. When they apply, it also shows
+**Approve**, **Cancel** and **Retry**.
+
+**Incidents** lists open and resolved incidents with their updates.
 
 ## Theme
 
-The console is dark by default. Switch to the light theme from the user menu; the choice is applied
-before first paint.
+The console uses the dark theme by default. Switch to the light theme from the user menu. The
+console applies your choice before the first paint, so the page never flashes the wrong theme.

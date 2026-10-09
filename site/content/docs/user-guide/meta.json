@@ -1,6 +1,6 @@
 {
   "title": "User guide",
-  "description": "Use the console: instances, plans, deployments, status",
+  "description": "Create instances, review plans, deploy and follow status in the console",
   "root": true,
   "pages": [
     "console",

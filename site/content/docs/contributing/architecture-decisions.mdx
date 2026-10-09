@@ -1,60 +1,82 @@
 ---
 title: Architecture decisions
-description: Summaries of the OrkStage architecture decision records. Placement slots, adapters and simulation, the BullMQ workflow engine, tenancy and authorization, OpenTofu execution and state, and toolchain choices.
+description: The six accepted OrkStage ADRs in brief. Placement slots, provider adapters, BullMQ workflows, tenancy, OpenTofu state and the toolchain.
 ---
 
-Decisions are recorded as ADRs in `docs/adr/` of the platform repository. Each summary links to the
-full record.
+Architecture decision records (ADRs) live in `docs/adr/` of the platform repository. Each summary
+below links to the full record.
 
-## 0001 Per-resource placement through template slots
+## 0001 Per resource placement through template slots
 
-**Accepted.** Templates are shared across tenants, but each tenant has its own accounts, so provider,
-account and region cannot live in the template. Templates declare **placement slots** with allowed
-providers; each resource names a slot; each instance binds slots to `{ targetId, region }`. The same
-template becomes single-cloud or multi-cloud by binding alone, and networks bind only to resources in
-the same slot. [Read ADR 0001](https://github.com/orkstage/orkstage/blob/main/docs/adr/0001-placement-slots.md)
+**Accepted.** Templates are shared across tenants, but each tenant has its own cloud accounts. So
+the provider, account and region cannot live in the template.
+
+Instead, a template declares **placement slots**, each with a list of allowed providers. Every
+resource names a slot, and every instance binds each slot to `{ targetId, region }`. The same
+template runs on one cloud or on several, depending only on the bindings. Networks bind only to
+resources in the same slot.
+[Read ADR 0001](https://github.com/orkstage/orkstage/blob/main/docs/adr/0001-placement-slots.md)
 
 ## 0002 Provider adapters, capability catalogs and simulation
 
-**Accepted.** `CloudProviderAdapter` is the only way the platform touches a cloud; `ensureResource`
-converges to desired state so retries cannot duplicate. Logical resource → implementation mapping is
-**data** (capability catalogs with features, regional gaps and static pricing). A deterministic `mock`
-provider simulates AWS, Azure or OCI with injectable failures, and everything simulated is labelled.
-A shared contract test suite runs against every adapter.
+**Accepted.** `CloudProviderAdapter` is the only way the platform touches a cloud. Its
+`ensureResource` call converges a resource to the desired state, so a retry cannot create a
+duplicate.
+
+The mapping from a logical resource to a provider implementation is **data**: capability catalogs
+that list features, regional gaps and static prices. A deterministic `mock` provider simulates
+AWS, Azure or OCI with injectable failures, and the platform labels everything it simulates. One
+shared contract test suite runs against every adapter.
 [Read ADR 0002](https://github.com/orkstage/orkstage/blob/main/docs/adr/0002-adapters-and-simulation.md)
 
 ## 0003 Deployment workflow on BullMQ with persisted steps
 
-**Accepted.** Temporal would add a cluster to operate; BullMQ reuses the Redis and Postgres already
-required. Jobs carry only the deployment id; steps are rows created at request time and updated
-before and after each action; resume means re-running the job. Revisit Temporal if long human-in-the-loop
-flows or very large fan-out appear.
+**Accepted.** Temporal would add a cluster to operate. BullMQ reuses the Redis and Postgres that
+the platform already requires.
+
+A job carries only the deployment id. Steps are database rows, created when the deployment is
+requested and updated before and after each action. Resuming a deployment means running the same
+job again, which skips the phases that already finished. Temporal is worth another look if long
+flows that wait on people, or very large fan out, appear.
 [Read ADR 0003](https://github.com/orkstage/orkstage/blob/main/docs/adr/0003-workflow-engine.md)
 
 ## 0004 Tenancy, sessions and authorization
 
-**Accepted.** Shared database with `tenantId` on every tenant-owned row, isolation in layers
-(principal → query scoping → CASL on the loaded record → audit), foreign records reported as not
-found. CASL rules are defined once and sent to the console for visibility only. Server-side opaque
-sessions instead of JWTs. OIDC providers are configuration.
+**Accepted.** All tenants share one database, and every row a tenant owns carries a `tenantId`.
+Isolation works in four layers: the request principal, query scoping by membership, a CASL check
+on the loaded record, and the audit log. A record from another tenant is reported as not found.
+
+CASL rules are defined once. The API enforces them, and the console receives them only to decide
+what to show. Sessions are opaque and stored on the server, not JWTs. OIDC providers are plain
+configuration.
 [Read ADR 0004](https://github.com/orkstage/orkstage/blob/main/docs/adr/0004-tenancy-and-authorization.md)
 
 ## 0005 OpenTofu execution and state
 
-**Accepted.** Every `tofu` command runs in a pinned throwaway container with credentials only in its
-environment. **One state per resource** in S3 with `use_lockfile` locking and encryption, keeping the
-platform's DAG and per-resource failure isolation. No secrets in state (ephemeral passwords,
-write-only attributes). The same code serves real AWS and MiniStack.
+**Accepted.** Every `tofu` command runs in a throwaway container with a pinned image. Credentials
+exist only in that container's environment.
+
+Each resource has **its own state file** in S3, locked with `use_lockfile` and encrypted. This keeps
+the platform's own DAG and isolates a failure to one resource. State holds no secrets: passwords
+come from ephemeral resources and travel through write only attributes. The same code serves real
+AWS and MiniStack.
 [Read ADR 0005](https://github.com/orkstage/orkstage/blob/main/docs/adr/0005-opentofu-state.md)
 
 ## 0006 Toolchain choices
 
-**Accepted.** pnpm workspaces without Turborepo (machines block native binaries from `node_modules`);
-TypeScript 7; Prisma 7.10 rather than a release candidate; Zod 4 shared by validation, OpenAPI and
-forms; ESM everywhere.
+**Accepted.**
+
+- pnpm workspaces without Turborepo, because development machines block native binaries from
+  `node_modules`.
+- TypeScript 7.
+- Prisma 7.10, not the 8.0 release candidate.
+- Zod 4, shared by request validation, the OpenAPI document and console forms.
+- ESM everywhere.
+
 [Read ADR 0006](https://github.com/orkstage/orkstage/blob/main/docs/adr/0006-toolchain.md)
 
 ## Writing a new ADR
 
-Copy the structure of an existing record: **Status**, **Context**, **Decision**, **Consequences**.
-Number it sequentially, keep it short, and supersede rather than rewrite an accepted decision.
+Copy the structure of an existing record: **Status**, **Context**, **Decision** and
+**Consequences**. Give it the next number and keep it short. To change an accepted decision, write
+a new ADR that supersedes it instead of editing the old one.

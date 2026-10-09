@@ -1,11 +1,12 @@
 ---
 title: Local AWS with MiniStack
-description: Provision real AWS resources with OpenTofu against MiniStack, a local AWS emulator that runs real containers for ECS, RDS and ElastiCache. No AWS account needed.
+description: Provision real AWS resources with OpenTofu against MiniStack, a local emulator that runs real ECS, RDS and ElastiCache containers. No AWS account needed.
 ---
 
-[MiniStack](https://ministack.org) is an MIT-licensed AWS emulator. Unlike pure API mocks it starts
-real containers for ECS tasks, RDS and ElastiCache, so a deployment against it exercises the same
-OpenTofu modules, the same state handling and the same health checks as a real account.
+[MiniStack](https://ministack.org) is an AWS emulator under the MIT license. Most API mocks only
+answer calls; MiniStack also starts real containers for ECS tasks, RDS and ElastiCache. A deployment
+against it runs the same OpenTofu modules, the same state handling and the same health checks as a
+deployment against a real account.
 
 <Callout type="warn" title="Docker socket">
   MiniStack needs the Docker socket to start those containers, which gives it control of your Docker
@@ -15,14 +16,14 @@ OpenTofu modules, the same state handling and the same health checks as a real a
 ## Start MiniStack
 
 The [quickstart](/docs/get-started/quickstart/) compose command already includes the `aws-emulator`
-profile. If you run the apps on the host instead:
+profile. If you run the apps on the host instead, start MiniStack on its own:
 
 ```bash
 pnpm local:aws    # docker compose ... --profile aws-emulator up -d --wait ministack
 ```
 
-MiniStack listens on `http://localhost:4566`. Inside the compose network it is
-`http://ministack:4566`; containers it starts join the same network.
+MiniStack listens on `http://localhost:4566`. Inside the compose network its address is
+`http://ministack:4566`, and the containers it starts join the same network.
 
 ## The seeded target
 
@@ -42,33 +43,33 @@ The seed registers an AWS cloud target named **Local AWS (MiniStack)**:
 | Field | Meaning |
 |---|---|
 | `emulator` | Switches to the emulator's static test credentials and endpoint overrides. |
-| `endpointUrl` | The AWS endpoint as reached by the API and worker processes. |
-| `runnerEndpointUrl` | The same endpoint as reached from inside OpenTofu runner containers. |
-| `dnsZone`, `createDnsZone` | Platform DNS zone for instance subdomains; created on first use on the emulator. |
+| `endpointUrl` | The AWS endpoint as the API and worker processes reach it. |
+| `runnerEndpointUrl` | The same endpoint as OpenTofu runner containers reach it. |
+| `dnsZone`, `createDnsZone` | The platform DNS zone for instance subdomains. On the emulator, OrkStage creates it on first use. |
 
-In the compose stack the worker also sets `AWS_EMULATOR_ENDPOINT=http://ministack:4566`. Links shown
-in the console keep `http://localhost:4566` so your browser can open them.
+In the compose stack, the worker also sets `AWS_EMULATOR_ENDPOINT=http://ministack:4566`. Links in
+the console keep `http://localhost:4566`, so your browser can open them.
 
-## Deploy Acme Staging
+## Deploy the staging instance
 
 <Steps>
 <Step>
 
 ### Validate the target
 
-Open **Cloud targets → Local AWS (MiniStack)** and click **Validate**. Validation checks the
-emulator credentials, account access and the OpenTofu state bucket (created and versioned on first
-use on the emulator). It fails with a clear message when MiniStack is not running. The IAM permission
-probe applies to real accounts only.
+Open **Cloud targets**, then **Local AWS (MiniStack)**, and click **Validate**. Validation checks the
+emulator credentials, account access and the OpenTofu state bucket. On the emulator, OrkStage
+creates the bucket and turns on versioning the first time it needs it. Validation fails with a clear
+message when MiniStack is not running. The IAM permission probe runs on real accounts only.
 
 </Step>
 <Step>
 
 ### Deploy
 
-Open **Instances → Acme Staging (local AWS)** (template `starter-standard`) and click **Deploy**.
-The worker runs one OpenTofu container per resource step, in dependency order, with one isolated
-state file per resource in MiniStack's S3.
+Open **Instances**, then **Acme Staging (local AWS)** (template `starter-standard`), and click
+**Deploy**. The worker runs one OpenTofu container per resource step, in dependency order. Each
+resource gets its own state file in MiniStack's S3.
 
 </Step>
 <Step>
@@ -81,13 +82,13 @@ state file per resource in MiniStack's S3.
 | `registry` | ECR repository with scan on push, immutable tags and a lifecycle policy |
 | `database` | RDS PostgreSQL instance, subnet group, security group, Secrets Manager secret for the credentials |
 | `cache` | ElastiCache Valkey replication group, subnet group, security group |
-| `messaging` | SQS queue with a dead-letter queue |
+| `messaging` | SQS queue, plus a second queue for messages that fail processing (dead letter queue) |
 | `api`, `worker` | ECS cluster, task definition, service, CloudWatch log group, execution role, security group |
 | `ingress` | Application Load Balancer, target groups, HTTP listener and path rules |
 | `dns` | Route 53 record, ACM certificate with DNS validation, HTTPS listener |
 
-The ALB is reachable through MiniStack at `http://localhost:4566/_alb/<lb-name>/`; the console shows
-it as the ingress `url` output.
+MiniStack serves the ALB at `http://localhost:4566/_alb/<lb-name>/`. The console shows this address
+as the `url` output of the ingress.
 
 </Step>
 </Steps>
@@ -95,16 +96,18 @@ it as the ingress `url` output.
 ## Mix real and simulated
 
 You can bind only the `primary` slot of `multicloud-reference` to MiniStack and keep `data` (Azure)
-and `storage` (OCI) on the simulated targets. The AWS part is provisioned for real, the rest is
-simulated and labelled as such.
+and `storage` (OCI) on the simulated targets. OrkStage provisions the AWS part for real. The rest is
+simulated and labelled as simulated.
 
 ## Known differences from real AWS
 
-- MiniStack reports in-place changes on a second plan for some RDS and ElastiCache attributes, so
-  drift scans against the emulator can flag changes nobody made. Treat drift on MiniStack as a hint.
-- Autoscaling is not emulated: services run their fixed `replicas` and the deployment logs a warning.
-- MiniStack does not serve the public SSM parameter for the ECS-optimized AMI; `ecs-ec2` services use
-  a placeholder AMI on the emulator.
+- On a second plan, MiniStack reports changes in place for some RDS and ElastiCache attributes. Drift
+  scans against the emulator can therefore flag changes nobody made. Treat drift on MiniStack as a
+  hint.
+- MiniStack does not emulate autoscaling. Services run their fixed `replicas`, and the deployment
+  logs a warning.
+- MiniStack does not serve the public SSM parameter for the Amazon ECS optimized AMI. On the
+  emulator, `ecs-ec2` services use a placeholder AMI.
 
 ## Contract tests against the emulator
 
@@ -112,4 +115,5 @@ simulated and labelled as such.
 MINISTACK_E2E=1 pnpm --filter @co/cloud-aws test
 ```
 
-This runs the provider adapter contract suite (ensure, read, health, delete) against MiniStack.
+This command runs the contract suite of the AWS provider adapter (ensure, read, health, delete)
+against MiniStack.

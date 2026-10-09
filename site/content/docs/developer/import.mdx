@@ -1,46 +1,49 @@
 ---
-title: Importing Terraform, CloudFormation, Kubernetes and Compose
-description: Turn existing infrastructure code into a draft OrkStage template with the IaC import API. Supported sources, the ScanReport format, mapping rules, confidence, unmapped items and the API flow.
+title: Importing infrastructure code
+description: How the IaC import API and scan engine work. Supported sources, mapping rules, the ScanReport v1 format and the calls that create a draft template.
 ---
 
-The import turns infrastructure code into a reviewed **draft template**. One engine,
-`orkstage-scan` (Rust), does detection and mapping everywhere: in the `ork` CLI, and in the platform
-compiled to WebAssembly (`@orkstage/scan`).
+An import turns infrastructure code into a **draft template** that you review. One engine,
+`orkstage-scan` (written in Rust), does all detection and mapping. The `ork` CLI runs it natively,
+and the platform runs it compiled to WebAssembly (`@orkstage/scan`).
 
 | Path | Status |
 |---|---|
 | `POST /imports { report }`: send a ScanReport produced by `ork import` or `ork scan` | Available |
-| `POST /imports { files }`: upload files, the server scans them | Available: the API ships with the scan engine (`@orkstage/scan`, WebAssembly). A build without it answers `501 SCANNER_UNAVAILABLE` |
-| `ork import` / `ork scan` on your machine | <Badge>Preview</Badge> |
+| `POST /imports { files }`: upload files and let the server scan them | Available. The API ships with the scan engine (`@orkstage/scan`, WebAssembly). A build without it answers `501 SCANNER_UNAVAILABLE`. |
+| `ork import` or `ork scan` on your machine | <Badge>Preview</Badge> |
 
 ## Supported sources
 
-| Source kind | Examples of what is read |
+| Source kind | What the engine reads |
 |---|---|
-| `terraform` | `.tf` and `.tf.json`; variables, locals, local modules, resource references |
-| `cloudformation`, `sam`, `cdk` | Templates in YAML or JSON with short-form tags; synthesized CDK output |
+| `terraform` | `.tf` and `.tf.json` files; variables, locals, local modules, resource references |
+| `cloudformation`, `sam`, `cdk` | Templates in YAML or JSON, including tags in short form; synthesized CDK output |
 | `kubernetes`, `helm` | Deployments, Services, Ingresses, StatefulSets; `Chart.yaml` |
-| `compose` | `docker-compose.yml` / `compose.yaml` services, ports, images, dependencies |
+| `compose` | Services, ports, images and dependencies in `docker-compose.yml` or `compose.yaml` |
 | `dockerfile` | Base images and exposed ports |
-| `package` | `package.json`, `go.mod`, `requirements.txt`, … as hints (for example a Postgres driver) |
+| `package` | `package.json`, `go.mod`, `requirements.txt` and similar files, as hints (for example a Postgres driver) |
 | `pulumi`, `serverless`, `bicep`, `arm` | Detected and reported |
 
 Detected resources map to the nine OrkStage types: `network`, `compute.container-service`,
-`container-registry`, `database.postgresql`, `cache.redis`, `queue`, `object-storage`, `ingress`,
-`dns`. Anything else is listed as **unmapped** with a reason, never dropped silently.
+`container-registry`, `database.postgresql`, `cache.redis`, `queue`, `object-storage`, `ingress` and
+`dns`. Anything else appears in the **unmapped** list with a reason. Nothing is dropped silently.
 
 ## Mapping rules in short
 
-- The same component found in several sources becomes **one** resource that keeps every source:
-  Compose `postgres` + `pg` in `package.json` + `aws_db_instance` is one `database.postgresql` on AWS.
-- Evidence strength: IaC > Kubernetes > Compose, Dockerfiles and package hints.
+- When several sources show the same component, it becomes **one** resource that keeps every
+  source. For example, a Compose `postgres` service, `pg` in `package.json` and an
+  `aws_db_instance` become one `database.postgresql` on AWS.
+- Evidence strength, from strongest: IaC, then Kubernetes, then Compose, Dockerfiles and package
+  hints.
 - References become **connections**, for example a task definition that reads
   `aws_db_instance.main.address`.
-- A network is inferred when services or data stores need one; an ingress and DNS when a public HTTP
-  service runs on a cloud provider.
-- Placement slots are chosen per provider (`primary` for the compute provider; `data`, `storage`,
-  `messaging`, … for others) and the smallest plan whose default entitlements fit.
-- Each resource has a **confidence**: `high`, `medium` or `low`.
+- The engine adds a network when services or data stores need one. It adds an ingress and DNS when a
+  public HTTP service runs on a cloud provider.
+- Placement slots are chosen per provider: `primary` for the compute provider, and slots such as
+  `data`, `storage` and `messaging` for the others. The engine also picks the smallest plan whose
+  default entitlements fit.
+- Each resource has a **confidence** of `high`, `medium` or `low`.
 
 ## API flow
 
@@ -57,14 +60,14 @@ Content-Type: application/json
 { "tenantId": "8a1c…", "report": { "version": 1, "generator": "orkstage-scan/0.1.0", … } }
 ```
 
-or, with server-side scanning:
+To let the server scan the files instead, send them as text:
 
 ```json
 { "tenantId": "8a1c…", "files": [ { "path": "infra/main.tf", "content": "resource \"aws_db_instance\" \"main\" { … }" } ] }
 ```
 
-Send **either** `files` (text only, at most 2000 files and 5 MB in total) **or** `report`. The
-response is an `ImportDto`:
+Send **either** `files` (text only, at most 2000 files and 5 MB in total) **or** `report`, never
+both. The response is an `ImportDto`:
 
 ```ts
 interface ImportDto {
@@ -78,12 +81,14 @@ interface ImportDto {
 }
 ```
 
+A report that is not a ScanReport version 1 gets `422 INVALID_REPORT`.
+
 </Step>
 <Step>
 
 ### Review
 
-`GET /api/v1/imports/:id`, or open `https://<console>/templates/import?importId=<id>`. Check
+Call `GET /api/v1/imports/:id`, or open `https://<console>/templates/import?importId=<id>`. Check
 `report.resources` (with sources and confidence), `report.unmapped`, `report.connections`,
 `report.warnings` and `validation.issues`.
 
@@ -99,15 +104,19 @@ Content-Type: application/json
 { "name": "shop", "displayName": "Shop" }
 ```
 
-Returns `{ templateId, name, version: "0.1.0", status: "DRAFT" }`. The YAML is renamed in place, so
-formatting and comments from the report's template survive. Errors: `409 ALREADY_CONVERTED` (one
-template per import), `409 TEMPLATE_EXISTS`, `422 TEMPLATE_INVALID` with the issues.
+The response is `{ templateId, name, version: "0.1.0", status: "DRAFT" }`. The API sets the name,
+display name and version in the YAML document itself, so the formatting and comments of the generated template survive. Templates
+are shared by all tenants, so this step needs a platform role: with an API key, an organization key
+with the `PlatformAdmin` role.
+
+Possible errors: `409 ALREADY_CONVERTED` (an import produces one template at most),
+`409 TEMPLATE_EXISTS`, and `422 TEMPLATE_INVALID` with the issues.
 
 </Step>
 </Steps>
 
-Then edit the draft in the builder, validate and publish. The import and the template creation are
-audited.
+Then edit the draft in the builder, validate it and publish it. Both the import and the template
+creation are audited.
 
 ## ScanReport (version 1)
 
@@ -139,13 +148,13 @@ interface DetectedResource {
 
 ## Using the engine in Node.js
 
-The WebAssembly build is packaged as `@orkstage/scan` (built from the `cli/` folder with
-`scripts/build-wasm.sh`; not published to a registry yet).
+The WebAssembly build is packaged as `@orkstage/scan`. You build it from the `cli/` folder with
+`scripts/build-wasm.sh`. It is not published to a registry yet.
 
 ```js
 const { scanFiles, version } = require('@orkstage/scan');
 const report = scanFiles([{ path: 'main.tf', content }], { templateName: 'shop' });
 ```
 
-`scanFiles(files, options?)` is synchronous and does no I/O. Options: `templateName`, `displayName`,
-`templateVersion`, `maxFileBytes`.
+`scanFiles(files, options?)` is synchronous and does no I/O. The options are `templateName`,
+`displayName`, `templateVersion` and `maxFileBytes`.

@@ -1,43 +1,43 @@
 ---
 title: Backups and recovery
-description: What to back up in a self-hosted OrkStage installation (Postgres, OpenTofu state, secrets), what OrkStage does and does not do for backups of the instances it manages, and how to recover.
+description: What to back up when you host OrkStage (Postgres, OpenTofu state, secrets), how to recover, and what OrkStage does for the backups of managed instances.
 ---
 
-This page is deliberately plain about what exists. OrkStage does not ship a backup tool for its own
-control plane yet; you back up the stores it depends on.
+OrkStage does not ship a backup tool for its own control plane yet. You back up the stores it
+depends on, and this page lists them.
 
 ## The control plane
 
 | Store | What it holds | How to protect it |
 |---|---|---|
-| **Postgres** | Tenants, users, templates, instances, known resource state, deployments, audit log, webhook secrets (encrypted), API key hashes | The one thing you must back up. Use your managed database's automated backups and point-in-time recovery, or scheduled `pg_dump`. |
-| **Redis** | Queues, concurrency slots, simulation state | Recoverable: jobs carry only ids and deployments resume from Postgres. Persistence (`appendonly yes` in compose) shortens recovery. |
-| **OpenTofu state** | One state file per AWS resource, in S3 in each customer account | Versioning on the state bucket (required) lets you restore a previous state version. |
-| **Secrets** | `SESSION_SECRET`, `ENCRYPTION_KEY`, license key, OIDC secrets | Keep them in your secret store. Losing `ENCRYPTION_KEY` makes stored webhook secrets unreadable; rotate the webhook secrets if that happens. |
+| **Postgres** | Tenants, users, templates, instances, known resource state, deployments, the audit log, webhook secrets (encrypted) and API key hashes | This is the one store you must back up. Use the automated backups and point in time recovery of your managed database, or run `pg_dump` on a schedule. |
+| **Redis** | Queues, concurrency slots and simulation state | You can lose it. Jobs carry only ids, and deployments resume from Postgres. Persistence (`appendonly yes` in the Compose file) shortens recovery. |
+| **OpenTofu state** | One state file per AWS resource, in S3 in each customer account | The state bucket must have versioning, so you can restore an earlier version of a state file. |
+| **Secrets** | `SESSION_SECRET`, `ENCRYPTION_KEY`, the license key and OIDC client secrets | Keep them in your secret store. If you lose `ENCRYPTION_KEY`, the stored webhook signing secrets become unreadable, and you must rotate them. |
 
 ```bash title="example: logical backup of the compose database"
 docker compose -f infra/local/docker-compose.yml exec -T postgres \
   pg_dump -U platform -Fc platform > orkstage-$(date +%F).dump
 ```
 
-Test restores. A backup you have not restored is a hope, not a backup.
+Test your restores. Until you have restored a backup, you do not know that it works.
 
 ## Recovery
 
 1. Restore Postgres to a new database and point `DATABASE_URL` at it.
-2. Start the API and worker with the same `ENCRYPTION_KEY` and `SESSION_SECRET` (users sign in again
-   if the session secret changed).
-3. Deployments that were running resume from their persisted steps; converged resources are not
-   re-applied.
-4. The health monitor and drift scan re-read actual state from the providers, so the known state
-   catches up with reality.
+2. Start the API and the worker with the same `ENCRYPTION_KEY` and `SESSION_SECRET`. If the session
+   secret changed, users must sign in again.
+3. Deployments that were running resume from their persisted steps. OrkStage does not apply
+   converged resources again.
+4. The health monitor and the drift scan read actual state from the providers again, so the known
+   state catches up with reality.
 
 ## Instances OrkStage manages
 
-- Templates express database backups (`backup.enabled`, `retentionDays` up to 35), and the
-  `production-backups` policy fails production databases without them. On AWS this sets the RDS
-  automated backup retention.
-- Retention is capped by the tenant plan (`backupRetentionDays`).
-- The destroy workflow has a **backup** phase that checks the backup policy. It does **not** verify
-  that a restorable backup exists yet.
+- Templates declare database backups (`backup.enabled`, and `retentionDays` up to 35). The
+  `production-backups` policy fails any production database without them. On AWS, these settings
+  set the RDS automated backup retention.
+- The tenant plan caps retention (`backupRetentionDays`).
+- The destroy workflow has a **backup** phase that checks the backup policy. It does **not** yet
+  verify that a backup exists and can be restored.
 - A backups API (last successful backup, restore to a new instance) is on the roadmap.

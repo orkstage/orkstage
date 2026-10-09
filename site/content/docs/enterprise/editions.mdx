@@ -1,34 +1,35 @@
 ---
 title: Community vs Enterprise
-description: Feature-by-feature comparison of the OrkStage Community edition (AGPL-3.0) and the Enterprise edition (commercial, ee/), with the status of every Enterprise item.
+description: Compare the OrkStage Community edition (AGPL-3.0) with the commercial Enterprise edition (ee/) area by area, with the status of each Enterprise item.
 ---
 
-**Community** is complete: templates, multi-cloud placement, plans, policies and cost, deployments,
-health, incidents, status pages, notifications, audit log, API keys, webhooks, CI intake, IaC import
-and the CLI. **Enterprise** adds organizational scale and compliance.
+**Community** is complete. It includes templates, multicloud placement, plans, policies and cost,
+deployments, health, incidents, status pages, notifications, the audit log, API keys, webhooks, CI
+intake, IaC import and the CLI. **Enterprise** adds features for organizational scale and
+compliance.
 
-Enterprise items marked <Badge tone="planned">planned</Badge> are on the plan but not built yet.
+Enterprise items marked <Badge tone="planned">planned</Badge> are on the roadmap but not built yet.
 
 | Area | Community (AGPL-3.0) | Enterprise (`ee/`) |
 |---|---|---|
-| Provisioning | Templates and the visual builder; AWS via OpenTofu; simulated Azure and OCI; DAG with retries; provider plans before apply; drift scans | Policy packs (CIS / SOC 2-style rule sets) <Badge tone="planned">planned</Badge>; custom policy authoring <Badge tone="planned">planned</Badge>; cost budgets per team <Badge tone="planned">planned</Badge> |
-| Multi-cloud | Per-resource placement; cross-cloud connectivity strategy | Private connectivity provisioning (VPN, interconnect) <Badge tone="planned">planned</Badge> |
-| Governance | 7 built-in roles; approvals for high-risk production changes; append-only audit log | **Audit log export** (NDJSON, CSV); custom roles and fine-grained permissions <Badge tone="planned">planned</Badge>; multi-step approvals and change windows <Badge tone="planned">planned</Badge>; audit retention policies and SIEM streaming <Badge tone="planned">planned</Badge> |
-| Identity | Dev login (local), OIDC: Microsoft Entra ID, Google and GitLab by configuration | SAML 2.0 SSO <Badge tone="planned">planned</Badge>; SCIM provisioning <Badge tone="planned">planned</Badge>; enforced SSO / MFA and session policies <Badge tone="planned">planned</Badge> |
-| Organizations | One organization, many tenants | Multiple organizations, delegated administration <Badge tone="planned">planned</Badge>; white-label status pages and custom status domains <Badge tone="planned">planned</Badge> |
-| Integrations | API keys, webhooks, CI intake, IaC import, `ork` CLI (Preview) | ServiceNow / Jira change management <Badge tone="planned">planned</Badge>; PagerDuty / Opsgenie <Badge tone="planned">planned</Badge> |
-| Observability | Health, incidents, private status pages, logs and metrics via adapters | Long-term metrics retention, SLO management, incident analytics <Badge tone="planned">planned</Badge> |
-| Support | Community (GitHub Discussions) | SLA-backed support, security advisories ahead of disclosure <Badge tone="planned">planned</Badge> |
+| Provisioning | Templates and the visual builder; AWS through OpenTofu; simulated Azure and OCI; DAG with retries; provider plans before apply; drift scans | Policy packs (rule sets in the style of CIS and SOC 2) <Badge tone="planned">planned</Badge>; custom policy authoring <Badge tone="planned">planned</Badge>; cost budgets per team <Badge tone="planned">planned</Badge> |
+| Multicloud | Placement per resource; connectivity strategy for links between clouds | Provisioning of private connectivity (VPN, interconnect) <Badge tone="planned">planned</Badge> |
+| Governance | 7 predefined roles; approvals for high risk production changes; audit log that only accepts inserts | **Audit log export** (NDJSON, CSV); custom roles and detailed permissions <Badge tone="planned">planned</Badge>; approvals with several steps and change windows <Badge tone="planned">planned</Badge>; audit retention policies and SIEM streaming <Badge tone="planned">planned</Badge> |
+| Identity | Development login (local); OIDC with Microsoft Entra ID, Google and GitLab through configuration | SAML 2.0 SSO <Badge tone="planned">planned</Badge>; SCIM provisioning <Badge tone="planned">planned</Badge>; enforced SSO and MFA, session policies <Badge tone="planned">planned</Badge> |
+| Organizations | One organization, many tenants | Multiple organizations, delegated administration <Badge tone="planned">planned</Badge>; status pages with your own branding and custom status domains <Badge tone="planned">planned</Badge> |
+| Integrations | API keys, webhooks, CI intake, IaC import, `ork` CLI (Preview) | Change management with ServiceNow or Jira <Badge tone="planned">planned</Badge>; PagerDuty and Opsgenie <Badge tone="planned">planned</Badge> |
+| Observability | Health, incidents, private status pages, logs and metrics through adapters | Metrics retention over long periods, SLO management, incident analytics <Badge tone="planned">planned</Badge> |
+| Support | Community (GitHub Discussions) | Support backed by an SLA, security advisories before public disclosure <Badge tone="planned">planned</Badge> |
 
-Not decided yet: whether future Azure, OCI and GCP adapters are Community or Enterprise. The current
-recommendation is Community, to keep multi-cloud in the open core.
+One question is still open: whether future Azure, OCI and GCP adapters belong to Community or
+Enterprise. The current recommendation is Community, so that multicloud stays in the open core.
 
 ## Editions
 
 | Edition | For | Model |
 |---|---|---|
-| Community | Self-hosted, any size | Free, AGPL-3.0 |
-| Enterprise (self-hosted) | Regulated or larger organizations | Annual subscription, includes support |
-| OrkStage Cloud | Teams that want it hosted | Planned |
+| Community | Any size, on your own infrastructure | Free, AGPL-3.0 |
+| Enterprise (on your own infrastructure) | Regulated or larger organizations | Annual subscription, support included |
+| OrkStage Cloud | Teams that want us to host it | Planned |
 
 Pricing is not published yet. [Contact us](/docs/enterprise/contact/).

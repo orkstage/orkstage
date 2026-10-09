@@ -1,10 +1,10 @@
 ---
 title: Webhooks
-description: Receive OrkStage deployment, instance, incident and cloud target events as signed HTTP POSTs. Endpoints, events, payload, the OrkStage-Signature header, verification in Node.js, Python and Go, retries and redelivery.
+description: Receive signed OrkStage events over HTTPS. Event types, payload, signature checks in Node.js, Python and Go, retries, testing and redelivery.
 ---
 
 OrkStage sends events to your HTTPS endpoints as JSON `POST` requests signed with HMAC-SHA256. Use
-them to post to chat, open tickets, trigger pipelines or feed your incident tooling.
+them to post to chat, open tickets, start pipelines or feed your incident tools.
 
 ## Events
 
@@ -13,17 +13,17 @@ them to post to chat, open tickets, trigger pipelines or feed your incident tool
 | `deployment.started` | The worker picked up a deployment. |
 | `deployment.succeeded` | A deployment (apply or destroy) finished. |
 | `deployment.failed` | A deployment ended in failure. |
-| `deployment.awaiting_approval` | A high-risk production deployment waits for approval. |
+| `deployment.awaiting_approval` | A high risk production deployment waits for approval. |
 | `instance.degraded` | An instance's health dropped. |
 | `instance.drift_detected` | The drift scan found changes made outside OrkStage. |
-| `incident.opened`, `incident.updated`, `incident.resolved` | Incident lifecycle. |
-| `cloud_target.unhealthy` | A cloud target failed its checks. Subscribable, but not emitted by the current release. |
-| `ping` | Sent by **Send test**; not subscribable. |
+| `incident.opened`, `incident.updated`, `incident.resolved` | An incident was opened, updated or resolved. |
+| `cloud_target.unhealthy` | A cloud target failed validation, either when someone validates it or when a deployment checks it before it starts. Sent once, when the target becomes unhealthy. |
+| `ping` | Sent by the **Test** button in the console and by `POST /webhooks/:id/test`. You cannot subscribe to it. |
 
 ## Creating an endpoint
 
-In the console: **Integrations → Webhooks → New webhook**. Through the API (session, or a key with
-`webhooks:manage`):
+In the console, open **Integrations**, then **Webhooks**, then **New webhook**. Through the API, use a
+session or a key with `webhooks:manage`:
 
 ```http
 POST /api/v1/webhooks
@@ -37,17 +37,19 @@ Content-Type: application/json
 }
 ```
 
-The response contains `{ webhook, secret }`. The signing secret `whsec_…` is shown **once**; it is
-stored encrypted (`ENCRYPTION_KEY`). Rotate it with `POST /webhooks/:id/rotate-secret`.
+The response contains `{ webhook, secret }`. You see the signing secret (`whsec_…`) **once**. The
+server stores it encrypted with `ENCRYPTION_KEY`. To rotate it, call
+`POST /webhooks/:id/rotate-secret`, which returns the new secret.
 
-URL rules, checked at creation and again before every delivery:
+OrkStage checks the URL when you create the endpoint and again before every delivery, because DNS
+can change:
 
-- `https://` only, no credentials in the URL;
-- the host must not resolve to private, loopback, link-local or multicast addresses;
-- redirects are not followed; the timeout is 10 seconds.
+- The URL must use `https://` and must not contain credentials.
+- The host must not resolve to a private, loopback, link local or multicast address.
+- Redirects are not followed, and each request times out after 10 seconds.
 
-`WEBHOOK_ALLOW_PRIVATE=true` relaxes the first two rules for local development and is refused in
-production.
+For local development, `WEBHOOK_ALLOW_PRIVATE=true` also accepts `http://` URLs and private
+addresses. The API refuses to start with this setting in production.
 
 ## The request
 
@@ -75,7 +77,9 @@ OrkStage-Signature: t=1791234567,v1=5f2b…c9
 }
 ```
 
-`OrkStage-Delivery` is unique per delivery and stays the same across retries: use it to deduplicate.
+`OrkStage-Delivery` is unique per delivery and stays the same across retries. A manual redelivery is
+a new delivery with a new `OrkStage-Delivery` value, but its body keeps the original `id`. To drop
+duplicates, use the body `id`, which covers both retries and redeliveries.
 
 ## Verifying the signature
 
@@ -85,10 +89,11 @@ OrkStage-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>
 
 1. Read the **raw** request body, before any JSON parsing.
 2. Split the header on `,` and `=` to get `t` and `v1`.
-3. Reject the request if `t` is more than **300 seconds** away from your clock (replay protection).
+3. Reject the request if `t` is more than **300 seconds** away from your clock. This protects
+   against replays.
 4. Compute `HMAC-SHA256(secret, t + "." + rawBody)` as lowercase hex and compare it with `v1` in
    constant time.
-5. Answer `2xx` quickly; do the work asynchronously.
+5. Answer with a `2xx` status quickly, and do the work in the background.
 
 <Tabs items={['Node.js', 'Python', 'Go']}>
 <Tab value="Node.js">
@@ -114,7 +119,7 @@ export function verifyOrkStage(secret: string, header: string, rawBody: string, 
 // });
 ```
 
-This is the same algorithm as `verifyWebhook` in the platform's `packages/runtime/src/webhooks.ts`.
+The platform uses the same algorithm in `verifyWebhook` (`packages/runtime/src/webhooks.ts`).
 
 </Tab>
 <Tab value="Python">
@@ -209,19 +214,19 @@ func VerifyOrkStage(secret, header string, rawBody []byte, tolerance time.Durati
 
 | | |
 |---|---|
-| Success | Any `2xx` response within 10 seconds. The response body is ignored. |
-| Retry schedule | After a non-`2xx` or network error: 1 min, 5 min, 30 min, 2 h, 6 h, then `FAILED`. |
-| Auto-disable | After 20 consecutive failed deliveries the endpoint is disabled with a reason. Re-enable it with `PATCH /webhooks/:id { "enabled": true }`. |
+| Success | Any `2xx` response within 10 seconds. OrkStage ignores the response body. |
+| Retry schedule | After a network error or a status outside `2xx`, OrkStage retries after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours. Then the delivery is `FAILED`. |
+| Automatic disabling | After 20 failed deliveries in a row, OrkStage disables the endpoint and records a reason. Turn it back on with `PATCH /webhooks/:id { "enabled": true }`, which also resets the failure count. |
 
 ## Testing and redelivery
 
-| Endpoint | Does |
+| Endpoint | What it does |
 |---|---|
-| `POST /webhooks/:id/test` | Sends a `ping` immediately and returns the delivery result. |
-| `GET /webhooks/:id/deliveries` | The last 50 deliveries with status, attempts, response status and error. |
-| `POST /webhooks/:id/deliveries/:deliveryId/redeliver` | Queues the same payload again. |
-| `PATCH /webhooks/:id` | Change `url`, `description`, `events` or `enabled`. |
-| `DELETE /webhooks/:id` | Remove the endpoint. |
+| `POST /webhooks/:id/test` | Sends a `ping` at once and returns the delivery result. |
+| `GET /webhooks/:id/deliveries` | Lists the last 50 deliveries with status, attempts, response status and error. |
+| `POST /webhooks/:id/deliveries/:deliveryId/redeliver` | Creates a new delivery with the same payload and answers `202`. The worker sends it on its next pass. |
+| `PATCH /webhooks/:id` | Changes `url`, `description`, `events` or `enabled`. |
+| `DELETE /webhooks/:id` | Removes the endpoint. |
 
-In the console, **Integrations → Webhooks** shows recent deliveries per endpoint with a redeliver
-action.
+In the console, open **Integrations**, then **Webhooks**. The **Deliveries** button of an endpoint
+lists its recent deliveries, each with a **Redeliver** button.

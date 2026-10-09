@@ -1,6 +1,6 @@
 {
   "title": "Developer guide",
-  "description": "Templates, REST API, keys, webhooks, CLI, import",
+  "description": "Template format, REST API, API keys, webhooks, CI/CD, the CLI and IaC import",
   "root": true,
   "pages": [
     "template-reference",

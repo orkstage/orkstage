@@ -1,49 +1,52 @@
 ---
 title: Creating an instance
-description: Use the six-step wizard to create an OrkStage instance. Choose the tenant and template, bind each placement slot to a cloud target and region, set variables and the environment.
+description: Create an OrkStage instance with the six step wizard. Pick the tenant and template, bind each slot to a target and region, then set variables.
 ---
 
-An instance is created as a `DRAFT`. Nothing is provisioned until you [deploy](/docs/user-guide/deploy/).
-Open **Instances → New instance**. You need a role that can create instances: platform owner or
-admin, or customer owner or admin in the tenant.
+A new instance starts as a `DRAFT`, and nothing is provisioned until you
+[deploy](/docs/user-guide/deploy/) it. Open **Instances**, then **New instance**. Creating an
+instance needs a platform owner or admin role, or the customer owner or admin role in the tenant.
+
+## The six wizard steps
 
 <Steps>
 <Step>
 
 ### Tenant
 
-Choose the customer the instance belongs to. The tenant's plan decides which templates and placements
-are allowed, and the instance's cost is attributed to it.
+Choose the customer that owns the instance. The tenant's plan decides which templates and
+placements are allowed, and the instance's cost is attributed to that tenant.
 
 </Step>
 <Step>
 
 ### Template
 
-Pick a template and a **published** version. Published versions are immutable; drafts cannot be used.
-Templates marked non-production show a warning, and the `non-production-template` policy fails if you
-use one for a `production` instance.
+Pick a template and one of its **published** versions. Published versions never change, and drafts
+cannot be used. Templates marked `nonProduction` show a warning. The `non-production-template`
+policy fails if you use one for a `production` instance.
 
-| Built-in template | Profile | Plans |
+| Predefined template | Profile | Plans |
 |---|---|---|
-| `free-validation` | shared sandbox, non-production | FREE, SANDBOX |
-| `sandbox-min-cost` | dedicated sandbox, non-production | SANDBOX, STARTER |
-| `starter-standard` | starter | STARTER, GROWTH |
-| `growth-standard` | growth | GROWTH, SCALE |
-| `scale-custom` | scale | SCALE |
-| `multicloud-reference` | growth | GROWTH, SCALE |
+| `free-validation` | `shared-sandbox`, nonproduction | FREE, SANDBOX |
+| `sandbox-min-cost` | `dedicated-sandbox`, nonproduction | SANDBOX, STARTER |
+| `starter-standard` | `starter` | STARTER, GROWTH |
+| `growth-standard` | `growth` | GROWTH, SCALE |
+| `scale-custom` | `scale` | SCALE |
+| `multicloud-reference` | `growth` | GROWTH, SCALE |
 
 </Step>
 <Step>
 
 ### Placement
 
-Bind every **placement slot** of the template to a **cloud target** and a **region**. Slots can use
-different clouds: for `multicloud-reference`, `primary` on AWS, `data` on Azure and `storage` on OCI.
-The list only offers targets whose provider the slot accepts and regions the target allows.
+Bind every **placement slot** of the template to a **cloud target** and a **region**. Slots can
+use different clouds. With `multicloud-reference`, for example, `primary` can run on AWS, `data` on
+Azure and `storage` on OCI. The list offers only targets whose provider the slot accepts, and only
+the regions each target allows.
 
 <Callout>
-  Simulated targets (the mock provider) are labelled as simulated. Use them to rehearse a topology
+  Simulated targets (the mock provider) carry a simulated label. Use them to rehearse a topology
   before you connect real accounts.
 </Callout>
 
@@ -52,25 +55,26 @@ The list only offers targets whose provider the slot accepts and regions the tar
 
 ### Variables
 
-Templates expose a few typed variables (for example `apiReplicas` or `databaseSize`). Defaults are
-pre-filled; ranges and allowed values are validated in the browser and again by the API.
+Templates expose a few typed variables, for example `apiReplicas` or `databaseSize`. The form
+starts with the default values. The browser checks ranges and allowed values, and the API checks
+them again.
 
 </Step>
 <Step>
 
 ### Name and environment
 
-Give the instance a name and a slug (lowercase, used in physical resource names such as
-`co-acme-staging-api`), and choose the environment: `production`, `staging`, `development` or
-`sandbox`. Production instances get stricter policies (backups) and an approval step for high-risk
-changes.
+Give the instance a name and a slug. The slug is lowercase and goes into physical resource names
+such as `co-acme-staging-api`. Then choose the environment: `production`, `staging`, `development`
+or `sandbox`. Production instances get stricter policies (backups are required) and an approval
+step for high risk changes.
 
 </Step>
 <Step>
 
 ### Review and create
 
-Check the summary and create the draft. You land on the instance page, where the
+Check the summary and create the draft. The console opens the instance page, where the
 [Plan & cost](/docs/user-guide/plan-and-cost/) tab previews what a deployment would do.
 
 </Step>
@@ -92,4 +96,4 @@ curl -X POST http://localhost:4000/api/v1/instances \
   }'
 ```
 
-The key needs the `instances:write` scope. See [API keys](/docs/developer/api-keys/).
+The API key needs the `instances:write` scope. See [API keys](/docs/developer/api-keys/).

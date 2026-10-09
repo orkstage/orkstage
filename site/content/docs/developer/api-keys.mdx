@@ -3,9 +3,9 @@ title: API keys
 description: Create, use, scope and revoke OrkStage API keys for CI/CD, scripts and the ork CLI. Token format, roles, the ten scopes, expiry, auditing and storage.
 ---
 
-API keys authenticate automation: CI pipelines, scripts and the `ork` CLI. A key acts with a
-**role**, and **scopes** narrow what that role allows. A key never outranks its role, and keys cannot
-manage keys.
+API keys authenticate automation: CI pipelines, scripts and the `ork` CLI. Each key acts with a
+**role**, and its **scopes** narrow what that role allows. A key can never do more than its role,
+and no key can manage other keys.
 
 ## Token format
 
@@ -14,16 +14,19 @@ ork_<env>_<prefix>_<secret>
 ork_live_7f3a9c21_q3Xv…   (43 URL-safe characters of secret)
 ```
 
-- `env` is `live` or `test`, a label for you; both work the same.
-- `prefix` (8 hex characters) is stored and shown in lists and audit entries.
-- Only the SHA-256 of the full token is stored. The token is shown **once**, at creation.
+- `env` is `live` or `test`. It is a label for you, and both kinds work the same way.
+- The prefix (`ork_<env>_` plus 8 hex characters, for example `ork_live_7f3a9c21`) is stored and
+  appears in key lists and audit entries.
+- The server stores only the SHA-256 hash of the full token. You see the token **once**, when you
+  create the key.
 
 ## Creating a key
 
 <Tabs items={['Console', 'API']}>
 <Tab value="Console">
 
-Open **Integrations → API keys → New API key**. Pick a preset or choose scopes:
+Open **Integrations**, then **API keys**, then **New API key**. Pick a preset or choose the scopes
+yourself:
 
 | Preset | Scopes |
 |---|---|
@@ -32,12 +35,12 @@ Open **Integrations → API keys → New API key**. Pick a preset or choose scop
 | ork CLI (developer) | `instances:read`, `instances:deploy`, `templates:read`, `templates:write`, `imports:write` |
 | Image publishing | `applications:write` |
 
-Copy the token immediately and store it in your CI secret store.
+Copy the token right away and put it in your CI secret store.
 
 </Tab>
 <Tab value="API">
 
-Key management needs a signed-in user (a session), not another key:
+Only a signed in user (a session) can create keys. Another key cannot:
 
 ```http
 POST /api/v1/api-keys
@@ -68,28 +71,36 @@ Content-Type: application/json
 
 | Key | `tenantId` | Allowed roles | Who can create it |
 |---|---|---|---|
-| Tenant key | required | `CustomerAdmin`, `CustomerDeveloper`, `CustomerViewer` | Owners and admins of that tenant, platform admins |
+| Tenant key | required | `CustomerAdmin`, `CustomerDeveloper`, `CustomerViewer` | Owners and admins of that tenant, platform owners and admins |
 | Organization key | omitted | `PlatformAdmin`, `PlatformOperator` | Platform owners and admins only |
 
-Mixing them is rejected (`INVALID_KEY_ROLE`, `TENANT_REQUIRED`, `ROLE_TOO_HIGH`).
+The API rejects any other combination with `INVALID_KEY_ROLE`, `TENANT_REQUIRED` or
+`ROLE_TOO_HIGH`.
+
+<Callout title="Templates and catalog applications need an organization key">
+  Templates and catalog applications are shared by all tenants, so only platform roles can change
+  them. Creating or publishing a template (`ork template push`, or a template from an import) and
+  registering or publishing application images need an organization key with the `PlatformAdmin`
+  role. A tenant key can still validate templates, create imports and deploy.
+</Callout>
 
 ## Scopes
 
 | Scope | Grants (within the role) |
 |---|---|
-| `instances:read` | Instances, deployments and events, logs, metrics, tenants, cloud targets, incidents, status pages |
+| `instances:read` | Instances, deployments and their events, logs, metrics, tenants, cloud targets, incidents, status pages |
 | `instances:write` | Create and update instances, upgrade the template version |
 | `instances:deploy` | Deploy, destroy, approve, cancel, retry; simulation controls |
 | `templates:read` | Templates, plans, applications; template validation |
 | `templates:write` | Create templates and versions, publish, clone; create a template from an import |
-| `applications:write` | Publish application image versions (CI intake) |
+| `applications:write` | Register applications and publish image versions (CI intake) |
 | `incidents:write` | Create incidents and post updates |
 | `imports:write` | Create and read IaC imports |
-| `webhooks:manage` | Manage webhook endpoints, test, deliveries, redelivery |
+| `webhooks:manage` | Manage webhook endpoints, send tests, list deliveries, redeliver |
 | `audit:read` | Read the audit log (and export it, with an Enterprise license) |
 
-A request with a key that lacks the scope gets `403 API_KEY_SCOPE` with the required scope in
-`details`. An endpoint that declares no scope answers `403 API_KEY_NOT_ALLOWED`.
+When a key lacks the scope an endpoint requires, the API answers `403 API_KEY_SCOPE` and names the
+required scope in `details`. An endpoint that declares no scope answers `403 API_KEY_NOT_ALLOWED`.
 
 ## Using a key
 
@@ -98,17 +109,20 @@ export ORK_TOKEN=ork_live_7f3a9c21_…
 curl -s "$ORK_API_URL/api/v1/instances" -H "Authorization: Bearer $ORK_TOKEN"
 ```
 
-Bearer requests need no `x-co-csrf` header.
+Requests with a bearer token need no `x-co-csrf` header.
 
 ## Lifecycle
 
-- **Expiry**: optional `expiresAt` in the future. Expired keys get `401 INVALID_API_KEY`.
-- **Revocation**: `DELETE /api/v1/api-keys/:id` (204) or the console. Effective immediately.
-- **Last use**: `lastUsedAt` is updated (at most every few minutes) with the client address.
-- **Audit**: every action is recorded with `actorType = API_KEY` and `actorLabel = "<key name> (<prefix>)"`.
+- **Expiry**: `expiresAt` is optional and must be in the future. An expired key gets
+  `401 INVALID_API_KEY`.
+- **Revocation**: call `DELETE /api/v1/api-keys/:id` (it returns `204`) or use the console. The key
+  stops working at once and also gets `401 INVALID_API_KEY`.
+- **Last use**: the API updates `lastUsedAt` and the client address at most once a minute.
+- **Audit**: every action a key takes is recorded with `actorType = API_KEY` and
+  `actorLabel = "<key name> (<prefix>)"`.
 
 ## Good practice
 
-- One key per pipeline or integration, with the smallest preset that works.
-- Prefer tenant keys with `CustomerDeveloper` over organization keys.
-- Set an expiry and rotate by creating a new key before revoking the old one.
+- Create one key per pipeline or integration, with the smallest preset that works.
+- Prefer tenant keys with `CustomerDeveloper` over organization keys where the job allows it.
+- Set an expiry. To rotate, create the new key first and then revoke the old one.

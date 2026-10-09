@@ -9,8 +9,9 @@
  * primary actions, focus and a few highlights; War Forge Orange #FF6B00 only signals alerts.
  */
 @theme {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: 'Space Grotesk Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  /* --font-inter and --font-space-grotesk come from next/font (lib/fonts.ts), set on <html>. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* Light (docs) */
@@ -135,4 +136,9 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Code comments in the dark theme: the Shiki default (#6A737D) fails WCAG AA on the code surface. */
+.dark .shiki span[style*='--shiki-dark:#6A737D'] {
+  --shiki-dark: #8b949e !important; /* beats the inline style */
 }

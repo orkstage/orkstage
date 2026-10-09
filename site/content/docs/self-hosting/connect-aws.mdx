@@ -1,11 +1,11 @@
 ---
 title: Connecting an AWS account
-description: Connect a real AWS account to OrkStage. Create the deployment role with the CloudFormation template and an external id, prepare the OpenTofu state bucket, register and validate the cloud target, and understand the permission checks.
+description: Create the OrkStage deployment role with an external id, prepare the OpenTofu state bucket, then register and validate an AWS account as a cloud target.
 ---
 
-OrkStage never stores AWS keys for your accounts. The worker assumes a **deployment role** in each
-account with **AssumeRole + an external id** and gets short-lived credentials (one hour, cached in
-memory, never persisted or logged).
+OrkStage never stores AWS keys for your accounts. In each account, the worker assumes a **deployment
+role** with **AssumeRole and an external id**. It receives short lived credentials that last one hour,
+stay in memory and are never persisted or logged.
 
 ```text
 control plane identity (worker task role / IAM user)
@@ -15,23 +15,25 @@ co-deploy role in the customer account  ──▶  OpenTofu runner (credentials 
 ```
 
 <Callout type="warn">
-  Prefer a dedicated AWS account per environment: the deployment role can create and delete
-  infrastructure.
+  The deployment role can create and delete infrastructure. Use a dedicated AWS account for each
+  environment.
 </Callout>
+
+## Connect an account
 
 <Steps>
 <Step>
 
 ### Create the deployment role
 
-Launch the CloudFormation template `infra/aws/orkstage-deployment-role.yaml` (from the platform
-repository) once in each account you connect.
+Launch the CloudFormation template `infra/aws/orkstage-deployment-role.yaml` from the platform
+repository once in each account you connect.
 
 | Parameter | Value |
 |---|---|
-| `ControlPlanePrincipalArn` | ARN of the identity the OrkStage worker runs as, e.g. `arn:aws:iam::111122223333:role/orkstage-worker` |
-| `ExternalId` | A random shared secret, at least 16 characters (`openssl rand -hex 24`). `NoEcho`. |
-| `RoleName` | Default `co-deploy` |
+| `ControlPlanePrincipalArn` | ARN of the identity the OrkStage worker runs as, for example `arn:aws:iam::111122223333:role/orkstage-worker`. |
+| `ExternalId` | A random shared secret of at least 16 characters (`openssl rand -hex 24`). Marked `NoEcho`. |
+| `RoleName` | Defaults to `co-deploy`. |
 
 ```bash
 aws cloudformation deploy \
@@ -43,29 +45,29 @@ aws cloudformation deploy \
       ExternalId="$EXTERNAL_ID"
 ```
 
-The stack outputs **`RoleArn`** and **`AccountId`**; you paste both into the cloud target.
+The stack outputs **`RoleArn`** and **`AccountId`**. You paste both into the cloud target.
 
-What the role may do, in short:
+In short, the role may:
 
-- manage EC2/VPC, ECS, RDS, ElastiCache, ELB, Auto Scaling, Route 53 and ACM resources;
+- manage EC2 and VPC, ECS, RDS, ElastiCache, ELB, Auto Scaling, Route 53 and ACM resources;
 - manage ECR repositories, SQS queues, Secrets Manager secrets, S3 buckets and IAM service roles
-  whose names start with `co-` (every physical name OrkStage creates does), and log groups under
+  whose names start with `co-` (every physical name OrkStage creates does), plus log groups under
   `/orkstage/`;
 - read and write the OpenTofu state bucket `orkstage-tfstate-<account>-*`;
-- pass `co-*` roles only to ECS tasks and EC2;
+- pass `co-*` roles to ECS tasks and EC2 only;
 - call `iam:SimulatePrincipalPolicy` **on itself**, so OrkStage can check permissions before it
   deploys.
 
-The template is kept in sync with the actions the OpenTofu modules need; a platform unit test fails
-when a module needs an action the policy does not grant.
+The template tracks the actions the OpenTofu modules need. A platform unit test fails when a module
+needs an action that the policy does not grant.
 
 </Step>
 <Step>
 
 ### Store the external id
 
-Put the external id in a secret store the control plane can read and reference it, never paste the
-value:
+Put the external id in a secret store that the control plane can read, and give OrkStage a reference
+to it. Never paste the value itself.
 
 ```text
 aws-sm://orkstage/aws/prod-external-id          # AWS Secrets Manager (name or ARN, optional #jsonKey)
@@ -79,14 +81,17 @@ See [Secret references](/docs/self-hosting/secrets/).
 
 ### Prepare the state bucket
 
-OpenTofu state lives in S3, one state file per resource (`orkstage/<physical-name>.tfstate`). On a
-real account the bucket must exist before the first deployment:
+OpenTofu state lives in S3, with one state file per resource (`orkstage/<physical-name>.tfstate`). In
+a real account, the bucket must exist before the first deployment and must have:
 
-- default name `orkstage-tfstate-<accountId>-<region>`, or set `stateBucket` on the target;
-- **versioning enabled** (recover from a damaged state);
+- the default name `orkstage-tfstate-<accountId>-<region>`, or the name you set in `stateBucket` on
+  the target;
+- **versioning enabled**, so you can recover from a damaged state;
 - **default encryption** enabled;
-- public access blocked;
-- locking uses OpenTofu's S3-native lock file (`use_lockfile`), so no DynamoDB table is needed.
+- public access blocked.
+
+Locking uses the lock file that OpenTofu keeps in S3 (`use_lockfile`), so you do not need a DynamoDB
+table.
 
 ```bash
 B=orkstage-tfstate-123456789012-us-east-1
@@ -103,7 +108,8 @@ aws s3api put-public-access-block --bucket "$B" \
 
 ### Register the cloud target
 
-**Cloud targets → Register cloud target** (platform owners and admins), or the API:
+Platform owners and admins can open **Cloud targets** in the console and click **Register cloud
+target**. You can also call the API:
 
 ```http
 POST /api/v1/cloud/targets
@@ -128,54 +134,57 @@ Content-Type: application/json
 
 | `config` field | Meaning |
 |---|---|
-| `accountId` | 12-digit account id (the `AccountId` output). |
+| `accountId` | The 12 digit account id (the `AccountId` output). |
 | `roleArn` | The `RoleArn` output. |
-| `stateBucket` | Optional; defaults to `orkstage-tfstate-<accountId>-<region>`. |
-| `dnsZone` | Platform DNS zone for instance subdomains, pre-provisioned in Route 53. |
-| `ecsAmiId` | Optional AMI for `ecs-ec2` capacity; empty uses the latest ECS-optimized AMI from SSM. |
+| `stateBucket` | Optional. Defaults to `orkstage-tfstate-<accountId>-<region>`. |
+| `dnsZone` | Platform DNS zone for instance subdomains. It must already exist in Route 53. |
+| `ecsAmiId` | Optional AMI for `ecs-ec2` capacity. When empty, OrkStage uses the latest ECS optimized AMI published in SSM. |
 
-`config` must not contain secrets: the API rejects keys that look like secrets
-(`422 SECRET_IN_CONFIG`). `credentialRef` must be an `env://` or `aws-sm://` reference; any other
-value is rejected. A target can be assigned to one tenant (`tenantId`) or shared.
+`config` must not contain secrets. The API rejects keys that look like secrets with
+`422 SECRET_IN_CONFIG`. `credentialRef` must be an `env://` or `aws-sm://` reference, and any other
+value is rejected. You can assign a target to one tenant (`tenantId`) or share it across tenants.
 
 </Step>
 <Step>
 
 ### Validate
 
-Click **Validate** (or `POST /cloud/targets/:id/validate { "region": "us-east-1" }`). OrkStage:
+Click **Validate**, or call `POST /cloud/targets/:id/validate { "region": "us-east-1" }`. OrkStage
+then:
 
 1. resolves the external id and **assumes the role**;
 2. checks that the credentials belong to `accountId`;
-3. checks the **state bucket** is reachable;
-4. **simulates the role** against the actions each supported service needs
-   (`iam:SimulatePrincipalPolicy`).
+3. checks that the **state bucket** is reachable;
+4. **simulates the role** against the actions each supported service needs, with
+   `iam:SimulatePrincipalPolicy`.
 
-Missing actions for a service show up as **warnings** on the Validate button: a target may be scoped
-to fewer services on purpose. If the role cannot call `iam:SimulatePrincipalPolicy`, the permission
-check is reported as skipped.
+Missing actions for a service appear as **warnings** on the Validate button, because you may scope a
+target to fewer services on purpose. If the role cannot call `iam:SimulatePrincipalPolicy`, the
+permission check is reported as skipped.
 
 </Step>
 </Steps>
 
 ## During a deployment
 
-The **Validate cloud targets** phase repeats the checks for each target and region the deployment
-uses, this time strictly for the services being deployed: a missing permission fails the phase with
-`AUTHORIZATION_ERROR` before any resource is touched, naming the missing actions.
+The **Validate cloud targets** phase repeats these checks for each target and region the deployment
+uses. This time it checks only the services being deployed, and it is strict. A missing permission
+fails the phase with `AUTHORIZATION_ERROR` before any resource is touched, and the error names the
+missing actions.
 
 ## What OrkStage creates in your account
 
 | Template resource | AWS resources |
 |---|---|
-| `network` | VPC, public/private subnets, internet gateway, route tables, internal security group, optional NAT gateways |
+| `network` | VPC, public and private subnets, internet gateway, route tables, internal security group, optional NAT gateways |
 | `container-registry` | ECR repository, lifecycle policy |
-| `compute.container-service` | ECS cluster, task definition, service, log group, execution role, security group; EC2 launch template, Auto Scaling group and capacity provider for `ecs-ec2`; Application Auto Scaling for `autoscaling` |
-| `database.postgresql` | RDS PostgreSQL instance, subnet group, security group, Secrets Manager secret (password generated as an ephemeral value, written write-only) |
+| `compute.container-service` | ECS cluster, task definition, service, log group, execution role, security group. With `ecs-ec2`: EC2 launch template, Auto Scaling group and capacity provider. With `autoscaling`: Application Auto Scaling. |
+| `database.postgresql` | RDS PostgreSQL instance, subnet group, security group, Secrets Manager secret (the password is generated as an ephemeral value and passed through write only attributes) |
 | `cache.redis` | ElastiCache Valkey replication group, subnet group, security group |
-| `queue` | SQS queue and dead-letter queue |
-| `object-storage` | S3 bucket with public access block, encryption, versioning and lifecycle |
+| `queue` | SQS queue and dead letter queue |
+| `object-storage` | S3 bucket with public access block, encryption, versioning and lifecycle rules |
 | `ingress` | Application Load Balancer, target groups, HTTP listener and rules |
 | `dns` | Route 53 record, ACM certificate with DNS validation, HTTPS listener |
 
-Every resource carries the platform's standard tags and a `co-<tenant>-<instance>-<resource>` name.
+Every resource carries the platform's standard tags and a name of the form
+`co-<tenant>-<instance>-<resource>`.

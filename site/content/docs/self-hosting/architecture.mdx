@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: How OrkStage is built. The console, the Control API, the worker, Postgres and Redis, the provisioning compiler, the DAG executor, provider adapters, the OpenTofu runner and the path from template to cloud.
+description: The OrkStage components (console, Control API, worker, Postgres, Redis), the path from template to cloud, the deployment workflow and provider adapters.
 ---
 
 ## Components
@@ -27,15 +27,15 @@ Web console (Next.js)  ──/api rewrite──▶  Control API (NestJS + Fastif
 
 | Component | Role |
 |---|---|
-| **Console** | Next.js app. Reaches the API through its own origin, so cookies stay first-party and CORS stays closed. |
-| **Control API** | Authentication, tenancy, authorization, templates, instances, integrations. Writes intent and enqueues jobs; never calls a cloud during a request. |
-| **Worker** | Runs deployments, the health monitor, drift scans, email and webhook delivery. The only process that changes cloud resources. |
-| **Postgres** | Desired and known state, deployments and steps, audit log (append-only). |
-| **Redis** | BullMQ queues and per-target concurrency slots. |
-| **OpenTofu runner** | Each `tofu` command runs in a throwaway container started by the worker. |
+| **Console** | Next.js app. It calls the API through its own origin, so cookies stay first party and the API needs no CORS. |
+| **Control API** | Authentication, tenancy, authorization, templates, instances and integrations. It records intent and enqueues jobs. It never calls a cloud while handling a request. |
+| **Worker** | Runs deployments, the health monitor, drift scans, email and webhook delivery. It is the only process that changes cloud resources. |
+| **Postgres** | Desired and known state, deployments and their steps, and the audit log (append only). |
+| **Redis** | BullMQ queues and the concurrency slots of each cloud target. |
+| **OpenTofu runner** | Each `tofu` command runs in a throwaway container that the worker starts. |
 
 The domain packages (`domain`, `templates`, `provisioning`) import no cloud SDK and no framework.
-Provider code lives only in `cloud-*` packages.
+Provider code lives only in the `cloud-*` packages.
 
 ## From template to cloud
 
@@ -53,48 +53,56 @@ Template (provider-neutral, versioned)
 = ResolvedInfrastructure ─▶ diff vs known resources ─▶ DeploymentPlan (grouped by provider)
 ```
 
-Nothing above touches a cloud. A deployment stores the `ResolvedInfrastructure` snapshot, so what
-was previewed is exactly what is applied.
+None of these steps touches a cloud. A deployment stores the `ResolvedInfrastructure` snapshot, so
+OrkStage applies exactly what you previewed.
 
 ## Deployment workflow
 
-Steps are created when the deployment is requested, so the console shows the whole plan at once. Jobs
-carry only the deployment id; each phase and resource step is persisted before and after it runs.
+OrkStage creates all steps when the deployment is requested, so the console shows the whole plan at
+once. A job carries only the deployment id. The worker persists each phase and resource step before
+and after it runs.
 
-- A crashed worker's job is re-delivered (BullMQ stalled-job handling) and resumes: finished phases
-  are skipped, converged resources (same idempotency key) are not re-applied.
-- Resource failures skip only dependents. Only transient failure classes (rate limits, network,
-  timeouts) are retried, with exponential backoff; destructive operations never are.
-- One active deployment per instance (atomic compare-and-set on status) and a configurable slot limit
-  per cloud target (`maxConcurrentDeployments`, in Redis).
-- Approval parks the deployment; approving re-enqueues it.
+- If a worker crashes, BullMQ delivers the job again (its stalled job handling) and the deployment
+  resumes. Finished phases are skipped, and converged resources (same idempotency key) are not
+  applied again.
+- A failed resource skips only the resources that depend on it. Only transient failures (rate limits,
+  network errors, timeouts) are retried, with exponential backoff. Destructive operations are never
+  retried.
+- An instance has at most one active deployment, enforced by an atomic compare and set on its status.
+  Each cloud target has a configurable slot limit (`maxConcurrentDeployments`, kept in Redis).
+- A deployment that needs approval is parked. Approving it puts it back in the queue.
 
-See [ADR 0003](/docs/contributing/architecture-decisions/#0003-deployment-workflow-on-bullmq-with-persisted-steps)
-for why BullMQ rather than Temporal.
+[ADR 0003](/docs/contributing/architecture-decisions/#0003-deployment-workflow-on-bullmq-with-persisted-steps)
+explains why the workflow runs on BullMQ rather than Temporal.
 
 ## Provider adapters
 
-`CloudProviderAdapter` is the only way the platform touches a cloud: `validateTarget`,
-`capabilities`, idempotent `ensureResource`, `deleteResource`, `getResource`, `checkHealth`, optional
-logs, metrics, plan and existence probes. A shared contract test suite runs against every adapter.
+`CloudProviderAdapter` is the only way the platform touches a cloud. It defines `validateTarget`,
+`capabilities`, an idempotent `ensureResource`, `deleteResource`, `getResource` and `checkHealth`, plus
+optional logs, metrics, plan and existence probes. One shared contract test suite runs against every
+adapter.
 
 | Adapter | Status |
 |---|---|
-| AWS (`cloud-aws`) | Real: OpenTofu provisioning, AWS SDK health checks, CloudWatch logs, cross-account AssumeRole. |
-| Mock (`cloud-mock`) | Deterministic simulation of AWS, Azure or OCI per target, with injectable failures, latency, health overrides and drift. Everything it touches is labelled simulated. |
-| Azure, OCI, GCP | Not yet. Their capability catalogs exist for simulation and planning. |
+| AWS (`cloud-aws`) | Real. Provisions with OpenTofu, checks health with the AWS SDK, reads CloudWatch logs and assumes a role in each connected account. |
+| Mock (`cloud-mock`) | Deterministic simulation of AWS, Azure or OCI, chosen per target, with injectable failures, latency, health overrides and drift. Everything it creates is labeled simulated. |
+| Azure, OCI | No real adapter yet. Their capability catalogs exist for simulation and planning. |
+| GCP | Not yet. No adapter and no capability catalog. |
 
-## State: desired, known, actual
+## Desired, known and actual state
 
-The database holds **desired** state (templates, instance configuration) and **known** state (what
-OrkStage recorded). Providers hold **actual** state. Each resource row carries a knowledge state and a
-drift status. Health checks re-read actual state each tick; the drift scan re-plans applied resources
-on real providers.
+The database holds **desired** state (templates and instance configuration) and **known** state (what
+OrkStage recorded). The providers hold **actual** state. Each resource row has a knowledge state and a
+drift status. Health checks read actual state again on every tick, and the drift scan plans applied
+resources again on real providers.
 
 ## Tenancy and security model
 
-Shared database with an explicit `tenantId` on every tenant-owned row. Isolation is layered: request
-principal → query scoping by membership → CASL check on the loaded record → audit. Server-side opaque
-sessions, a CSRF header, no CORS, secrets referenced never stored, provider credentials never in the
-browser, and an append-only audit log. See [Security hardening](/docs/self-hosting/security/) and
+All tenants share one database, and every row a tenant owns carries an explicit `tenantId`. Isolation
+has four layers, in order: the request principal, query scoping by membership, a CASL check on the
+loaded record, and the audit log.
+
+Sessions are opaque and stored on the server. Requests need a CSRF header, the API allows no CORS,
+secrets are stored as references only, provider credentials never reach the browser and the audit log
+is append only. See [Security hardening](/docs/self-hosting/security/) and
 [ADR 0004](/docs/contributing/architecture-decisions/#0004-tenancy-sessions-and-authorization).

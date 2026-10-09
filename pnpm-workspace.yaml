@@ -10,3 +10,6 @@ allowBuilds:
   '@scarf/scarf': false
   # Optional native accelerator for BullMQ's msgpack; prebuilt fallback is fine.
   msgpackr-extract: false
+
+# Supply chain: ignore package versions published less than a day ago (minutes).
+minimumReleaseAge: 1440

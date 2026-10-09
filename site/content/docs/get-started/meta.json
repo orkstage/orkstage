@@ -1,6 +1,6 @@
 {
   "title": "Get started",
-  "description": "Install, run and understand OrkStage",
+  "description": "Run OrkStage locally and learn its core concepts",
   "root": true,
   "pages": ["index", "quickstart", "local-aws", "core-concepts"]
 }

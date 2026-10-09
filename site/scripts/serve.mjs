@@ -1,8 +1,10 @@
-// Minimal static server for `out/` that mimics S3 + CloudFront: `/path/` → `/path/index.html`,
+// Minimal static server for `out/` that mimics S3 + CloudFront (gzip for text, immutable cache for
+// /_next/static, as in infra/): `/path/` → `/path/index.html`,
 // `/path` → `/path/index.html` when it is a directory, unknown paths → 404.html with status 404.
 // Usage: pnpm serve [port]   (default 4321)
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createGzip } from 'node:zlib';
 import { extname, join, normalize, resolve } from 'node:path';
 
 const root = resolve('out');
@@ -35,6 +37,12 @@ function resolveFile(urlPath) {
 createServer((req, res) => {
   const file = resolveFile(req.url ?? '/');
   const target = file ?? join(root, '404.html');
-  res.writeHead(file ? 200 : 404, { 'content-type': TYPES[extname(target)] ?? 'application/octet-stream' });
-  createReadStream(target).pipe(res);
+  const type = TYPES[extname(target)] ?? 'application/octet-stream';
+  const headers = { 'content-type': type };
+  if ((req.url ?? '').startsWith('/_next/static/')) headers['cache-control'] = 'public, max-age=31536000, immutable';
+  const gzip = /text|javascript|json|xml|svg/.test(type) && /\bgzip\b/.test(req.headers['accept-encoding'] ?? '');
+  if (gzip) headers['content-encoding'] = 'gzip';
+  res.writeHead(file ? 200 : 404, headers);
+  const stream = createReadStream(target);
+  (gzip ? stream.pipe(createGzip()) : stream).pipe(res);
 }).listen(port, () => console.log(`Serving ${root} on http://localhost:${port}`));

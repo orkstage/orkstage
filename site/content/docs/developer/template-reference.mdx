@@ -1,10 +1,11 @@
 ---
 title: Template reference
-description: The complete platform/v1 EnvironmentTemplate format. Metadata, plans, placement slots, variables, every resource type and field with defaults and limits, connectivity, observability and examples.
+description: The platform/v1 EnvironmentTemplate format. Metadata, plans, placement slots, variables, every resource type with defaults and limits, and examples.
 ---
 
-Templates describe **intent**, never provider resource blocks. The schema below is the source of
-truth used by the API, the console builder and the CLI (`packages/templates/src/schema.ts`).
+A template describes **intent**, never provider resource blocks. The schema on this page comes from
+`packages/templates/src/schema.ts`, the source of truth for the API, the console builder and the
+CLI.
 
 ```yaml title="minimal template"
 apiVersion: platform/v1
@@ -29,8 +30,8 @@ spec:
 
 ## Identifiers
 
-Resource ids, slot names and variable names match `^[a-z][a-zA-Z0-9-]{0,39}$`: start with a
-lowercase letter, then letters, digits and dashes, at most 40 characters.
+Resource ids, slot names and variable names match `^[a-z][a-zA-Z0-9-]{0,39}$`. They start with a
+lowercase letter, continue with letters, digits and dashes, and have at most 40 characters.
 
 ## metadata
 
@@ -40,17 +41,17 @@ lowercase letter, then letters, digits and dashes, at most 40 characters.
 | `version` | string | required | Semantic version `MAJOR.MINOR.PATCH`. |
 | `displayName` | string | required | Shown in the console. |
 | `description` | string | `""` | |
-| `nonProduction` | boolean | `false` | Shows a warning; the `non-production-template` policy fails it for production instances. |
+| `nonProduction` | boolean | `false` | Shows a warning. The `non-production-template` policy fails it for production instances. |
 | `profile` | enum | required | `shared-sandbox`, `dedicated-sandbox`, `starter`, `growth`, `scale`. |
 
 ## spec
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `plans` | enum[] | required, ≥ 1 | `FREE`, `SANDBOX`, `STARTER`, `GROWTH`, `SCALE`. |
-| `placements` | slot[] | required, ≥ 1 | See [placements](#placements). |
+| `plans` | enum[] | required, at least 1 | `FREE`, `SANDBOX`, `STARTER`, `GROWTH`, `SCALE`. |
+| `placements` | slot[] | required, at least 1 | See [placements](#placements). |
 | `variables` | variable[] | `[]` | See [variables](#variables). |
-| `resources` | resource[] | required, ≥ 1 | See [resources](#resources). |
+| `resources` | resource[] | required, at least 1 | See [resources](#resources). |
 | `connectivity` | requirement[] | `[]` | See [connectivity](#connectivity). |
 | `observability` | object | all on except `traces` | See [observability](#observability). |
 
@@ -60,9 +61,9 @@ A placement slot is a named group of resources that an instance binds to one clo
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `name` | id | required | Referenced by resources' `placement`. |
+| `name` | id | required | Resources refer to it in their `placement` field. |
 | `description` | string | | |
-| `providers` | enum[] | `[]` (any) | Allowed providers: `aws`, `azure`, `gcp`, `oci`, `mock`. |
+| `providers` | enum[] | `[]` (any) | Allowed providers: `aws`, `azure`, `gcp`, `oci`, `mock`. An empty list allows any registered provider. |
 
 ```yaml
 placements:
@@ -74,8 +75,8 @@ placements:
     providers: [aws, azure, mock]
 ```
 
-Networks bind implicitly only to resources in the same slot, so a database placed on another cloud
-does not depend on the AWS VPC.
+A network binds implicitly only to resources in its own slot. A database placed on another cloud
+therefore does not depend on the AWS VPC.
 
 ## Variables
 
@@ -85,9 +86,9 @@ does not depend on the AWS VPC.
 | `description` | string | | |
 | `type` | enum | required | `number`, `string`, `boolean`. |
 | `default` | number, string or boolean | required | |
-| `min`, `max` | number | | For numbers. |
-| `allowed` | string[] | | For strings. |
-| `target` | string | required | The field it sets, `<resourceId>.<field>`, for example `api.replicas`. |
+| `min`, `max` | number | | For number variables. |
+| `allowed` | string[] | | For string variables. |
+| `target` | string | required | The field the variable sets, as `<resourceId>.<field>`, for example `api.replicas`. |
 
 ```yaml
 variables:
@@ -110,13 +111,13 @@ Every resource has these common fields, plus the fields of its `type`.
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `id` | id | required | Unique in the template. Used in physical names: `co-<tenant>-<instance>-<id>`. |
+| `id` | id | required | Unique in the template. Physical names use it: `co-<tenant>-<instance>-<id>`. |
 | `type` | enum | required | One of the nine types below. |
 | `placement` | id | `primary` | The slot this resource belongs to. |
-| `implementation` | string | resolver's default | Preferred capability, e.g. `ecs-fargate`, `ecs-ec2`, `rds-postgres`. |
-| `enabled` | boolean | `true` | Disabled resources stay in the template (so variables can toggle them) but are never provisioned. |
-| `dependsOn` | id[] | `[]` | Explicit dependencies; implicit ones (network, ingress routes, DNS target) are added. |
-| `overrides` | map of maps | | Provider-specific escape hatch, `{ aws: { … } }`. Less portable; admin only. |
+| `implementation` | string | resolver's default | Preferred capability, for example `ecs-fargate`, `ecs-ec2` or `rds-postgres`. |
+| `enabled` | boolean | `true` | A disabled resource stays in the template, so a variable can turn it on, but is never provisioned. |
+| `dependsOn` | id[] | `[]` | Explicit dependencies. OrkStage adds the implicit ones (network, ingress routes, DNS target). |
+| `overrides` | map of maps | | Escape hatch for settings of one provider, such as `{ aws: { … } }`. Less portable, and for admins only. |
 
 ### `network`
 
@@ -124,28 +125,28 @@ Every resource has these common fields, plus the fields of its `type`.
 |---|---|---|---|
 | `strategy` | enum | `isolated` | `isolated` or `shared`. |
 | `availabilityZones` | integer | `1` | 1 to 3. |
-| `natGateway` | boolean | `false` | Private egress through NAT (one per AZ; adds cost). |
+| `natGateway` | boolean | `false` | Private egress through NAT. Adds one NAT gateway per availability zone, which adds cost. |
 
 ### `compute.container-service`
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `image` | string | required | Catalog reference, e.g. `catalog://orders-api`, resolved to an immutable digest at deploy. |
+| `image` | string | required | Catalog reference such as `catalog://orders-api`. It resolves to an immutable digest at deploy time. |
 | `replicas` | integer | `1` | 0 to 100. |
-| `cpu` | number | `0.25` | vCPU, > 0 and ≤ 16. |
+| `cpu` | number | `0.25` | vCPU, more than 0 and at most 16. |
 | `memoryMiB` | integer | `512` | 128 to 122880. |
 | `port` | integer | | 1 to 65535. |
 | `public` | boolean | `false` | Reachable through an ingress. |
 | `healthCheckPath` | string | | Must start with `/`. |
-| `autoscaling` | object | | `{ minReplicas, maxReplicas, targetCpuPercent (10–95) }`. |
-| `critical` | boolean | `true` | Unhealthy critical components make the instance unhealthy. |
+| `autoscaling` | object | | `{ minReplicas, maxReplicas, targetCpuPercent }`, with `targetCpuPercent` from 10 to 95. |
+| `critical` | boolean | `true` | When a critical component is unhealthy, the instance is unhealthy. |
 
-AWS implementations: `ecs-fargate` (default) and `ecs-ec2`.
+AWS implementations: `ecs-fargate` (the default) and `ecs-ec2`.
 
 <Callout>
-  On AWS, `autoscaling` becomes an Application Auto Scaling target and a CPU target-tracking policy
-  on the ECS service. MiniStack does not emulate autoscaling: there the service runs `replicas` fixed
-  tasks and the deployment logs a warning.
+  On AWS, `autoscaling` becomes an Application Auto Scaling target with a target tracking policy on
+  CPU for the ECS service. MiniStack does not emulate autoscaling. There the service runs a fixed
+  number of tasks (`replicas`) and the deployment logs a warning.
 </Callout>
 
 ### `container-registry`
@@ -162,9 +163,9 @@ AWS implementations: `ecs-fargate` (default) and `ecs-ec2`.
 | `version` | string | `"17"` | Major version. |
 | `size` | enum | `small` | `micro`, `small`, `medium`, `large`, `xlarge`. |
 | `storageGiB` | integer | `20` | 1 to 16384. |
-| `highAvailability` | enum | `none` | `none`, `same-zone`, `zone-redundant`. RDS offers zone-redundant (Multi-AZ) only. |
-| `publicAccess` | boolean | `false` | The `no-public-database` policy fails `true`. |
-| `backup` | object | `{ enabled: true, retentionDays: 7 }` | `retentionDays` 0 to 35; optional `recoveryPointObjectiveMinutes`. |
+| `highAvailability` | enum | `none` | `none`, `same-zone`, `zone-redundant`. On AWS, RDS supports only `zone-redundant`, which turns on the RDS `multi_az` setting. |
+| `publicAccess` | boolean | `false` | The `no-public-database` policy fails a database with `true`. |
+| `backup` | object | `{ enabled: true, retentionDays: 7 }` | `retentionDays` is 0 to 35. `recoveryPointObjectiveMinutes` is optional. |
 | `critical` | boolean | `true` | |
 
 ### `cache.redis`
@@ -175,7 +176,7 @@ AWS implementations: `ecs-fargate` (default) and `ecs-ec2`.
 | `replicas` | integer | `0` | 0 to 5. |
 | `critical` | boolean | `false` | |
 
-AWS implementation: ElastiCache with the Valkey engine (Redis OSS compatible).
+AWS implementation: ElastiCache with the Valkey engine, which is compatible with Redis OSS.
 
 ### `queue`
 
@@ -191,15 +192,15 @@ AWS implementation: ElastiCache with the Valkey engine (Redis OSS compatible).
 |---|---|---|---|
 | `tier` | enum | `standard` | `standard`, `infrequent`, `archive`. |
 | `versioning` | boolean | `false` | |
-| `publicAccess` | boolean | `false` | The `no-public-storage` policy fails `true`. |
-| `retentionDays` | integer | | Lifecycle expiration. |
+| `publicAccess` | boolean | `false` | The `no-public-storage` policy fails a bucket with `true`. |
+| `retentionDays` | integer | | Lifecycle expiration, in days. |
 | `critical` | boolean | `false` | |
 
 ### `ingress`
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `routes` | route[] | required, ≥ 1 | `{ service: <container-service id>, pathPrefix: "/" }`. |
+| `routes` | route[] | required, at least 1 | `{ service, pathPrefix }`. `service` is the id of a container service. `pathPrefix` defaults to `/`. |
 | `tls` | boolean | `true` | |
 
 ### `dns`
@@ -207,7 +208,7 @@ AWS implementation: ElastiCache with the Valkey engine (Redis OSS compatible).
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `target` | id | required | The ingress this name points to. |
-| `subdomain` | boolean | `true` | A name under the platform zone, e.g. `production-acme.apps.example.com`. |
+| `subdomain` | boolean | `true` | A name under the platform zone, for example `production-acme.apps.example.com`. |
 | `customDomain` | enum | `disabled` | `disabled`, `optional`, `required`. |
 
 ## Connectivity
@@ -216,12 +217,12 @@ AWS implementation: ElastiCache with the Valkey engine (Redis OSS compatible).
 |---|---|---|---|
 | `from`, `to` | id | required | Resource ids. |
 | `protocol` | enum | required | `tcp`, `http`, `https`, `postgres`, `redis`, `amqp`. |
-| `port` | integer | | |
+| `port` | integer | | 1 to 65535. |
 | `mode` | enum | `private-preferred` | `private-required`, `private-preferred`, `secure`. |
 
-`private-preferred` falls back to TLS over a public endpoint with allowlisting when the two resources
-are on different clouds; `private-required` across clouds is rejected by the plan. See
-[Reviewing plan & cost](/docs/user-guide/plan-and-cost/#connectivity).
+When the two resources are on different clouds, `private-preferred` falls back to TLS over a public
+endpoint with an allowlist. The plan rejects `private-required` across clouds. See
+[connectivity in the plan review](/docs/user-guide/plan-and-cost/#connectivity).
 
 ```yaml
 connectivity:
@@ -239,7 +240,11 @@ connectivity:
 | `uptime` | `true` |
 | `alerts` | `true` |
 
-## Example: the multi-cloud reference
+## Example: the multicloud reference
+
+This example places the API on AWS, the database on Azure and object storage on OCI. AWS is
+deployed for real through OpenTofu. Azure and OCI are simulated in this release, so those two slots
+produce simulated resources unless you bind them to an AWS target.
 
 ```yaml title="06-multicloud-reference.yaml"
 apiVersion: platform/v1

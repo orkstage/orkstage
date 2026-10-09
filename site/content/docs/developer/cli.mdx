@@ -1,24 +1,24 @@
 ---
 title: ork CLI reference
-description: The ork command-line tool (Preview). Install from source or run in Docker, log in with an API key, scan a project into a template, push it, deploy and operate instances. Commands, flags, exit codes, the .ork folder and credentials.
+description: The ork CLI (Preview). Install it, log in with an API key, scan a project into a template, push it, deploy instances. Commands, flags and exit codes.
 ---
 
 <Callout title="Preview" type="warn">
-  `ork` works against the OrkStage API today, but signed binaries are not released yet. Build it from
+  `ork` works against the OrkStage API today, but there are no signed binaries yet. Build it from
   source or run it in Docker. Commands and output may still change.
 </Callout>
 
-`ork` turns an existing project (Terraform/OpenTofu, CloudFormation/SAM/CDK, Kubernetes/Helm, Docker
-Compose, Dockerfiles, package manifests, with Pulumi, Serverless, Bicep and ARM detection) into an
-OrkStage template, pushes it, and deploys and operates instances from your terminal or CI. It is
-written in Rust and licensed AGPL-3.0.
+`ork` turns an existing project into an OrkStage template, pushes it, and deploys and operates
+instances from your terminal or from CI. It reads Terraform and OpenTofu, CloudFormation, SAM and
+CDK, Kubernetes and Helm, Docker Compose, Dockerfiles and package manifests. It also detects Pulumi,
+Serverless, Bicep and ARM projects. The CLI is written in Rust and licensed under AGPL-3.0.
 
 ## Install
 
 <Tabs items={['From source', 'Docker']}>
 <Tab value="From source">
 
-Requires Rust 1.88 or newer.
+You need Rust 1.88 or newer.
 
 ```bash
 git clone https://github.com/orkstage/orkstage.git
@@ -27,8 +27,8 @@ cargo install --path crates/ork-cli --locked
 ork --version
 ```
 
-The CLI lives in the `cli/` folder of the main repository; it moves to its own repository,
-`orkstage-cli`, when the [polyrepo split](/docs/contributing/repository-map/) happens.
+The CLI lives in the `cli/` folder of the main repository. It moves to its own repository,
+`orkstage-cli`, with the [polyrepo split](/docs/contributing/repository-map/).
 
 </Tab>
 <Tab value="Docker">
@@ -51,7 +51,7 @@ docker run --rm --network cloud-orchestrator_default \
 </Tab>
 </Tabs>
 
-Shell completions: `ork completions bash|zsh|fish|powershell|elvish > <your completion dir>`.
+For shell completions, run `ork completions bash|zsh|fish|powershell|elvish > <your completion dir>`.
 
 ## Quick start
 
@@ -65,27 +65,29 @@ ork deploy --wait                                  # deploys [instance].slug fro
 ork status && ork logs api
 ```
 
-Use the **ork CLI (developer)** key preset: `instances:read`, `instances:deploy`, `templates:read`,
-`templates:write`, `imports:write`. See [API keys](/docs/developer/api-keys/).
+Create the key with the **ork CLI (developer)** preset: `instances:read`, `instances:deploy`,
+`templates:read`, `templates:write`, `imports:write`. Templates are shared by all tenants, so
+`ork template push` works only with an organization key (role `PlatformAdmin`). See
+[API keys](/docs/developer/api-keys/).
 
 ## Commands
 
-| Command | Does |
+| Command | What it does |
 |---|---|
-| `ork login [--api-url URL] [--with-token]` | Stores an API key for that API URL, from `--token`/`ORK_TOKEN`, stdin with `--with-token`, or a prompt. Verified with `GET /me` unless `--no-verify`. |
+| `ork login [--api-url URL] [--with-token]` | Stores an API key for that API URL. The key comes from `--token` or `ORK_TOKEN`, from stdin with `--with-token`, or from a prompt. The CLI checks it with `GET /me` unless you pass `--no-verify`. |
 | `ork logout` | Forgets the key for the API URL. |
-| `ork whoami` | User, key name, scopes and tenants. |
-| `ork init [--name] [--tenant] [--environment] [--yes] [--force] [PATH]` | Scans and creates `.ork/`. Interactive unless `--yes` or stdin is not a TTY. |
-| `ork scan [PATH] [--format table\|json] [--write]` | Walks and scans in parallel. `PATH` may be a directory or one file. `--write` refreshes `.ork/inventory.json` and `.ork/template.yaml`. |
-| `ork template validate [-f FILE] [--plan CODE]` | `POST /templates/validate`; exit 1 when invalid. |
-| `ork template push [-f FILE]` | Creates the template, or adds a DRAFT version, bumping the patch version when the local one is not newer (the file is updated). |
-| `ork template diff [-f FILE] [--exit-code]` | Unified diff between the local template and the latest server version. |
-| `ork import [PATH] [--tenant]` | Scans locally and sends `POST /imports { report }`; prints the import id and the console URL. The code never leaves your machine. |
-| `ork instances list [--tenant]` | Instances you can see. |
-| `ork deploy [--instance SLUG] [--wait] [--timeout S]` | Deploys; `--wait` streams the deployment events and exits non-zero on failure. |
-| `ork status [--instance SLUG]` | Instance, resources and last deployment. |
-| `ork logs <resource> [--instance SLUG] [-n N]` | Recent log lines of a resource. |
-| `ork destroy --instance SLUG --confirm SLUG [--wait]` | Destroys an instance; `--confirm` must repeat the slug. |
+| `ork whoami` | Shows the user, key name, scopes and tenants. |
+| `ork init [--name] [--tenant] [--environment] [--yes] [--force] [PATH]` | Scans the project and creates `.ork/`. It asks questions unless you pass `--yes` or stdin is not a TTY. |
+| `ork scan [PATH] [--format table\|json] [--write]` | Walks and scans in parallel. `PATH` can be a directory or one file. `--write` refreshes `.ork/inventory.json` and `.ork/template.yaml`. |
+| `ork template validate [-f FILE] [--plan CODE]` | Calls `POST /templates/validate` and exits with 1 when the template is invalid. |
+| `ork template push [-f FILE]` | Creates the template, or adds a `DRAFT` version. When the local version is not newer than the server's, it bumps the patch number and updates the file. |
+| `ork template diff [-f FILE] [--exit-code]` | Prints a unified diff between the local template and the latest server version. |
+| `ork import [PATH] [--tenant]` | Scans locally and sends `POST /imports { report }`, then prints the import id and the console URL. Your code never leaves your machine. |
+| `ork instances list [--tenant]` | Lists the instances you can see. |
+| `ork deploy [--instance SLUG] [--wait] [--timeout S]` | Deploys. With `--wait` it streams the deployment events and exits with a nonzero code if the deployment fails. `--timeout` defaults to 3600 seconds. |
+| `ork status [--instance SLUG]` | Shows the instance, its resources and the last deployment. |
+| `ork logs <resource> [--instance SLUG] [-n N]` | Prints recent log lines of a resource (50 by default). |
+| `ork destroy --instance SLUG --confirm SLUG [--wait]` | Destroys an instance. `--confirm` must repeat the slug. |
 | `ork completions <shell>` | Prints shell completions. |
 
 ## Global flags and environment
@@ -95,13 +97,14 @@ Use the **ork CLI (developer)** key preset: `instances:read`, `instances:deploy`
 | `--api-url` | `ORK_API_URL` | OrkStage API base URL. |
 | `--token` | `ORK_TOKEN` | API key. |
 | `-o, --output table\|json` | `ORK_OUTPUT` | Output format. |
-| `--no-color` | `NO_COLOR` | Disable colours. |
-| `-v`, `-vv`, `-vvv` | `ORK_LOG=debug` | Logs on stderr. |
-| `-C DIR` | | Run as if started in `DIR`. |
-| | `ORK_CONFIG_DIR` | Move the user config directory. |
-| | `ORK_CREDENTIALS_STORE=file` | Force the credentials file instead of the OS keychain. |
+| `--no-color` | `NO_COLOR` | Turns off colors. |
+| `-v`, `-vv`, `-vvv` | `ORK_LOG=debug` | Writes logs to stderr. |
+| `-C, --chdir DIR` | | Runs as if started in `DIR`. |
+| | `ORK_CONFIG_DIR` | Moves the user config directory. |
+| | `ORK_CREDENTIALS_STORE=file` | Uses the credentials file instead of the OS keychain. |
 
-**Precedence**: flags, then environment, then `.ork/config.toml`, then the user config.
+**Precedence**: flags first, then environment variables, then `.ork/config.toml`, then the user
+config.
 
 ## Output and exit codes
 
@@ -110,13 +113,13 @@ Use the **ork CLI (developer)** key preset: `instances:read`, `instances:deploy`
 | `0` | OK |
 | `1` | Failure (invalid template, failed deployment, API error) |
 | `2` | Usage error |
-| `3` | Authentication or authorization |
+| `3` | Authentication or authorization error |
 | `4` | Not found |
 
-With `-o json`, stdout carries exactly one JSON document with deterministic ordering, progress goes
-to stderr as NDJSON, and errors are printed on stderr as
-`{ "error": { code, message, status, correlationId, help, exitCode } }`. API errors always include the
-platform's message and correlation id.
+With `-o json`, stdout carries exactly one JSON document with deterministic ordering. Progress goes
+to stderr as NDJSON, and errors go to stderr as
+`{ "error": { code, message, status, correlationId, help, exitCode } }`. API errors always include
+the platform's message and correlation id.
 
 ## The `.ork/` folder
 
@@ -129,11 +132,11 @@ platform's message and correlation id.
   </Folder>
 </Files>
 
-| File | Commit it? | Contents |
+| File | Commit it | Contents |
 |---|---|---|
-| `config.toml` | yes | API URL, tenant, template name, instance slug and environment, placement bindings, scan include/exclude |
-| `template.yaml` | yes | The `platform/v1` template: generated by `init`, then yours to edit |
-| `inventory.json` | no | The last ScanReport (ignored by `.ork/.gitignore`) |
+| `config.toml` | Yes | API URL, tenant, template name, instance slug and environment, placement bindings, scan include and exclude lists |
+| `template.yaml` | Yes | The `platform/v1` template. `init` generates it, and then it is yours to edit. |
+| `inventory.json` | No | The last ScanReport (`.ork/.gitignore` excludes it) |
 
 ```toml title=".ork/config.toml"
 api_url = "https://orkstage.example.com"
@@ -158,9 +161,9 @@ exclude = ["examples/**"]
 
 ## Credentials
 
-Keys are stored per API URL in the OS keychain: macOS Keychain, Windows Credential Manager or Secret
-Service on Linux. Where no keychain is reachable (containers, headless CI) they go to
-`credentials.toml` (mode 0600) in the user config directory:
+The CLI stores one key per API URL in the OS keychain: macOS Keychain, Windows Credential Manager,
+or Secret Service on Linux. Where no keychain is available (containers, CI runners without a
+desktop session), it writes them to `credentials.toml` (mode 0600) in the user config directory:
 
 | OS | Directory |
 |---|---|
@@ -172,20 +175,21 @@ Keys are never written to the project.
 
 ## How the scan works
 
-1. **Walk** (CLI only): a `.gitignore`-aware parallel walk that skips `node_modules`, `.terraform`,
-   `target`, `vendor`, `dist`, hidden directories and CDK `asset.*` copies, files over 1 MiB
-   (configurable) and non-UTF-8 files.
-2. **Detect** per source kind. Terraform is parsed as HCL; `var.*`, `local.*` and simple expressions
-   are evaluated; local modules are expanded per call (remote modules are reported as unmapped); and
-   references such as `aws_db_instance.main.address` in a task definition become connections.
-   CloudFormation short-form tags (`!Ref`, `!GetAtt`, `!Sub`, …) are normalised.
-3. **Merge**: the same component seen in several sources becomes one resource that keeps every
-   source. IaC evidence wins over Kubernetes, which wins over Compose, Dockerfiles and package hints.
-4. **Infer** a network when services or data stores need one, and an ingress plus DNS for a public
-   HTTP service on a cloud provider; choose placement slots and the smallest plan whose default
-   entitlements fit.
-5. **Render and validate** the template. Problems become warnings; the scan never fails on bad
+1. **Walk** (CLI only). A parallel walk that respects `.gitignore` skips `node_modules`,
+   `.terraform`, `target`, `vendor`, `dist`, hidden directories and CDK `asset.*` copies. It also
+   skips files over 1 MiB (configurable) and files that are not valid UTF-8.
+2. **Detect** each source kind. Terraform is parsed as HCL. The scan evaluates `var.*`, `local.*`
+   and simple expressions, expands local modules per call and reports remote modules as unmapped.
+   References such as `aws_db_instance.main.address` in a task definition become connections.
+   CloudFormation tags in short form (such as `!Ref`, `!GetAtt` and `!Sub`) are normalized.
+3. **Merge**. When several sources show the same component, it becomes one resource that keeps
+   every source. IaC evidence wins over Kubernetes, and Kubernetes wins over Compose, Dockerfiles and
+   package hints.
+4. **Infer**. The scan adds a network when services or data stores need one, and an ingress plus DNS
+   for a public HTTP service on a cloud provider. It then chooses placement slots and the smallest
+   plan whose default entitlements fit.
+5. **Render and validate** the template. Problems become warnings, so the scan never fails on bad
    input.
 
-Images in the generated template are catalog references named after each service
-(`catalog://api`); the detected image is kept in the resource's `sourceImage` property.
+In the generated template, each image is a catalog reference named after its service
+(`catalog://api`). The resource's `sourceImage` property keeps the image the scan detected.

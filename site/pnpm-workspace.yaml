@@ -7,3 +7,6 @@ allowBuilds:
   esbuild: true
   sharp: false
   '@tailwindcss/oxide': true
+
+# Ignore package versions published less than a day ago (minutes).
+minimumReleaseAge: 1440
