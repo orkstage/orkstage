@@ -12,7 +12,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@orkstage/scan": "workspace:*",
     "@orkstage/authorization": "workspace:*",
     "@orkstage/cloud-core": "workspace:*",
     "@orkstage/cloud-mock": "workspace:*",

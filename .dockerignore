@@ -1,10 +1,5 @@
 **/node_modules
 **/dist
-# The scan engine's WebAssembly package is committed build output the API needs.
-!cli/dist/scan-wasm
-cli/target
-cli/crates
-site
 **/.next
 **/.turbo
 **/*.tsbuildinfo

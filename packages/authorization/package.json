@@ -1,7 +1,6 @@
 {
   "name": "@orkstage/authorization",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,5 +21,15 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orkstage/orkstage.git",
+    "directory": "packages/authorization"
+  },
+  "license": "AGPL-3.0-only"
 }
