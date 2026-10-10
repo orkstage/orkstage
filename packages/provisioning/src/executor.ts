@@ -87,6 +87,7 @@ export async function executeApply(opts: ExecuteOptions): Promise<ExecutionOutco
       correlationId: opts.correlationId,
       signal,
       log: opts.log ? (level, message) => opts.log!(r.id, level, message) : undefined,
+      dependencySecret: (depId) => readDependencySecret(registry, resolved, r, depId, outputs[depId], opts.correlationId, signal),
     };
     const adapter = registry.get(r.provider);
     const dependencyOutputs = Object.fromEntries(r.dependsOn.map((d) => [d, outputs[d] ?? {}]));
@@ -228,6 +229,40 @@ export async function executeDestroy(opts: DestroyOptions): Promise<ExecutionOut
     await Promise.race(running.values());
   }
   return status;
+}
+
+/**
+ * Credentials a dependency published (its `secret_ref` output), read by the adapter that owns the
+ * dependency: that is what lets a Vercel frontend receive a Supabase password or an AWS access key.
+ * Only declared dependencies are readable, and values go straight to the calling adapter.
+ */
+export async function readDependencySecret(
+  registry: AdapterRegistry,
+  resolved: ResolvedInfrastructure,
+  consumer: ResolvedResource,
+  depId: string,
+  depOutputs: ResourceOutputs | undefined,
+  correlationId: string,
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  if (!consumer.dependsOn.includes(depId)) {
+    throw new ProviderError('UNDECLARED_DEPENDENCY', `"${consumer.id}" can only read credentials of resources it depends on; add "${depId}" to dependsOn.`, 'VALIDATION_ERROR', consumer.provider);
+  }
+  const dep = resolved.resources.find((x) => x.id === depId);
+  const ref = depOutputs?.secret_ref;
+  if (!dep || typeof ref !== 'string' || !ref) {
+    throw new ProviderError('NO_SECRET_PUBLISHED', `"${depId}" does not publish credentials.`, 'VALIDATION_ERROR', consumer.provider);
+  }
+  const owner = registry.get(dep.provider);
+  if (!owner.readSecret) {
+    throw new ProviderError(
+      'SECRET_NOT_SHAREABLE',
+      `${dep.provider} cannot hand the credentials of "${depId}" to another provider. Place "${consumer.id}" on ${dep.provider} or pass a secret reference.`,
+      'VALIDATION_ERROR',
+      consumer.provider,
+    );
+  }
+  return owner.readSecret({ target: resolved.targets[dep.targetId]!, region: dep.region, correlationId, signal }, ref);
 }
 
 async function stillExists(registry: AdapterRegistry, resolved: ResolvedInfrastructure, r: ResolvedResource, correlationId: string): Promise<boolean> {

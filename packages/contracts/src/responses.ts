@@ -303,3 +303,45 @@ export interface OverviewDto {
   estimatedMonthlyCost: number;
   recentAudit: AuditEventDto[];
 }
+
+export interface TriggerParamDto {
+  name: string;
+  type: 'string' | 'number' | 'boolean';
+  required?: boolean;
+  description?: string;
+}
+
+/** A template trigger as it applies to one deployed instance. */
+export interface TriggerDto {
+  name: string;
+  description: string | null;
+  resourceId: string;
+  action: string;
+  params: Record<string, string | number | boolean>;
+  overridable: string[];
+  on: { manual: boolean; webhook: boolean; schedule: string | null };
+  /** False when the resource is not deployed or its provider does not offer the action. */
+  available: boolean;
+  unavailableReason: string | null;
+  /** Parameters the provider accepts for this action. */
+  actionParams: TriggerParamDto[];
+  provider: string | null;
+  lastRun: TriggerRunDto | null;
+}
+
+export interface TriggerRunDto {
+  id: string;
+  instanceId: string;
+  trigger: string;
+  resourceId: string;
+  action: string;
+  params: Record<string, string | number | boolean>;
+  source: 'MANUAL' | 'SCHEDULE' | 'WEBHOOK';
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  reference: string | null;
+  url: string | null;
+  message: string | null;
+  errorClass: string | null;
+  queuedAt: string;
+  finishedAt: string | null;
+}

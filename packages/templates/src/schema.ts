@@ -99,6 +99,12 @@ export const objectStorageResource = z.object({
   versioning: z.boolean().default(false),
   publicAccess: z.boolean().default(false),
   retentionDays: z.number().int().min(0).optional(),
+  /**
+   * Create an access key limited to this bucket, kept in the provider's secret store, for
+   * consumers on other providers (a Vercel or Render app). Services on the same provider use
+   * their own identity instead.
+   */
+  accessKeys: z.boolean().default(false),
   critical: z.boolean().default(false),
 });
 

@@ -34,11 +34,20 @@ const pass = (policy: string, message: string): PolicyResult => ({ policy, statu
  * cannot bypass them (spec §72).
  */
 export const POLICIES: Record<string, Policy> = {
-  'no-public-database': ({ sources }) => {
-    const bad = [...sources.values()].filter((r) => r.type === 'database.postgresql' && r.publicAccess);
-    return bad.length
-      ? bad.map((r) => ({ policy: 'no-public-database', status: 'fail' as const, resourceId: r.id, message: `Database "${r.id}" must not be publicly accessible.` }))
-      : [pass('no-public-database', 'No database is publicly accessible.')];
+  /**
+   * A public database fails, unless the template declares that a resource on another provider
+   * reaches it over TLS (connectivity mode `secure`): that is how a Vercel or Render app talks to
+   * a database elsewhere. It is then a warning, so the exposure stays visible in every plan.
+   */
+  'no-public-database': ({ sources, connectivity }) => {
+    const exposed = [...sources.values()].filter((r) => r.type === 'database.postgresql' && r.publicAccess);
+    if (!exposed.length) return [pass('no-public-database', 'No database is publicly accessible.')];
+    return exposed.map((r) => {
+      const crossCloudTls = connectivity.filter((c) => c.to === r.id && c.crossCloud && (c.strategy === 'public-tls' || c.strategy === 'public-tls-allowlist'));
+      return crossCloudTls.length
+        ? { policy: 'no-public-database', status: 'warn' as const, resourceId: r.id, message: `Database "${r.id}" is reachable over TLS for ${crossCloudTls.map((c) => c.from).join(', ')} on another provider.` }
+        : { policy: 'no-public-database', status: 'fail' as const, resourceId: r.id, message: `Database "${r.id}" must not be publicly accessible.` };
+    });
   },
 
   'no-public-storage': ({ sources }) => {

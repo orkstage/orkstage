@@ -11,3 +11,9 @@ allowBuilds:
 
 # Supply chain: ignore package versions published less than a day ago (minutes).
 minimumReleaseAge: 1440
+
+# Security floors for transitive dependencies of the Prisma CLI (GHSA-ggr8-5vv4-36mx,
+# GHSA-3f6p-5ww8-9rcr). Remove once Prisma ships them.
+overrides:
+  deepmerge-ts: '^8.0.2'
+  mysql2: '^3.22.0'

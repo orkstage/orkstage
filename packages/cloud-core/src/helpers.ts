@@ -31,7 +31,7 @@ const INFRA_KINDS = new Set(['network', 'container-registry', 'ingress', 'dns'])
 
 /**
  * Connection settings a service receives for its dependencies, the same names on every
- * provider: `<ID>_HOST`, `<ID>_PORT`, `<ID>_URL`, `<ID>_BUCKET`, `<ID>_ENDPOINT`, and the secret
+ * provider: `<ID>_HOST`, `<ID>_PORT`, `<ID>_URL`, `<ID>_BUCKET`, `<ID>_ENDPOINT`, `<ID>_REGION`, and the secret
  * reference as `<ID>_CREDENTIALS_REF` (resolved by the provider module, never by value here).
  */
 export function dependencyEnvironment(deps: Deps): { environment: Record<string, string>; secretRefs: Record<string, string> } {
@@ -46,6 +46,7 @@ export function dependencyEnvironment(deps: Deps): { environment: Record<string,
     if (out.queue_url) environment[`${key}_URL`] = String(out.queue_url);
     if (out.bucket) environment[`${key}_BUCKET`] = String(out.bucket);
     if (out.endpoint) environment[`${key}_ENDPOINT`] = String(out.endpoint);
+    if (out.region) environment[`${key}_REGION`] = String(out.region);
     if (out.secret_ref) secretRefs[key] = String(out.secret_ref);
   }
   return { environment, secretRefs };

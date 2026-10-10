@@ -1,6 +1,16 @@
 import { AwsAdapter } from '@orkstage/cloud-aws';
+import { AzureAdapter } from '@orkstage/cloud-azure';
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
+import { CoreWeaveAdapter } from '@orkstage/cloud-coreweave';
+import { DigitalOceanAdapter } from '@orkstage/cloud-digitalocean';
+import { GcpAdapter } from '@orkstage/cloud-gcp';
+import { MagaluAdapter } from '@orkstage/cloud-magalu';
 import { MockAdapter, type MockStateStore } from '@orkstage/cloud-mock';
+import { OciAdapter } from '@orkstage/cloud-oci';
+import { RenderAdapter } from '@orkstage/cloud-render';
+import { SupabaseAdapter } from '@orkstage/cloud-supabase';
+import { VercelAdapter } from '@orkstage/cloud-vercel';
+import { VultrAdapter } from '@orkstage/cloud-vultr';
 import type { CloudProvider } from '@orkstage/domain';
 import { TofuRunner } from '@orkstage/iac';
 import type { Redis } from 'ioredis';
@@ -23,20 +33,33 @@ export class RedisMockStateStore implements MockStateStore {
   }
 }
 
-export function createAdapterRegistry(deps: { redis: Redis; secrets: SecretResolver; runner?: TofuRunner; awsEmulatorEndpoint?: string }): {
-  registry: AdapterRegistry;
-  mock: MockAdapter;
-} {
+export interface AdapterDeps {
+  redis: Redis;
+  secrets: SecretResolver;
+  /** Deterministic secrets from the platform key (SecretBox.derive): generated passwords that are never stored. */
+  deriveSecret: (purpose: string) => string;
+  /** Only the worker has one: the API validates targets and reads state but never provisions. */
+  runner?: TofuRunner;
+  awsEmulatorEndpoint?: string;
+}
+
+export function createAdapterRegistry(deps: AdapterDeps): { registry: AdapterRegistry; mock: MockAdapter } {
+  const resolveSecret = (ref: string) => deps.secrets.resolve(ref);
+  const tofu = { resolveSecret, runner: deps.runner };
   const mock = new MockAdapter(new RedisMockStateStore(deps.redis));
   const registry = new AdapterRegistry()
     .register(mock)
-    .register(
-      new AwsAdapter({
-        resolveExternalId: (ref) => deps.secrets.resolve(ref),
-        runner: deps.runner,
-        emulatorEndpoint: deps.awsEmulatorEndpoint,
-      }),
-    );
+    .register(new AwsAdapter({ resolveExternalId: resolveSecret, runner: deps.runner, emulatorEndpoint: deps.awsEmulatorEndpoint }))
+    .register(new AzureAdapter(tofu))
+    .register(new GcpAdapter(tofu))
+    .register(new OciAdapter(tofu))
+    .register(new DigitalOceanAdapter(tofu))
+    .register(new VultrAdapter(tofu))
+    .register(new CoreWeaveAdapter(tofu))
+    .register(new MagaluAdapter(tofu))
+    .register(new VercelAdapter({ resolveSecret }))
+    .register(new RenderAdapter({ resolveSecret }))
+    .register(new SupabaseAdapter({ resolveSecret, deriveSecret: deps.deriveSecret }));
   return { registry, mock };
 }
 

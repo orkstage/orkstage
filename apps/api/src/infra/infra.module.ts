@@ -1,4 +1,4 @@
-import { QUEUES, type DeploymentJob, type NotificationJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient, type PrismaClient } from '@orkstage/database';
 import {
   createAdapterRegistry,
@@ -24,8 +24,13 @@ export const SECRET_BOX = Symbol('SECRET_BOX');
 export class Adapters {
   readonly registry: AdapterRegistry;
   readonly mock: MockAdapter;
-  constructor(@Inject(REDIS) redis: Redis, @Inject(CONFIG) config: PlatformConfig) {
-    const { registry, mock } = createAdapterRegistry({ redis, secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }), awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
+  constructor(@Inject(REDIS) redis: Redis, @Inject(CONFIG) config: PlatformConfig, @Inject(SECRET_BOX) box: SecretBox) {
+    const { registry, mock } = createAdapterRegistry({
+      redis,
+      secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }),
+      deriveSecret: (purpose) => box.derive(purpose),
+      awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT,
+    });
     this.registry = registry;
     this.mock = mock;
   }
@@ -36,11 +41,18 @@ export class Adapters {
 export class Queues implements OnApplicationShutdown {
   readonly deployments: Queue<DeploymentJob>;
   readonly notifications: Queue<NotificationJob>;
+  readonly triggers: Queue<TriggerJob>;
 
   constructor(@Inject(REDIS) redis: Redis) {
     const connection = redis.duplicate();
     this.deployments = new Queue<DeploymentJob>(QUEUES.deployments, { connection });
     this.notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection });
+    this.triggers = new Queue<TriggerJob>(QUEUES.triggers, { connection });
+  }
+
+  /** jobId = run id: a repeated enqueue of the same run collapses into one job. */
+  async enqueueTrigger(runId: string) {
+    await this.triggers.add('run', { runId }, { jobId: runId, attempts: 1, removeOnComplete: 1000, removeOnFail: 5000 });
   }
 
   /** jobId = deployment id (+ phase) so duplicate enqueues collapse into one job. */
@@ -63,7 +75,7 @@ export class Queues implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown() {
-    await Promise.all([this.deployments.close(), this.notifications.close()]);
+    await Promise.all([this.deployments.close(), this.notifications.close(), this.triggers.close()]);
   }
 }
 

@@ -8,6 +8,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { IAMClient } from '@aws-sdk/client-iam';
+import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import {
   ProviderError,
@@ -227,6 +228,27 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const state = await this.getResource(ctx, res);
     return state.exists ? readAwsLogs(state.outputs, await this.creds.clientConfig(ctx), limit, ctx.signal) : [];
+  }
+
+  /**
+   * Reads a Secrets Manager secret this adapter's modules created (database credentials, bucket
+   * access keys) with the deployment role, for wiring a resource on another provider. Only
+   * OrkStage secrets (names starting with the platform prefix) are readable this way.
+   */
+  async readSecret(rawCtx: ProviderContext, ref: string): Promise<Record<string, string>> {
+    const ctx = this.effective(rawCtx);
+    if (!/^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:\d{12}:secret:ork-/.test(ref)) {
+      throw new ProviderError('AWS_SECRET_REF_INVALID', 'Only secrets created by OrkStage modules can be shared with other providers.', 'VALIDATION_ERROR', 'aws');
+    }
+    try {
+      const sm = new SecretsManagerClient(await this.creds.clientConfig(ctx));
+      const out = await sm.send(new GetSecretValueCommand({ SecretId: ref }), { abortSignal: ctx.signal });
+      const parsed = JSON.parse(out.SecretString ?? '{}') as Record<string, unknown>;
+      return Object.fromEntries(Object.entries(parsed).filter(([, v]) => typeof v === 'string' || typeof v === 'number').map(([k, v]) => [k, String(v)]));
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      throw new ProviderError('AWS_SECRET_UNREADABLE', `Could not read the shared secret (${(err as { name?: string }).name ?? 'Error'}).`, 'AUTHORIZATION_ERROR', 'aws');
+    }
   }
 
   // ───────────────────────── state bucket & runner plumbing ─────────────────────────

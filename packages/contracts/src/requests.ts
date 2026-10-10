@@ -110,6 +110,11 @@ export const incidentUpdateSchema = z.object({
   impact: z.enum(STATUS_STATES).optional(),
 });
 
+/** Parameters for a trigger run; only the names the template marks overridable are accepted. */
+export const runTriggerSchema = z.object({
+  params: z.record(z.string(), z.union([z.string().max(500), z.number(), z.boolean()])).default({}),
+});
+
 /** Simulation controls, accepted only for resources on mock targets. */
 export const simulateSchema = z.object({
   resourceId: z.string().min(1),

@@ -1,0 +1,72 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: web-platforms
+  version: 1.0.0
+  displayName: Web app on managed platforms
+  description: >
+    A frontend on Vercel or Render, PostgreSQL on Supabase or Render, and files in an object
+    store on AWS, Google Cloud or Supabase. Each slot goes to the provider that costs least for
+    the job; OrkStage wires the connection settings and credentials between them and keeps
+    triggers to redeploy the site from CI or on a schedule.
+  profile: starter
+spec:
+  plans: [STARTER, GROWTH, SCALE]
+  placements:
+    - name: web
+      description: Website or web app built from a Git repository.
+      providers: [vercel, render, mock]
+    - name: data
+      description: Relational database.
+      providers: [supabase, render, aws, gcp, azure, mock]
+    - name: files
+      description: Uploads and static files.
+      providers: [aws, gcp, azure, supabase, digitalocean, mock]
+  variables:
+    - name: databaseSize
+      type: string
+      default: micro
+      allowed: [micro, small, medium, large]
+      target: database.size
+  resources:
+    - id: database
+      type: database.postgresql
+      placement: data
+      size: micro
+      storageGiB: 8
+      publicAccess: true
+      backup: { enabled: true, retentionDays: 7 }
+    - id: files
+      type: object-storage
+      placement: files
+      tier: standard
+      versioning: true
+      accessKeys: true
+    - id: web
+      type: web.frontend
+      placement: web
+      source:
+        repository: acme/website
+        branch: main
+      framework: nextjs
+      environment:
+        NEXT_PUBLIC_APP_NAME: Acme
+      dependsOn: [database, files]
+  connectivity:
+    - from: web
+      to: database
+      protocol: postgres
+      mode: secure
+  triggers:
+    - name: redeploy-site
+      description: Rebuild and publish the site, for example after a CMS publish or a merge.
+      resource: web
+      action: redeploy
+      params: { target: production }
+      overridable: [ref]
+      on: { manual: true, webhook: true }
+    - name: nightly-backup
+      description: Daily restore point of the database.
+      resource: database
+      action: backup
+      on: { manual: true, schedule: '0 3 * * *' }
