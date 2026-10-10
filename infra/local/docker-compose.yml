@@ -1,4 +1,4 @@
-# Project name kept from before the OrkStage rebrand so existing local volumes stay attached.
+# Compose project "orkstage": containers, volumes and the network are named orkstage-*.
 name: orkstage
 
 # Profiles:
