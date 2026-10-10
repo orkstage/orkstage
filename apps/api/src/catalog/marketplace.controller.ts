@@ -12,6 +12,7 @@ import { previewTemplate, type TemplatePreview } from '@orkstage/provisioning';
 import { environmentTemplate } from '@orkstage/templates';
 import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
@@ -116,6 +117,7 @@ export class MarketplaceController {
     };
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post()
   @ApiZodBody(submitListingSchema)
   async submit(@CurrentPrincipal() p: RequestPrincipal, @ZodBody(submitListingSchema) body: z.infer<typeof submitListingSchema>, @CorrelationId() correlationId: string): Promise<ListingSummaryDto> {

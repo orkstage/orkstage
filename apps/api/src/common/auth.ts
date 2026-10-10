@@ -19,7 +19,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
-import { PRISMA } from '../infra/infra.module.js';
+import type { PlatformConfig } from '@orkstage/runtime';
+import { CONFIG, PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 import { AppError, forbidden } from './errors.js';
 
@@ -57,6 +58,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Inject(PRISMA) private readonly prisma: PrismaClient,
+    @Inject(CONFIG) private readonly config: PlatformConfig,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -81,6 +83,11 @@ export class AuthGuard implements CanActivate {
     if (!session || session.revokedAt || session.expiresAt < now || session.user.disabledAt) {
       throw new AppError(401, 'UNAUTHENTICATED', 'Your session has expired. Sign in again.');
     }
+    // Idle timeout: a session unused for too long ends even before its absolute expiry.
+    if (now.getTime() - session.lastSeenAt.getTime() > this.config.SESSION_IDLE_MINUTES * 60_000) {
+      await this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: now } });
+      throw new AppError(401, 'UNAUTHENTICATED', 'Your session has expired. Sign in again.');
+    }
     if (now.getTime() - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
       await this.prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: now } });
     }
@@ -103,6 +110,14 @@ export class AuthGuard implements CanActivate {
     if (!key || key.revokedAt || (key.expiresAt && key.expiresAt < now)) {
       throw new AppError(401, 'INVALID_API_KEY', 'The API key is invalid, expired or revoked.');
     }
+    // A key acts for its creator: it stops working when the creator is disabled, loses platform
+    // access (platform keys) or leaves the key's tenant (tenant keys).
+    const creator = await this.prisma.user.findUnique({ where: { id: key.createdById }, include: { memberships: { select: { tenantId: true } } } });
+    const stillAllowed =
+      creator &&
+      !creator.disabledAt &&
+      (key.role.startsWith('Platform') ? Boolean(creator.platformRole) : Boolean(creator.platformRole) || creator.memberships.some((m) => m.tenantId === key.tenantId));
+    if (!stillAllowed) throw new AppError(401, 'INVALID_API_KEY', 'The API key is invalid, expired or revoked.');
     if (!required) throw new AppError(403, 'API_KEY_NOT_ALLOWED', 'This endpoint is not available to API keys.');
     if (required !== '*' && !key.scopes.includes(required)) {
       throw new AppError(403, 'API_KEY_SCOPE', `This API key lacks the "${required}" scope.`, { required });
@@ -152,17 +167,7 @@ export const CorrelationId = createParamDecorator(
   (_: unknown, ctx: ExecutionContext): string => ctx.switchToHttp().getRequest<FastifyRequest>().correlationId,
 );
 
-export function isPlatformStaff(p: RequestPrincipal): boolean {
-  return Boolean(p.platformRole);
-}
-
-/**
- * Database filter limiting rows to tenants the caller belongs to. Platform staff see all
- * tenants. This is one layer of defense in depth; CASL checks on loaded records are another.
- */
-export function tenantScope(p: RequestPrincipal): { tenantId?: { in: string[] } } {
-  return isPlatformStaff(p) ? {} : { tenantId: { in: p.memberships.map((m) => m.tenantId) } };
-}
+export { isPlatformStaff, scopedToTenant, tenantScope } from './tenancy.js';
 
 /** Throws 403 unless the principal may perform `action` on the record/subject. */
 export function authorize(p: RequestPrincipal, action: Action, type: SubjectName, record?: { tenantId?: string | null }) {

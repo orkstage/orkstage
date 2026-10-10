@@ -48,4 +48,3 @@ jobs:
           pnpm db:seed
       - name: Dependency audit
         run: pnpm audit --audit-level high
-        continue-on-error: true

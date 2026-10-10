@@ -13,12 +13,20 @@ export interface SecretResolver {
 
 const scheme = (ref: string) => /^([a-z][a-z0-9-]*):\/\//.exec(ref)?.[1];
 
+/**
+ * Environment variables an `env://` reference may never read: the platform's own configuration
+ * and credentials. A target's credentialRef is chosen by an operator, so without this a reference
+ * like `env://ENCRYPTION_KEY` would hand a platform secret to a provider adapter.
+ */
+const RESERVED_ENV = /^(DATABASE_URL|REDIS_URL|SESSION_SECRET|ENCRYPTION_KEY|ORKSTAGE_LICENSE_KEY|(OIDC|SMTP|AWS|TOFU|API|WEB|APP|NODE)_.*)$/;
+
 export class EnvSecretResolver implements SecretResolver {
   constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
 
   async resolve(ref: string): Promise<string> {
     const match = /^env:\/\/([A-Z0-9_]+)$/.exec(ref);
     if (!match) throw new Error(`Unsupported secret reference scheme in "${ref.split('://')[0]}://…".`);
+    if (RESERVED_ENV.test(match[1]!)) throw new Error(`env://${match[1]} is platform configuration and cannot be used as a credential reference.`);
     const value = this.env[match[1]!];
     if (!value) throw new Error(`Secret ${match[1]} is not set.`);
     return value;

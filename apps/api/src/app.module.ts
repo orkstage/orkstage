@@ -1,7 +1,8 @@
-import { loggerOptions, type PlatformConfig } from '@orkstage/runtime';
+import { loggerOptions, RedisRateLimitStorage, type PlatformConfig } from '@orkstage/runtime';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import type { Redis } from 'ioredis';
 import type { IncomingMessage } from 'node:http';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './auth/auth.module.js';
@@ -9,7 +10,8 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { AuthGuard, CsrfGuard } from './common/auth.js';
 import { CommonModule } from './common/common.module.js';
 import { ErrorFilter } from './common/errors.js';
-import { CONFIG, InfraModule } from './infra/infra.module.js';
+import { ClientThrottlerGuard } from './common/throttler.guard.js';
+import { CONFIG, InfraModule, REDIS } from './infra/infra.module.js';
 import { InstancesModule } from './instances/instances.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LicensingModule } from './licensing/licensing.module.js';
@@ -32,8 +34,15 @@ import { OpsModule } from './ops/ops.module.js';
         },
       }),
     }),
-    // Global ceiling per client; expensive routes declare stricter limits (spec §73).
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 600 }]),
+    // Global ceiling per client; expensive routes declare stricter limits (spec §73). Counters live
+    // in Redis so the limits hold across every API instance (spec §49).
+    ThrottlerModule.forRootAsync({
+      inject: [REDIS],
+      useFactory: (redis: Redis) => ({
+        throttlers: [{ name: 'default', ttl: 60_000, limit: 600 }],
+        storage: new RedisRateLimitStorage(redis),
+      }),
+    }),
     AuthModule,
     CatalogModule,
     InstancesModule,
@@ -43,7 +52,7 @@ import { OpsModule } from './ops/ops.module.js';
     EnterpriseModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ClientThrottlerGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: ErrorFilter },

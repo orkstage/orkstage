@@ -4,6 +4,7 @@ import { resolveTriggerParams, triggerAllows } from '@orkstage/provisioning';
 import { environmentTemplate, type TemplateTrigger } from '@orkstage/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
@@ -95,6 +96,7 @@ export class TriggersController {
   }
 
   @Scope('instances:deploy')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post(':id/triggers/:name/runs')
   @HttpCode(202)
   @ApiZodBody(runTriggerSchema)

@@ -4,7 +4,7 @@ import { Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/com
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -41,8 +41,7 @@ export class IncidentsController {
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.incident.findMany({
       where: {
-        ...tenantScope(p),
-        ...(q.tenantId ? { tenantId: q.tenantId } : {}),
+        ...scopedToTenant(p, q.tenantId),
         ...(q.instanceId ? { instanceId: q.instanceId } : {}),
         ...(q.status === 'open' ? { status: { not: 'RESOLVED' } } : q.status ? { status: q.status as never } : {}),
       },
