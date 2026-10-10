@@ -9,9 +9,9 @@ metadata:
     store on AWS, Google Cloud or Supabase. Each slot goes to the provider that costs least for
     the job; OrkStage wires the connection settings and credentials between them and keeps
     triggers to redeploy the site from CI or on a schedule.
-  profile: starter
+  profile: growth
 spec:
-  plans: [STARTER, GROWTH, SCALE]
+  plans: [GROWTH, SCALE]
   placements:
     - name: web
       description: Website or web app built from a Git repository.

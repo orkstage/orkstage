@@ -85,3 +85,18 @@ describe('tenant isolation', () => {
     expect(rebuilt.can('deploy', globexInstance)).toBe(false);
   });
 });
+
+describe('marketplace', () => {
+  it('everyone signed in can browse; only platform admins and owners review; operators cannot submit', () => {
+    const customer = defineAbilityFor({ userId: 'u', platformRole: null, memberships: [{ tenantId: 't1', role: 'CustomerViewer' }] } as never);
+    const operator = defineAbilityFor({ userId: 'o', platformRole: 'PlatformOperator', memberships: [] } as never);
+    const admin = defineAbilityFor({ userId: 'a', platformRole: 'PlatformAdmin', memberships: [] } as never);
+    expect(customer.can('read', 'Marketplace')).toBe(true);
+    expect(customer.can('approve', 'Marketplace')).toBe(false);
+    expect(operator.can('read', 'Marketplace')).toBe(true);
+    expect(operator.can('approve', 'Marketplace')).toBe(false);
+    expect(operator.can('publish', 'Template')).toBe(false);
+    expect(admin.can('approve', 'Marketplace')).toBe(true);
+    expect(admin.can('publish', 'Template')).toBe(true);
+  });
+});

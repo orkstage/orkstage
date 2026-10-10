@@ -27,7 +27,7 @@ export const csv = (v: unknown) => String(v ?? '').split(',').filter(Boolean);
 /** Environment variable prefix for a dependency, e.g. `orders-db` becomes `ORDERS_DB`. */
 export const envKey = (resourceId: string) => resourceId.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
-const INFRA_KINDS = new Set(['network', 'container-registry', 'ingress', 'dns']);
+const INFRA_KINDS = new Set(['network', 'container-registry', 'dns']);
 
 /**
  * Connection settings a service receives for its dependencies, the same names on every

@@ -1,0 +1,104 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: disaster-recovery-warm-standby
+  version: 1.0.0
+  displayName: Disaster recovery (warm standby)
+  description: >
+    A primary region that serves traffic and a smaller standby region that is already running and
+    can take over. The standby database starts from the primary's backups, so the recovery point is
+    the backup interval. Switching traffic is a deliberate operator action (DNS change), not an
+    automatic failover.
+  profile: scale
+spec:
+  plans: [SCALE]
+  placements:
+    - name: primary
+      description: Region that serves traffic.
+      providers: [aws, azure, gcp, oci, mock]
+    - name: standby
+      description: Second region (or second provider) kept warm for recovery.
+      providers: [aws, azure, gcp, oci, mock]
+  variables:
+    - name: standbyReplicas
+      description: Replicas kept running in the standby region.
+      type: number
+      default: 1
+      min: 1
+      max: 4
+      target: api-standby.replicas
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 2
+      natGateway: true
+    - id: api
+      type: compute.container-service
+      image: catalog://sample-api
+      replicas: 2
+      cpu: 1
+      memoryMiB: 2048
+      port: 8080
+      public: true
+      healthCheckPath: /health
+      autoscaling: { minReplicas: 2, maxReplicas: 6, targetCpuPercent: 60 }
+    - id: database
+      type: database.postgresql
+      size: medium
+      storageGiB: 100
+      highAvailability: zone-redundant
+      backup: { enabled: true, retentionDays: 30, recoveryPointObjectiveMinutes: 60 }
+    - id: files
+      type: object-storage
+      versioning: true
+    - id: ingress
+      type: ingress
+      routes:
+        - service: api
+    - id: dns
+      type: dns
+      target: ingress
+      customDomain: optional
+
+    - id: network-standby
+      type: network
+      placement: standby
+      availabilityZones: 2
+    - id: api-standby
+      type: compute.container-service
+      placement: standby
+      image: catalog://sample-api
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+      critical: false
+    - id: database-standby
+      type: database.postgresql
+      placement: standby
+      size: small
+      storageGiB: 100
+      backup: { enabled: true, retentionDays: 30 }
+      critical: false
+    - id: files-standby
+      type: object-storage
+      placement: standby
+      versioning: true
+    - id: ingress-standby
+      type: ingress
+      placement: standby
+      routes:
+        - service: api-standby
+  connectivity:
+    - { from: api, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: api, to: files, protocol: https, mode: secure }
+    - { from: api-standby, to: database-standby, protocol: postgres, port: 5432, mode: private-required }
+    - { from: api-standby, to: files-standby, protocol: https, mode: secure }
+  observability:
+    logs: true
+    metrics: true
+    traces: true
+    uptime: true
+    alerts: true

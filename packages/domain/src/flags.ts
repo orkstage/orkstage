@@ -37,6 +37,12 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
         ? 'Simulation targets: imitate any provider without an account.'
         : `Register ${PROVIDER_INFO[provider].displayName} targets and deploy resources to them.`,
   })),
+  {
+    key: 'TEMPLATE_MARKETPLACE',
+    category: 'feature',
+    defaultEnabled: true,
+    description: 'Template marketplace: browse curated and community templates, submit templates for review.',
+  },
 ];
 
 const BY_KEY = new Map(FEATURE_FLAGS.map((f) => [f.key, f]));
