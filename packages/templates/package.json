@@ -16,7 +16,8 @@
   },
   "files": [
     "dist",
-    "builtin"
+    "builtin",
+    "marketplace"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -192,6 +192,7 @@ model Template {
   updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
 
   versions TemplateVersion[]
+  listing  MarketplaceListing?
 }
 
 /// Published versions are immutable (spec §7, §71). Edits create a new DRAFT version.
@@ -866,4 +867,60 @@ model PlatformSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+enum ListingStatus {
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  UNLISTED
+}
+
+/// VERIFIED: reviewed by platform staff (policies, security, cost). DEVOPS: reviewed for operations
+/// readiness (backups, observability, health checks, safe defaults).
+enum ListingBadge {
+  VERIFIED
+  DEVOPS
+}
+
+/// A template offered in the marketplace: discovery metadata and review state on top of a template.
+model MarketplaceListing {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  templateId    String         @unique @db.Uuid
+  slug          String         @unique
+  title         String
+  summary       String
+  /// Plain text, paragraphs separated by blank lines.
+  description   String         @default("")
+  categories    String[]       @default([])
+  tags          String[]       @default([])
+  badges        ListingBadge[] @default([])
+  status        ListingStatus  @default(PENDING_REVIEW)
+  /// Shown as the author (a person, a team or OrkStage for curated listings).
+  publisherName String
+  submittedById String?        @db.Uuid
+  reviewedById  String?        @db.Uuid
+  reviewNotes   String?
+  reviewedAt    DateTime?      @db.Timestamptz(3)
+  publishedAt   DateTime?      @db.Timestamptz(3)
+  /// Times someone started an instance or a copy from this listing.
+  useCount      Int            @default(0)
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+
+  template Template          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stars    MarketplaceStar[]
+
+  @@index([status, publishedAt])
+}
+
+model MarketplaceStar {
+  listingId String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, userId])
+  @@index([userId])
 }

@@ -1,0 +1,42 @@
+[
+  {
+    "template": "disaster-recovery-warm-standby",
+    "title": "Disaster recovery with a warm standby region",
+    "summary": "Primary and standby regions (or providers), backups with a one hour recovery point, and a documented switch over by DNS.",
+    "categories": ["disaster-recovery", "saas"],
+    "tags": ["multi-region", "backups", "standby", "rpo"],
+    "badges": ["VERIFIED", "DEVOPS"]
+  },
+  {
+    "template": "payment-gateway",
+    "title": "Payment gateway",
+    "summary": "Payment API with idempotency cache, ordered event queue with dead letters, webhook dispatcher and a highly available ledger database.",
+    "categories": ["payments", "fintech"],
+    "tags": ["idempotency", "fifo", "webhooks", "pci-scope"],
+    "badges": ["VERIFIED", "DEVOPS"]
+  },
+  {
+    "template": "ecommerce-storefront",
+    "title": "Ecommerce storefront",
+    "summary": "Storefront on Vercel or Render, commerce API and order worker on containers, Postgres, Redis sessions, an order queue and a product image bucket.",
+    "categories": ["ecommerce", "web"],
+    "tags": ["storefront", "nextjs", "checkout", "multicloud"],
+    "badges": ["VERIFIED", "DEVOPS"]
+  },
+  {
+    "template": "logistics-tracking",
+    "title": "Logistics and shipment tracking",
+    "summary": "Tracking API, ordered scan event ingestion, latest status cache and a document bucket for labels and proof of delivery.",
+    "categories": ["logistics"],
+    "tags": ["tracking", "events", "fifo", "warehouse"],
+    "badges": ["VERIFIED", "DEVOPS"]
+  },
+  {
+    "template": "last-mile-delivery",
+    "title": "Last mile delivery",
+    "summary": "Customer tracking site, dispatch API, routing worker, courier location events and live positions, with the database on the provider of your choice.",
+    "categories": ["delivery", "logistics"],
+    "tags": ["dispatch", "couriers", "realtime", "multicloud"],
+    "badges": ["VERIFIED", "DEVOPS"]
+  }
+]

@@ -1,7 +1,7 @@
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
 import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@orkstage/cloud-mock';
 import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';
-import { loadBuiltinTemplates } from '@orkstage/templates/builtin';
+import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import type { EnvironmentTemplate } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,6 +11,7 @@ import {
   executeDestroy,
   idempotencyKeyFor,
   previewProviderPlans,
+  previewTemplate,
   readDependencySecret,
   renderPlan,
   resolveTriggerParams,
@@ -389,5 +390,21 @@ describe('compiler: provider feature flags', () => {
     expect(off.issues.some((i) => i.code === 'PROVIDER_DISABLED')).toBe(true);
     const simulated = compileInfrastructure({ ...input(templates['sandbox-min-cost']!, { primary: { target: aws, region: 'us-east-1' } }), providerEnabled: (p) => p === 'mock' }, registry());
     expect(simulated.issues.filter((i) => i.code === 'PROVIDER_DISABLED')).toEqual([]);
+  });
+});
+
+describe('compiler: marketplace templates', () => {
+  it.each(loadMarketplaceTemplates().map((s) => [s.slug, s.template] as const))('%s compiles for each of its plans in preview', (_slug, template) => {
+    for (const plan of template.spec.plans) {
+      const preview = previewTemplate(template, registry(), plan);
+      expect(preview.resolved.issues.filter((i) => i.severity === 'error'), plan).toEqual([]);
+      expect(preview.cost.total).toBeGreaterThan(0);
+    }
+  });
+
+  it('previews on the first allowed provider of each slot', () => {
+    const preview = previewTemplate(templates['web-platforms']!, registry());
+    expect(preview.placements).toEqual({ web: 'vercel', data: 'supabase', files: 'aws' });
+    expect(preview.providers).toEqual(['vercel', 'render', 'supabase', 'aws', 'gcp', 'azure', 'digitalocean']);
   });
 });

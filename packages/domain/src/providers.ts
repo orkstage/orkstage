@@ -28,21 +28,23 @@ export interface ProviderInfo {
   kind: ProviderKind;
   /** What one cloud target is on this provider (shown in forms and docs). */
   targetUnit: string;
+  /** A representative region, used for previews and estimates without a real target. */
+  previewRegion: string;
 }
 
 export const PROVIDER_INFO: Record<CloudProvider, ProviderInfo> = {
-  aws: { displayName: 'Amazon Web Services', kind: 'infrastructure', targetUnit: 'AWS account' },
-  azure: { displayName: 'Microsoft Azure', kind: 'infrastructure', targetUnit: 'Azure subscription' },
-  gcp: { displayName: 'Google Cloud', kind: 'infrastructure', targetUnit: 'GCP project' },
-  oci: { displayName: 'Oracle Cloud Infrastructure', kind: 'infrastructure', targetUnit: 'OCI compartment' },
-  digitalocean: { displayName: 'DigitalOcean', kind: 'infrastructure', targetUnit: 'DigitalOcean team' },
-  vultr: { displayName: 'Vultr', kind: 'infrastructure', targetUnit: 'Vultr account' },
-  coreweave: { displayName: 'CoreWeave', kind: 'infrastructure', targetUnit: 'CoreWeave organization' },
-  magalu: { displayName: 'Magalu Cloud', kind: 'infrastructure', targetUnit: 'Magalu Cloud tenant' },
-  vercel: { displayName: 'Vercel', kind: 'platform', targetUnit: 'Vercel team' },
-  render: { displayName: 'Render', kind: 'platform', targetUnit: 'Render workspace' },
-  supabase: { displayName: 'Supabase', kind: 'platform', targetUnit: 'Supabase organization' },
-  mock: { displayName: 'Simulation', kind: 'simulation', targetUnit: 'simulated account' },
+  aws: { displayName: 'Amazon Web Services', kind: 'infrastructure', targetUnit: 'AWS account', previewRegion: 'us-east-1' },
+  azure: { displayName: 'Microsoft Azure', kind: 'infrastructure', targetUnit: 'Azure subscription', previewRegion: 'eastus' },
+  gcp: { displayName: 'Google Cloud', kind: 'infrastructure', targetUnit: 'GCP project', previewRegion: 'us-central1' },
+  oci: { displayName: 'Oracle Cloud Infrastructure', kind: 'infrastructure', targetUnit: 'OCI compartment', previewRegion: 'us-ashburn-1' },
+  digitalocean: { displayName: 'DigitalOcean', kind: 'infrastructure', targetUnit: 'DigitalOcean team', previewRegion: 'nyc3' },
+  vultr: { displayName: 'Vultr', kind: 'infrastructure', targetUnit: 'Vultr account', previewRegion: 'ewr' },
+  coreweave: { displayName: 'CoreWeave', kind: 'infrastructure', targetUnit: 'CoreWeave organization', previewRegion: 'US-EAST-04A' },
+  magalu: { displayName: 'Magalu Cloud', kind: 'infrastructure', targetUnit: 'Magalu Cloud tenant', previewRegion: 'br-se1' },
+  vercel: { displayName: 'Vercel', kind: 'platform', targetUnit: 'Vercel team', previewRegion: 'iad1' },
+  render: { displayName: 'Render', kind: 'platform', targetUnit: 'Render workspace', previewRegion: 'oregon' },
+  supabase: { displayName: 'Supabase', kind: 'platform', targetUnit: 'Supabase organization', previewRegion: 'us-east-1' },
+  mock: { displayName: 'Simulation', kind: 'simulation', targetUnit: 'simulated account', previewRegion: 'us-east-1' },
 };
 
 export function isCloudProvider(value: string): value is CloudProvider {

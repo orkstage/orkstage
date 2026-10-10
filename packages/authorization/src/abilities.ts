@@ -29,6 +29,7 @@ export const SUBJECTS = [
   'ApiKey',
   'Webhook',
   'Import',
+  'Marketplace',
 ] as const;
 export type SubjectName = (typeof SUBJECTS)[number];
 
@@ -114,7 +115,7 @@ export function defineAbilityFor(principal: Principal): AppAbility {
 
   if (principal.memberships.length > 0) {
     can('read', ['Tenant', 'Instance', 'Deployment', 'Service', 'Incident', 'StatusPage', 'Notification'], all);
-    can('read', ['Template', 'Plan', 'Application']);
+    can('read', ['Template', 'Plan', 'Application', 'Marketplace']);
     can(['deploy', 'restart'], 'Instance', ops);
     can('deploy', 'Service', ops);
     can(['create', 'update', 'scale', 'destroy', 'approve'], 'Instance', admins);

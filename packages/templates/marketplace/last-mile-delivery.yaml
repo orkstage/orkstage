@@ -1,0 +1,100 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: last-mile-delivery
+  version: 1.0.0
+  displayName: Last mile delivery
+  description: >
+    Delivery apps for customers, couriers and dispatch: a tracking site on a frontend platform, a
+    dispatch API and a routing worker on containers, a queue for courier location events, Redis
+    for live positions, PostgreSQL for orders and a bucket for delivery photos. Low cost by default;
+    raise replicas and sizes through the variables.
+  profile: growth
+spec:
+  plans: [GROWTH, SCALE]
+  placements:
+    - name: web
+      description: Customer tracking site.
+      providers: [vercel, render, mock]
+    - name: backend
+      description: Dispatch API, routing worker, events and media.
+      providers: [aws, gcp, azure, digitalocean, vultr, magalu, mock]
+    - name: data
+      description: Orders database.
+      providers: [supabase, render, aws, gcp, azure, digitalocean, mock]
+  variables:
+    - name: dispatchReplicas
+      type: number
+      default: 1
+      min: 1
+      max: 2
+      target: dispatch-api.replicas
+    - name: databaseSize
+      type: string
+      default: small
+      allowed: [micro, small, medium, large]
+      target: orders-db.size
+  resources:
+    - id: network
+      type: network
+      placement: backend
+    - id: dispatch-api
+      type: compute.container-service
+      placement: backend
+      image: catalog://sample-api
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+      dependsOn: [orders-db]
+    - id: routing-worker
+      type: compute.container-service
+      placement: backend
+      image: catalog://sample-worker
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      critical: false
+    - id: courier-events
+      type: queue
+      placement: backend
+      deadLetter: true
+    - id: live-positions
+      type: cache.redis
+      placement: backend
+      size: micro
+    - id: photos
+      type: object-storage
+      placement: backend
+      retentionDays: 180
+      accessKeys: true
+    - id: orders-db
+      type: database.postgresql
+      placement: data
+      size: small
+      storageGiB: 20
+      backup: { enabled: true, retentionDays: 7 }
+    - id: tracking-site
+      type: web.frontend
+      placement: web
+      source:
+        repository: acme/tracking
+        branch: main
+      framework: nextjs
+      dependsOn: [dispatch-api, photos]
+  connectivity:
+    - { from: dispatch-api, to: orders-db, protocol: postgres, port: 5432, mode: secure }
+    - { from: dispatch-api, to: live-positions, protocol: redis, port: 6379, mode: private-required }
+    - { from: dispatch-api, to: courier-events, protocol: https, mode: secure }
+    - { from: routing-worker, to: courier-events, protocol: https, mode: secure }
+    - { from: routing-worker, to: live-positions, protocol: redis, port: 6379, mode: private-required }
+    - { from: tracking-site, to: dispatch-api, protocol: https, mode: secure }
+  triggers:
+    - name: redeploy-tracking-site
+      resource: tracking-site
+      action: redeploy
+      params: { target: production }
+      overridable: [ref]
+      on: { manual: true, webhook: true }

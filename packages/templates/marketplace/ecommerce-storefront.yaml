@@ -1,0 +1,93 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: ecommerce-storefront
+  version: 1.0.0
+  displayName: Ecommerce storefront
+  description: >
+    A storefront on a frontend platform, a commerce API and an order worker on containers,
+    PostgreSQL for catalog and orders, Redis for sessions and carts, a queue between checkout and
+    fulfillment, and a bucket for product images that the storefront can read. Triggers rebuild the
+    storefront after a catalog publish.
+  profile: growth
+spec:
+  plans: [GROWTH, SCALE]
+  placements:
+    - name: storefront
+      description: Website built from your repository.
+      providers: [vercel, render, mock]
+    - name: backend
+      description: API, worker, data and media.
+      providers: [aws, azure, gcp, digitalocean, mock]
+  resources:
+    - id: network
+      type: network
+      placement: backend
+      availabilityZones: 2
+    - id: commerce-api
+      type: compute.container-service
+      placement: backend
+      image: catalog://sample-api
+      replicas: 2
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: order-worker
+      type: compute.container-service
+      placement: backend
+      image: catalog://sample-worker
+      replicas: 1
+      cpu: 0.5
+      memoryMiB: 1024
+      critical: false
+    - id: database
+      type: database.postgresql
+      placement: backend
+      size: small
+      storageGiB: 50
+      backup: { enabled: true, retentionDays: 7 }
+    - id: sessions
+      type: cache.redis
+      placement: backend
+      size: micro
+    - id: orders
+      type: queue
+      placement: backend
+      deadLetter: true
+    - id: media
+      type: object-storage
+      placement: backend
+      versioning: true
+      accessKeys: true
+    - id: ingress
+      type: ingress
+      placement: backend
+      routes:
+        - service: commerce-api
+    - id: storefront
+      type: web.frontend
+      placement: storefront
+      source:
+        repository: acme/storefront
+        branch: main
+      framework: nextjs
+      environment:
+        NEXT_PUBLIC_STORE_NAME: Acme Store
+      dependsOn: [ingress, media]
+  connectivity:
+    - { from: commerce-api, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: order-worker, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: commerce-api, to: sessions, protocol: redis, port: 6379, mode: private-required }
+    - { from: commerce-api, to: orders, protocol: https, mode: secure }
+    - { from: order-worker, to: orders, protocol: https, mode: secure }
+    - { from: storefront, to: commerce-api, protocol: https, mode: secure }
+  triggers:
+    - name: rebuild-storefront
+      description: Rebuild the storefront, for example after a catalog or content publish.
+      resource: storefront
+      action: redeploy
+      params: { target: production }
+      overridable: [ref]
+      on: { manual: true, webhook: true }

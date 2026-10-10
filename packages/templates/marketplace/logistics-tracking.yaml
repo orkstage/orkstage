@@ -1,0 +1,68 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: logistics-tracking
+  version: 1.0.0
+  displayName: Logistics and shipment tracking
+  description: >
+    Shipment tracking for carriers and warehouses: a tracking API, an ingest worker that consumes
+    scan events from a FIFO queue in order, PostgreSQL for shipments and events, Redis for the
+    latest status of each shipment, and a bucket for labels and proof of delivery documents.
+  profile: starter
+spec:
+  plans: [STARTER, GROWTH, SCALE]
+  placements:
+    - name: primary
+      providers: [aws, azure, gcp, oci, digitalocean, magalu, mock]
+  resources:
+    - id: network
+      type: network
+      availabilityZones: 2
+      natGateway: true
+    - id: tracking-api
+      type: compute.container-service
+      image: catalog://sample-api
+      replicas: 2
+      cpu: 0.5
+      memoryMiB: 1024
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: ingest-worker
+      type: compute.container-service
+      image: catalog://sample-worker
+      replicas: 2
+      cpu: 0.5
+      memoryMiB: 1024
+    - id: database
+      type: database.postgresql
+      size: medium
+      storageGiB: 50
+      backup: { enabled: true, retentionDays: 7 }
+    - id: status-cache
+      type: cache.redis
+      size: small
+    - id: scan-events
+      type: queue
+      fifo: true
+      deadLetter: true
+      critical: true
+    - id: documents
+      type: object-storage
+      tier: infrequent
+      versioning: true
+    - id: ingress
+      type: ingress
+      routes:
+        - service: tracking-api
+    - id: dns
+      type: dns
+      target: ingress
+      customDomain: optional
+  connectivity:
+    - { from: tracking-api, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: tracking-api, to: status-cache, protocol: redis, port: 6379, mode: private-required }
+    - { from: ingest-worker, to: scan-events, protocol: https, mode: private-preferred }
+    - { from: ingest-worker, to: database, protocol: postgres, port: 5432, mode: private-required }
+    - { from: ingest-worker, to: status-cache, protocol: redis, port: 6379, mode: private-required }
+    - { from: tracking-api, to: documents, protocol: https, mode: secure }

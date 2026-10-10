@@ -1,5 +1,5 @@
 import { DEFAULT_ENTITLEMENTS, PLAN_CODES } from '@orkstage/domain';
-import { loadBuiltinTemplates } from '@orkstage/templates/builtin';
+import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import { createPrismaClient } from './index.js';
 
 /**
@@ -43,6 +43,34 @@ async function main() {
         validation: { valid: true, issues: [] },
         publishedAt: new Date(),
       },
+    });
+  }
+
+  // Curated marketplace listings: system templates published as VERIFIED and DEVOPS by OrkStage.
+  for (const m of loadMarketplaceTemplates()) {
+    const t = await prisma.template.upsert({
+      where: { name: m.template.metadata.name },
+      update: { displayName: m.template.metadata.displayName, description: m.template.metadata.description },
+      create: { name: m.template.metadata.name, displayName: m.template.metadata.displayName, description: m.template.metadata.description, visibility: 'SYSTEM' },
+    });
+    await prisma.templateVersion.upsert({
+      where: { templateId_version: { templateId: t.id, version: m.template.metadata.version } },
+      update: {},
+      create: {
+        templateId: t.id,
+        version: m.template.metadata.version,
+        status: 'PUBLISHED',
+        source: m.source,
+        document: m.template as object,
+        validation: { valid: true, issues: [] },
+        publishedAt: new Date(),
+      },
+    });
+    const listing = { title: m.title, summary: m.summary, description: m.template.metadata.description, categories: m.categories, tags: m.tags, badges: m.badges };
+    await prisma.marketplaceListing.upsert({
+      where: { slug: m.slug },
+      update: listing,
+      create: { ...listing, slug: m.slug, templateId: t.id, status: 'PUBLISHED', publisherName: 'OrkStage', publishedAt: new Date(), reviewedAt: new Date() },
     });
   }
 

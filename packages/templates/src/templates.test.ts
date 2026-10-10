@@ -6,10 +6,11 @@ import {
   dependentsOf,
   parseTemplate,
   topologicalLevels,
+  validateSemantics,
   validateTemplate,
   type EnvironmentTemplate,
 } from './index.js';
-import { loadBuiltinTemplates } from './builtin.js';
+import { loadBuiltinTemplates, loadMarketplaceTemplates } from './builtin.js';
 
 const builtins = loadBuiltinTemplates();
 const byName = (name: string): EnvironmentTemplate => {
@@ -140,5 +141,21 @@ describe('variables', () => {
     const on = buildDependencyGraph(applyVariables(t, { enableCache: true }).template);
     expect(off.has('cache')).toBe(false);
     expect(on.get('api')!.has('cache')).toBe(true);
+  });
+});
+
+describe('marketplace templates', () => {
+  const seeds = loadMarketplaceTemplates();
+
+  it('ships the curated listings, each matching its template', () => {
+    expect(seeds.map((s) => s.slug)).toEqual(['disaster-recovery-warm-standby', 'payment-gateway', 'ecommerce-storefront', 'logistics-tracking', 'last-mile-delivery']);
+    for (const s of seeds) {
+      expect(s.template.metadata.name).toBe(s.slug);
+      expect(s.categories.length).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(seeds.map((s) => [s.slug, s] as const))('%s passes semantic validation', (_slug, s) => {
+    expect(validateSemantics(s.template)).toEqual([]);
   });
 });
