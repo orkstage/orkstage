@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
  * Application-level encryption for secrets the platform must read back (e.g. webhook signing
@@ -23,6 +23,17 @@ export class SecretBox {
     const cipher = createCipheriv('aes-256-gcm', this.key, iv);
     const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), ct.toString('base64url')].join(':');
+  }
+
+  /**
+   * Deterministic secret for one purpose (e.g. `supabase:db:<target>:<name>`): the same input always
+   * gives the same value, so a generated database password can be recomputed when it is needed
+   * instead of being stored anywhere. Uses a subkey of its own, never the encryption key itself.
+   * Rotating ENCRYPTION_KEY changes every derived value.
+   */
+  derive(purpose: string): string {
+    const subkey = Buffer.from(hkdfSync('sha256', this.key, 'orkstage', 'derived-secrets-v1', 32));
+    return createHmac('sha256', subkey).update(purpose).digest('base64url');
   }
 
   open(sealed: string): string {

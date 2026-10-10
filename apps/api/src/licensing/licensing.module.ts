@@ -9,7 +9,7 @@ import { AppError } from '../common/errors.js';
 import { CONFIG } from '../infra/infra.module.js';
 
 export const LICENSING = Symbol('LICENSING');
-const FEATURE = 'co:enterpriseFeature';
+const FEATURE = 'orkstage:enterpriseFeature';
 
 /** Marks a route as an Enterprise feature; without a license covering it the API answers 402. */
 export const RequiresFeature = (feature: EnterpriseFeature) => SetMetadata(FEATURE, feature);

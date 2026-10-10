@@ -27,6 +27,7 @@ describe('built-in templates', () => {
       'growth-standard',
       'scale-custom',
       'multicloud-reference',
+      'web-platforms',
     ]);
   });
 

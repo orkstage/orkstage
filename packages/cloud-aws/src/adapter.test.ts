@@ -196,3 +196,11 @@ describe('deployment role template (infra/aws/orkstage-deployment-role.yaml)', (
     expect(required.filter((a) => !patterns.some((p) => p.test(a)))).toEqual([]);
   });
 });
+
+describe('AwsAdapter.readSecret', () => {
+  it('refuses secrets OrkStage did not create, before calling AWS', async () => {
+    const adapter = new AwsAdapter({ resolveExternalId: async () => 'x', stsFactory: vi.fn() });
+    await expect(adapter.readSecret(ctx, 'arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db')).rejects.toMatchObject({ code: 'AWS_SECRET_REF_INVALID' });
+    await expect(adapter.readSecret(ctx, 'env://X')).rejects.toMatchObject({ code: 'AWS_SECRET_REF_INVALID' });
+  });
+});

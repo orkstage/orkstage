@@ -31,7 +31,8 @@ export const REQUIRED_ACTIONS: Record<string, string[]> = {
   queue: ['sqs:CreateQueue', 'sqs:SetQueueAttributes', 'sqs:DeleteQueue', 'sqs:TagQueue'],
   'object-storage': [
     's3:CreateBucket', 's3:DeleteBucket', 's3:PutBucketVersioning', 's3:PutEncryptionConfiguration', 's3:PutBucketPublicAccessBlock',
-    's3:PutLifecycleConfiguration', 's3:PutBucketTagging',
+    's3:PutLifecycleConfiguration', 's3:PutBucketTagging', 'iam:CreateUser', 'iam:PutUserPolicy', 'iam:CreateAccessKey',
+    'secretsmanager:CreateSecret', 'secretsmanager:PutSecretValue',
   ],
   ingress: [
     'elasticloadbalancing:CreateLoadBalancer', 'elasticloadbalancing:DeleteLoadBalancer', 'elasticloadbalancing:CreateTargetGroup',

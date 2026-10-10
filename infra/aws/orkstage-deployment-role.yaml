@@ -146,6 +146,25 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/ork-*'
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/ork-*'
+              # Scoped access keys for buckets used from other providers (object-storage accessKeys).
+              - Sid: BucketAccessUsers
+                Effect: Allow
+                Action:
+                  - iam:CreateUser
+                  - iam:DeleteUser
+                  - iam:GetUser
+                  - iam:TagUser
+                  - iam:UntagUser
+                  - iam:PutUserPolicy
+                  - iam:GetUserPolicy
+                  - iam:DeleteUserPolicy
+                  - iam:ListUserPolicies
+                  - iam:ListAttachedUserPolicies
+                  - iam:CreateAccessKey
+                  - iam:DeleteAccessKey
+                  - iam:ListAccessKeys
+                  - iam:ListGroupsForUser
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:user/ork-*'
               - Sid: PassServiceRoles
                 Effect: Allow
                 Action: iam:PassRole

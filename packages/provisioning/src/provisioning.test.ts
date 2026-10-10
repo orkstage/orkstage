@@ -11,14 +11,17 @@ import {
   executeDestroy,
   idempotencyKeyFor,
   previewProviderPlans,
+  readDependencySecret,
   renderPlan,
+  resolveTriggerParams,
+  triggerAllows,
   type CompileInput,
   type ExecutionHooks,
 } from './index.js';
 
 const templates = Object.fromEntries(loadBuiltinTemplates().map((b) => [b.template.metadata.name, b.template]));
 
-function mockTarget(id: string, simulate: 'aws' | 'azure' | 'oci', region: string, extra: MockTargetConfig = {}): CloudTarget {
+function mockTarget(id: string, simulate: NonNullable<MockTargetConfig['simulate']>, region: string, extra: MockTargetConfig = {}): CloudTarget {
   return {
     id,
     provider: 'mock',
@@ -65,6 +68,32 @@ const multiCloudBindings = {
   data: { target: azure, region: 'eastus' },
   storage: { target: oci, region: 'us-ashburn-1' },
 };
+
+describe('compiler: web app on managed platforms', () => {
+  const bindings = {
+    web: { target: mockTarget('vercel-v', 'vercel', 'gru1'), region: 'gru1' },
+    data: { target: mockTarget('supabase-s', 'supabase', 'sa-east-1'), region: 'sa-east-1' },
+    files: { target: mockTarget('aws-f', 'aws', 'sa-east-1'), region: 'sa-east-1' },
+  };
+  const resolved = compileInfrastructure(input(templates['web-platforms']!, bindings), registry());
+
+  it('places the frontend, database and bucket on three providers', () => {
+    expect(resolved.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const placement = Object.fromEntries(resolved.resources.map((r) => [r.id, `${r.simulatedProvider}:${r.capability}`]));
+    expect(placement).toEqual({ database: 'supabase:supabase-postgres', files: 'aws:s3', web: 'vercel:vercel-project' });
+  });
+
+  it('warns, instead of failing, about a database reached over TLS from another provider', () => {
+    expect(resolved.policyResults.find((p) => p.policy === 'no-public-database')).toMatchObject({ status: 'warn', resourceId: 'database' });
+  });
+
+  it('still fails a public database nobody declared a cross provider link to', () => {
+    const template = structuredClone(templates['web-platforms']!);
+    template.spec.connectivity = [];
+    const other = compileInfrastructure(input(template, bindings), registry());
+    expect(other.policyResults.find((p) => p.policy === 'no-public-database')).toMatchObject({ status: 'fail' });
+  });
+});
 
 describe('compiler — spec §42.17 multi-cloud reference', () => {
   const resolved = compileInfrastructure(input(templates['multicloud-reference']!, multiCloudBindings), registry());
@@ -293,5 +322,62 @@ describe('provider plans', () => {
     delete existing[api.dependsOn[0]!];
     const summary = await previewProviderPlans({ resolved: withApi, registry: reg, ...ids, existing });
     expect(summary.entries.find((e) => e.resourceId === 'api')).toMatchObject({ status: 'skipped' });
+  });
+});
+
+describe('readDependencySecret', () => {
+  const target = (id: string, provider: 'vercel' | 'supabase'): CloudTarget => ({ id, provider, name: id, config: {}, allowedRegions: ['r'], defaultRegion: 'r' });
+  const res = (id: string, provider: 'vercel' | 'supabase', dependsOn: string[] = []) => ({
+    id, type: 't', slot: 's', provider, targetId: `${provider}-t`, targetName: 'n', region: 'r', capability: 'c', capabilityName: 'c', name: id, tags: {}, spec: {}, dependsOn, critical: true, specHash: 'h',
+  });
+  const db = res('db', 'supabase');
+  const web = res('web', 'vercel', ['db']);
+  const resolved = { resources: [db, web], targets: { 'supabase-t': target('supabase-t', 'supabase'), 'vercel-t': target('vercel-t', 'vercel') } } as unknown as Parameters<typeof readDependencySecret>[1];
+  const owner = (readSecret?: (ctx: unknown, ref: string) => Promise<Record<string, string>>) =>
+    new AdapterRegistry().register({ provider: 'supabase', simulated: false, readSecret } as never).register({ provider: 'vercel', simulated: false } as never);
+
+  it('asks the owning adapter, with the owner target', async () => {
+    const seen: unknown[] = [];
+    const registry = owner(async (ctx, ref) => (seen.push([(ctx as { target: CloudTarget }).target.id, ref]), { password: 'p' }));
+    expect(await readDependencySecret(registry, resolved, web, 'db', { secret_ref: 'supabase://x/database' }, 'c')).toEqual({ password: 'p' });
+    expect(seen).toEqual([['supabase-t', 'supabase://x/database']]);
+  });
+
+  it('refuses undeclared dependencies, missing refs and owners that cannot share', async () => {
+    await expect(readDependencySecret(owner(async () => ({})), resolved, db, 'web', { secret_ref: 'x' }, 'c')).rejects.toThrow('dependsOn');
+    await expect(readDependencySecret(owner(async () => ({})), resolved, web, 'db', {}, 'c')).rejects.toThrow('does not publish');
+    await expect(readDependencySecret(owner(), resolved, web, 'db', { secret_ref: 'x' }, 'c')).rejects.toThrow('cannot hand');
+  });
+});
+
+describe('triggers', () => {
+  const trigger = { name: 'redeploy-site', resource: 'web', action: 'redeploy', params: { target: 'production' }, overridable: ['ref'], on: { manual: true, webhook: true } };
+  const descriptor = {
+    name: 'redeploy',
+    description: 'Redeploy',
+    params: [
+      { name: 'ref', type: 'string' as const },
+      { name: 'target', type: 'string' as const, required: true },
+      { name: 'clearCache', type: 'boolean' as const },
+    ],
+  };
+
+  it('merges defaults with overridable values and checks the action', () => {
+    expect(resolveTriggerParams(trigger, { ref: 'main' }, descriptor)).toEqual({ ok: true, params: { target: 'production', ref: 'main' } });
+  });
+
+  it('rejects names that are not overridable, unknown params and wrong types', () => {
+    const r = resolveTriggerParams({ ...trigger, params: { target: 1, extra: 'x' } as never }, { target: 'preview' }, descriptor);
+    expect(r).toEqual({
+      ok: false,
+      errors: ['Parameter "target" cannot be set when running "redeploy-site".', 'Parameter "target" must be a string.', 'Action "redeploy" has no parameter "extra".'],
+    });
+  });
+
+  it('knows which sources may start a trigger', () => {
+    expect(triggerAllows(trigger, 'MANUAL')).toBe(true);
+    expect(triggerAllows(trigger, 'WEBHOOK')).toBe(true);
+    expect(triggerAllows(trigger, 'SCHEDULE')).toBe(false);
+    expect(triggerAllows({ ...trigger, on: { manual: false, webhook: false, schedule: '0 3 * * *' } }, 'SCHEDULE')).toBe(true);
   });
 });

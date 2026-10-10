@@ -255,6 +255,13 @@ enum CloudProvider {
   azure
   gcp
   oci
+  digitalocean
+  vultr
+  coreweave
+  magalu
+  vercel
+  render
+  supabase
   mock
 }
 
@@ -263,7 +270,7 @@ enum TargetStatus {
   DISABLED
 }
 
-/// An AWS account, Azure subscription, GCP project or OCI tenancy (spec §42.5).
+/// An AWS account, Azure subscription, GCP project, OCI compartment or platform team (spec §42.5).
 model CloudTarget {
   id             String        @id @default(uuid(7)) @db.Uuid
   /// Null for platform-shared targets; set when a target belongs to one tenant.
@@ -348,6 +355,7 @@ model Instance {
   deployments     Deployment[]
   transitions     InstanceTransition[]
   components      StatusComponent[]
+  triggerRuns     TriggerRun[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -453,6 +461,49 @@ enum StepStatus {
   FAILED
   SKIPPED
   CANCELLED
+}
+
+enum TriggerSource {
+  MANUAL
+  SCHEDULE
+  WEBHOOK
+}
+
+enum TriggerRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// One run of a template trigger: an action (redeploy, restart, purge cache) on one resource.
+model TriggerRun {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  tenantId      String           @db.Uuid
+  instanceId    String           @db.Uuid
+  trigger       String
+  resourceId    String
+  action        String
+  /// Template defaults merged with the overridable parameters the caller sent. Never secrets.
+  params        Json             @default("{}")
+  source        TriggerSource
+  status        TriggerRunStatus @default(QUEUED)
+  requestedById String?          @db.Uuid
+  apiKeyId      String?          @db.Uuid
+  correlationId String
+  /// Provider id of what the action started (a deployment, a backup).
+  reference     String?
+  url           String?
+  message       String?
+  errorClass    String?
+  queuedAt      DateTime         @default(now()) @db.Timestamptz(3)
+  startedAt     DateTime?        @db.Timestamptz(3)
+  finishedAt    DateTime?        @db.Timestamptz(3)
+
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId, queuedAt])
+  @@index([tenantId, queuedAt])
 }
 
 model Deployment {

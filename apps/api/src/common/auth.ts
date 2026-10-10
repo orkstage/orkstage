@@ -24,8 +24,8 @@ import type { RequestPrincipal } from '../types.js';
 import { AppError, forbidden } from './errors.js';
 
 export const SESSION_COOKIE = 'orkstage_session';
-const IS_PUBLIC = 'co:isPublic';
-const SCOPE = 'co:apiKeyScope';
+const IS_PUBLIC = 'orkstage:isPublic';
+const SCOPE = 'orkstage:apiKeyScope';
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 const KEY_TOUCH_INTERVAL_MS = 60 * 1000;
 const BEARER = /^Bearer\s+(ork_(?:live|test)_[a-f0-9]{8}_[A-Za-z0-9_-]{20,})$/;

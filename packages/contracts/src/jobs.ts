@@ -4,12 +4,19 @@ export const QUEUES = {
   health: 'health-checks',
   notifications: 'notifications',
   drift: 'drift-scans',
+  triggers: 'triggers',
 } as const;
 
 /** Payloads carry ids only; the worker reloads authoritative state from the database. */
 export interface DeploymentJob {
   deploymentId: string;
 }
+
+/**
+ * Run a template trigger. `runId` for runs created by the API; scheduled runs carry the instance
+ * and trigger name and the worker records the run itself.
+ */
+export type TriggerJob = { runId: string } | { instanceId: string; trigger: string };
 
 /**
  * Ask the worker to notify a tenant's responsible users. The worker resolves recipients and
@@ -37,6 +44,8 @@ export const NOTIFICATION_EVENTS = [
   'deployment.awaiting_approval',
   'instance.degraded',
   'instance.drift_detected',
+  'trigger.succeeded',
+  'trigger.failed',
   'incident.opened',
   'incident.updated',
   'incident.resolved',

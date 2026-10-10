@@ -168,7 +168,18 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
     case 'queue':
       return { module, inputs: { name: fitName(req.name, 70), fifo: Boolean(spec.fifo), dead_letter: spec.deadLetter ?? true } };
     case 'object-storage':
-      return { module, inputs: { name: fitName(req.name, 50), versioning: Boolean(spec.versioning), tier: spec.tier ?? 'standard', retention_days: spec.retentionDays ?? null, force_destroy: !production } };
+      return {
+        module,
+        inputs: {
+          name: fitName(req.name, 50),
+          versioning: Boolean(spec.versioning),
+          tier: spec.tier ?? 'standard',
+          retention_days: spec.retentionDays ?? null,
+          force_destroy: !production,
+          access_keys: Boolean(spec.accessKeys),
+          production,
+        },
+      };
     case 'dns': {
       const ingress = need(deps, 'ingress', req.resourceId);
       const tgs = ingress.target_groups ? Object.values(JSON.parse(String(ingress.target_groups)) as Record<string, string>) : [];

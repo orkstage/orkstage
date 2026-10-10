@@ -81,6 +81,15 @@ describe('secrets', () => {
     expect(() => new SecretBox(undefined, 'y'.repeat(40)).open(sealed)).toThrow();
   });
 
+  it('derives stable, purpose bound secrets from the key', () => {
+    const box = new SecretBox(undefined, 'x'.repeat(40));
+    const a = box.derive('supabase:db:t1:ork-acme-prod-db');
+    expect(a).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(box.derive('supabase:db:t1:ork-acme-prod-db')).toBe(a);
+    expect(box.derive('supabase:db:t1:other')).not.toBe(a);
+    expect(new SecretBox(undefined, 'y'.repeat(40)).derive('supabase:db:t1:ork-acme-prod-db')).not.toBe(a);
+  });
+
   it('requires production encryption keys', () => {
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', SESSION_SECRET: 'z'.repeat(40) })).toThrow(/ENCRYPTION_KEY/);
   });

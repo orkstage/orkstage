@@ -1,0 +1,102 @@
+import type { CloudCapability } from '@orkstage/cloud-core';
+
+const SOURCE = 'Static Google Cloud list prices, us-central1, approximate (2026). Not an invoice.';
+
+/**
+ * Google Cloud implementations for each logical resource kind. Data, not domain logic: the
+ * resolver picks from it. Regions are `*` (every region the target allows).
+ */
+export const GCP_CAPABILITIES: CloudCapability[] = [
+  {
+    provider: 'gcp',
+    serviceKind: 'network',
+    capability: 'vpc',
+    displayName: 'VPC network (custom mode)',
+    regions: '*',
+    isDefault: true,
+    features: ['private-subnets', 'nat-gateway', 'private-service-access'],
+    supportsEncryption: true,
+    supportsBackup: false,
+    limitations: ['One regional subnet per network; availabilityZones does not apply because Google Cloud subnets span all zones of a region.'],
+    pricing: { currency: 'USD', baseMonthly: 0, perUnitMonthly: { availabilityZone: 1.02 }, source: SOURCE },
+  },
+  {
+    provider: 'gcp',
+    serviceKind: 'compute.container-service',
+    capability: 'cloud-run',
+    displayName: 'Cloud Run',
+    regions: '*',
+    isDefault: true,
+    features: ['autoscaling', 'public-ingress', 'scale-to-zero', 'private-egress', 'managed-tls'],
+    supportsEncryption: true,
+    supportsBackup: false,
+    limitations: [
+      'CPU is rounded up to 1, 2, 4, 6 or 8 vCPU and memory raised to the minimum for that CPU.',
+      'Autoscaling follows request concurrency; targetCpuPercent is not used.',
+      'Services without a public flag accept internal traffic only.',
+    ],
+    pricing: { currency: 'USD', baseMonthly: 0, perUnitMonthly: { vcpu: 46.66, memoryGiB: 5.18 }, source: SOURCE },
+  },
+  {
+    provider: 'gcp',
+    serviceKind: 'database.postgresql',
+    capability: 'cloud-sql-postgres',
+    displayName: 'Cloud SQL for PostgreSQL',
+    regions: '*',
+    isDefault: true,
+    features: ['ha:zone-redundant', 'backup', 'encryption', 'private-endpoint', 'point-in-time-recovery'],
+    supportsEncryption: true,
+    supportsBackup: true,
+    limitations: [
+      'Same zone HA is not offered; regional availability (zone redundant) is the HA option.',
+      'Without a network in the same slot the instance gets a public IP with no authorized networks (Cloud SQL connectors only).',
+      'Connections require TLS.',
+    ],
+    pricing: {
+      currency: 'USD',
+      baseMonthly: 0,
+      bySize: { micro: 7.67, small: 25.55, medium: 49.31, large: 98.62, xlarge: 197.24 },
+      perUnitMonthly: { storageGiB: 0.17 },
+      haMultiplier: 2,
+      source: SOURCE,
+    },
+  },
+  {
+    provider: 'gcp',
+    serviceKind: 'cache.redis',
+    capability: 'memorystore-redis',
+    displayName: 'Memorystore for Redis',
+    regions: '*',
+    isDefault: true,
+    features: ['replicas', 'encryption', 'private-endpoint', 'auth'],
+    supportsEncryption: true,
+    supportsBackup: false,
+    limitations: ['Needs a network in the same slot.', 'In transit encryption is off; traffic stays inside the VPC.', 'Two or more replicas need at least 5 GB, so small sizes are raised.'],
+    pricing: { currency: 'USD', baseMonthly: 0, bySize: { micro: 35.77, small: 71.54, medium: 98.55, large: 227.76 }, source: SOURCE },
+  },
+  {
+    provider: 'gcp',
+    serviceKind: 'object-storage',
+    capability: 'gcs',
+    displayName: 'Cloud Storage',
+    regions: '*',
+    isDefault: true,
+    features: ['versioning', 'lifecycle', 'encryption', 'block-public-access', 'uniform-access'],
+    supportsEncryption: true,
+    supportsBackup: true,
+    pricing: { currency: 'USD', baseMonthly: 0.5, perUnitMonthly: { storageGiB: 0.02 }, source: SOURCE },
+  },
+  {
+    provider: 'gcp',
+    serviceKind: 'ingress',
+    capability: 'cloud-run-ingress',
+    displayName: 'Cloud Run built in HTTPS',
+    regions: '*',
+    isDefault: true,
+    features: ['tls', 'managed-tls'],
+    supportsEncryption: true,
+    supportsBackup: false,
+    limitations: ['Each routed service gets its own run.app HTTPS URL; path routing across services is not offered.'],
+    pricing: { currency: 'USD', baseMonthly: 0, source: SOURCE },
+  },
+];

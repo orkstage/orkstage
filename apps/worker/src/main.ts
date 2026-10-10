@@ -1,6 +1,6 @@
-import { QUEUES, type DeploymentJob, type NotificationJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient } from '@orkstage/database';
-import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv } from '@orkstage/runtime';
+import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv, SecretBox } from '@orkstage/runtime';
 import { DelayedError, Queue, Worker } from 'bullmq';
 import type { WorkerContext } from './context.js';
 import { DriftDetector } from './drift.js';
@@ -8,6 +8,7 @@ import { HealthMonitor } from './health.js';
 import { Notifier } from './notifier.js';
 import { DeploymentRunner, RetryLater } from './runner.js';
 import { TargetSlots } from './slots.js';
+import { TriggerRunner } from './triggers.js';
 import { WebhookDispatcher } from './webhooks.js';
 
 const SLOT_WAIT_MS = 5000;
@@ -20,11 +21,20 @@ async function main() {
   const prisma = createPrismaClient(config.DATABASE_URL);
   // Only the worker provisions: it alone gets an OpenTofu runner (the API validates targets only).
   const tofu = createTofuRunner(config);
-  const { registry } = createAdapterRegistry({ redis, secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }), runner: tofu, awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT });
+  const box = new SecretBox(config.ENCRYPTION_KEY, config.SESSION_SECRET);
+  const { registry } = createAdapterRegistry({
+    redis,
+    secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }),
+    deriveSecret: (purpose) => box.derive(purpose),
+    runner: tofu,
+    awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT,
+  });
   const notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection: redis.duplicate() });
   const ctx: WorkerContext = { config, prisma, redis, registry, logger, notifications };
 
   const runner = new DeploymentRunner(ctx, new TargetSlots(redis));
+  const triggerQueue = new Queue<TriggerJob>(QUEUES.triggers, { connection: redis.duplicate() });
+  const triggerRunner = new TriggerRunner(ctx, triggerQueue);
   const monitor = new HealthMonitor(ctx);
   const notifier = new Notifier(ctx);
 
@@ -33,6 +43,9 @@ async function main() {
     async (job, token) => {
       try {
         await runner.run(job.data.deploymentId);
+        // Scheduled triggers follow the template version that is now live (or stop on destroy).
+        const done = await prisma.deployment.findUnique({ where: { id: job.data.deploymentId }, select: { instanceId: true, status: true } });
+        if (done?.status === 'SUCCEEDED') await triggerRunner.syncSchedules(done.instanceId);
       } catch (err) {
         if (err instanceof RetryLater) {
           await job.moveToDelayed(Date.now() + SLOT_WAIT_MS, token);
@@ -87,7 +100,10 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 1, lockDuration: 120_000 },
   );
 
-  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health], ['drift', drift]] as const) {
+  // Trigger runs: provider actions are short API calls (they start work, they do not wait for it).
+  const triggers = new Worker<TriggerJob>(QUEUES.triggers, async (job) => triggerRunner.handle(job.data), { connection: redis.duplicate(), concurrency: 4 });
+
+  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health], ['drift', drift], ['triggers', triggers]] as const) {
     w.on('failed', (job, err) => logger.error({ queue: name, jobId: job?.id, err: err.message }, 'job failed'));
     w.on('error', (err) => logger.error({ queue: name, err: err.message }, 'worker error'));
   }
@@ -95,8 +111,8 @@ async function main() {
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down: finishing in-flight jobs');
-    await Promise.all([deployments.close(), notify.close(), health.close(), drift.close()]);
-    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close()]);
+    await Promise.all([deployments.close(), notify.close(), health.close(), drift.close(), triggers.close()]);
+    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close()]);
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

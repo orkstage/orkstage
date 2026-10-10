@@ -9,6 +9,7 @@ import {
   type ListQuery,
   type ResourceDto,
 } from '@orkstage/contracts';
+import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
 import { DEFAULT_ENTITLEMENTS, isInstanceBusy, type Entitlements } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
@@ -327,6 +328,7 @@ export class InstancesController {
         capability: row.capability,
         name: row.name,
         providerResourceId: row.providerResourceId ?? undefined,
+        outputs: (row.outputs ?? undefined) as ResourceOutputs | undefined,
         provider: row.provider,
       },
     };

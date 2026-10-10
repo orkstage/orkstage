@@ -1,0 +1,33 @@
+{
+  "name": "@orkstage/cloud-magalu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "default": "./dist/catalog.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@orkstage/cloud-core": "workspace:*",
+    "@orkstage/cloud-tofu": "workspace:*",
+    "@orkstage/domain": "workspace:*",
+    "@orkstage/iac": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -1,3 +1,4 @@
+import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { AlertRule, InstanceResource } from '@orkstage/database';
 import { healthToStatus, type HealthState } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
@@ -54,7 +55,15 @@ export class HealthMonitor {
     if (!targetRow || !registry.has(r.provider)) return;
     const adapter = registry.get(r.provider);
     const pctx = { target: toCloudTarget(targetRow), region: r.region, correlationId: `health-${randomUUID()}` };
-    const ident = { resourceId: r.resourceId, serviceKind: r.type, capability: r.capability, name: r.name, providerResourceId: r.providerResourceId ?? undefined };
+    const ident = {
+      resourceId: r.resourceId,
+      serviceKind: r.type,
+      capability: r.capability,
+      name: r.name,
+      providerResourceId: r.providerResourceId ?? undefined,
+      // Recorded outputs spare adapters a state read on every health cycle.
+      outputs: (r.outputs ?? undefined) as ResourceOutputs | undefined,
+    };
 
     let state: HealthState = 'UNKNOWN';
     let message: string | undefined;

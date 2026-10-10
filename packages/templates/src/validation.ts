@@ -112,6 +112,15 @@ export function validateSemantics(template: EnvironmentTemplate): ValidationIssu
     else if (!(field in target)) err('UNKNOWN_VARIABLE_FIELD', `Variable "${v.name}" targets unknown field "${field}" on "${resourceId}".`, `spec.variables.${v.name}`);
   }
 
+  const triggerNames = new Set<string>();
+  for (const t of template.spec.triggers) {
+    const path = `spec.triggers.${t.name}`;
+    if (triggerNames.has(t.name)) err('DUPLICATE_TRIGGER', `Trigger name "${t.name}" is used more than once.`, path);
+    triggerNames.add(t.name);
+    if (!ids.has(t.resource)) err('UNKNOWN_TRIGGER_RESOURCE', `Trigger "${t.name}" targets unknown resource "${t.resource}".`, `${path}.resource`);
+    if (!t.on.manual && !t.on.webhook && !t.on.schedule) err('TRIGGER_NEVER_RUNS', `Trigger "${t.name}" is not manual, scheduled or a webhook, so it can never run.`, `${path}.on`);
+  }
+
   if (issues.length === 0) {
     try {
       topologicalLevels(buildDependencyGraph(template));

@@ -7,6 +7,9 @@ import {
   type LogLine,
   type MetricPoint,
   type ProviderContext,
+  type ResourceActionDescriptor,
+  type ResourceActionRequest,
+  type ResourceActionResult,
   type ResourceIdentifier,
   type ResourceOutputs,
   type ResourcePlan,
@@ -84,12 +87,12 @@ export class MockAdapter implements CloudProviderAdapter {
   }
 
   capabilities(target: CloudTarget): CloudCapability[] {
-    return SIMULATED_CATALOGS[config(target).simulate ?? 'aws'];
+    return SIMULATED_CATALOGS[simulated(target)];
   }
 
   async validateTarget(ctx: ProviderContext): Promise<TargetValidationResult> {
     const cfg = config(ctx.target);
-    const simulate = cfg.simulate ?? 'aws';
+    const simulate = simulated(ctx.target);
     const regionOk = ctx.target.allowedRegions.includes(ctx.region);
     const checks = [
       cfg.invalidCredentials
@@ -184,6 +187,20 @@ export class MockAdapter implements CloudProviderAdapter {
     };
   }
 
+  /** The actions real platforms offer, simulated, so templates with triggers work without accounts. */
+  actions(): ResourceActionDescriptor[] {
+    return SIMULATED_ACTIONS;
+  }
+
+  async runAction(ctx: ProviderContext, res: ResourceIdentifier, request: ResourceActionRequest): Promise<ResourceActionResult> {
+    await this.simulateLatency(ctx, res.resourceId);
+    const state = await this.getResource(ctx, res);
+    if (!state.exists) throw new ProviderError('SIM_NOT_FOUND', `${res.resourceId} does not exist (simulated).`, 'VALIDATION_ERROR', 'mock');
+    const reference = `sim-${request.action}-${hash(`${res.name}:${ctx.correlationId}`).slice(0, 10)}`;
+    const params = Object.entries(request.params).map(([k, v]) => `${k}=${String(v)}`).join(', ');
+    return { reference, status: 'started', message: `Simulated ${request.action} of ${res.resourceId}${params ? ` (${params})` : ''}.` };
+  }
+
   async getLogs(ctx: ProviderContext, res: ResourceIdentifier, limit: number): Promise<LogLine[]> {
     const now = Date.now();
     const lines: LogLine[] = [];
@@ -269,6 +286,26 @@ function hash(value: string): string {
   return sha256(value);
 }
 
+const SIMULATED_ACTIONS: ResourceActionDescriptor[] = [
+  {
+    name: 'redeploy',
+    description: 'Start a new rollout (simulated).',
+    params: [
+      { name: 'ref', type: 'string', description: 'Branch or commit.' },
+      { name: 'target', type: 'string', description: 'production or preview.' },
+      { name: 'clearCache', type: 'boolean' },
+    ],
+  },
+  { name: 'restart', description: 'Restart running instances (simulated).', params: [] },
+  { name: 'backup', description: 'Take an on demand backup (simulated).', params: [] },
+];
+
+/** The imitated provider; unknown values fall back to AWS instead of breaking the target. */
+function simulated(target: CloudTarget): SimulatedProvider {
+  const value = config(target).simulate;
+  return value && value in SIMULATED_CATALOGS ? value : 'aws';
+}
+
 function outputsFor(req: ResourceRequest, region: string, simulate: string, id: string): ResourceOutputs {
   const short = id.slice(-10);
   const domain = `${simulate}.sim.internal`;
@@ -291,6 +328,8 @@ function outputsFor(req: ResourceRequest, region: string, simulate: string, id: 
       return { dnsName: `${req.name}.lb.${region}.${domain}` };
     case 'dns':
       return { fqdn: `${String(req.spec.subdomainLabel ?? req.name)}.platform.example.test`, tls: 'issued' };
+    case 'web.frontend':
+      return { url: `https://${req.name}.web.${domain}`, project_id: id };
     default:
       return {};
   }
