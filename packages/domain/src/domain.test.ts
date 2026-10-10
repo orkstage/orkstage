@@ -102,7 +102,7 @@ describe('idempotency', () => {
 describe('naming', () => {
   it('builds deterministic names', () => {
     expect(resourceName({ tenantSlug: 'acme', instanceSlug: 'prod', resourceId: 'api' })).toBe(
-      'co-acme-prod-api',
+      'ork-acme-prod-api',
     );
   });
   it('respects provider length limits with a stable hash suffix', () => {

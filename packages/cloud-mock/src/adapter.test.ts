@@ -19,7 +19,7 @@ function fixture(cfg: MockTargetConfig = {}) {
     resourceId: 'database',
     serviceKind: 'database.postgresql',
     capability: 'rds-postgres',
-    name: 'co-acme-prod-database',
+    name: 'ork-acme-prod-database',
     tags: { 'platform:managed': 'true' },
     spec: { size: 'small' },
     dependencyOutputs: {},
@@ -70,7 +70,7 @@ describe('MockAdapter simulation', () => {
 
   it('keeps resources of different instances on the same target apart', async () => {
     const { adapter, context, sampleRequest } = fixture();
-    const other = { ...sampleRequest, name: 'co-globex-staging-database', idempotencyKey: 'other' };
+    const other = { ...sampleRequest, name: 'ork-globex-staging-database', idempotencyKey: 'other' };
     await adapter.ensureResource(context, sampleRequest);
     await adapter.ensureResource(context, other);
     await adapter.deleteResource(context, other);

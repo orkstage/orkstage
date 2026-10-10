@@ -8,7 +8,7 @@ This page describes the security controls in the platform. To report a vulnerabi
 | Area | Control |
 |---|---|
 | Sessions | A 32 byte random opaque token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production). Only its SHA-256 hash is stored. Sessions expire after 12 hours and are revoked on logout. |
-| CSRF | Every state changing request needs the `x-co-csrf: 1` header. The API grants no cross origin CORS, so browsers cannot send it from another site. |
+| CSRF | Every state changing request needs the `x-orkstage-csrf: 1` header. The API grants no cross origin CORS, so browsers cannot send it from another site. |
 | OIDC | Authorization code flow with PKCE (S256); `state` and `nonce` are verified; the flow state lives in a signed cookie with a short lifetime; `returnTo` accepts relative paths only. Provider tokens are discarded. |
 | Account linking | Only by an email the provider verified (`email_verified`, or `xms_edov` for Entra). `preferred_username` is never trusted, which prevents "nOAuth" account takeover. Unknown users get no account unless a tenant allows their email domain. |
 | Development login | Disabled unless `AUTH_DEV_LOGIN_ENABLED=true`. Startup fails if it is enabled with `NODE_ENV=production`. |

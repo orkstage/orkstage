@@ -16,7 +16,7 @@ import type { RequestPrincipal } from '../types.js';
 import { OidcService } from './oidc.service.js';
 import { SessionService } from './session.service.js';
 
-const FLOW_COOKIE = 'co_oidc_flow';
+const FLOW_COOKIE = 'orkstage_oidc_flow';
 
 interface OidcFlow {
   provider: string;
