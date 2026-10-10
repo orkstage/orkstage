@@ -77,6 +77,17 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
       capabilityIssue(r.id, `Slot "${r.placement}" allows ${slot.providers.join(', ')}, but target ${target.name} is ${target.provider}.`);
       continue;
     }
+    if (input.providerEnabled && !input.providerEnabled(target.provider)) {
+      issues.push({
+        stage: 'capability',
+        severity: 'error',
+        code: 'PROVIDER_DISABLED',
+        message: `${target.provider} is disabled on this platform, so "${r.id}" cannot be placed on ${target.name}.`,
+        path: `spec.resources.${r.id}`,
+        suggestions: ['Bind this slot to a target of an enabled provider.', 'Ask a platform administrator to enable the provider (feature flags).'],
+      });
+      continue;
+    }
     if (!registry.has(target.provider)) {
       capabilityIssue(r.id, `No adapter is installed for provider ${target.provider}.`);
       continue;

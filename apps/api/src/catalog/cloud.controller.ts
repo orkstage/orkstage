@@ -1,4 +1,5 @@
-import { createCloudTargetSchema, validateTargetSchema, type ApplicationDto, type CapabilityDto, type CloudTargetDto } from '@orkstage/contracts';
+import { createCloudTargetSchema, validateTargetSchema, type ApplicationDto, type CapabilityDto, type CloudTargetDto, type ProviderDto } from '@orkstage/contracts';
+import { PROVIDER_INFO } from '@orkstage/domain';
 import type { CloudTarget as CloudTargetRow, PrismaClient } from '@orkstage/database';
 import { findSecretLikeKeys, toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
@@ -6,6 +7,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
+import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
@@ -23,6 +25,7 @@ export class CloudController {
     private readonly adapters: Adapters,
     private readonly audit: AuditService,
     private readonly queues: Queues,
+    private readonly flags: FeatureFlagsService,
   ) {}
 
   @Scope('templates:read')
@@ -42,10 +45,18 @@ export class CloudController {
     }));
   }
 
+  /** Installed providers and whether their feature flag is on for the platform. */
   @Get('cloud/providers')
-  providers(@CurrentPrincipal() p: RequestPrincipal) {
+  async providers(@CurrentPrincipal() p: RequestPrincipal): Promise<ProviderDto[]> {
     authorize(p, 'read', 'CloudTarget');
-    return this.adapters.registry.providers().map((provider) => ({ provider, simulated: this.adapters.registry.get(provider).simulated }));
+    const enabled = await this.flags.providerCheck(null);
+    return this.adapters.registry.providers().map((provider) => ({
+      provider,
+      displayName: PROVIDER_INFO[provider].displayName,
+      kind: PROVIDER_INFO[provider].kind,
+      simulated: this.adapters.registry.get(provider).simulated,
+      enabled: enabled(provider),
+    }));
   }
 
   @Scope('instances:read')
@@ -70,6 +81,7 @@ export class CloudController {
     }
     if (!body.allowedRegions.includes(body.defaultRegion)) throw unprocessable('INVALID_REGION', 'defaultRegion must be one of allowedRegions.');
     if (!this.adapters.registry.has(body.provider)) throw unprocessable('NO_ADAPTER', `No adapter is installed for ${body.provider} yet.`);
+    await this.flags.assertProvider(body.provider, body.tenantId);
     const row = await this.prisma.cloudTarget.create({ data: { ...body, config: body.config as object } });
     await this.audit.record({ principal: p, tenantId: row.tenantId, resourceType: 'CloudTarget', resourceId: row.id, action: 'CREATE', correlationId, changes: { provider: row.provider, name: row.name, regions: row.allowedRegions } });
     return this.toDto(row);

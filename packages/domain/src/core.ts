@@ -8,3 +8,4 @@ export * from './instance-lifecycle.js';
 export * from './deployment.js';
 export * from './health.js';
 export * from './plans.js';
+export * from './flags.js';

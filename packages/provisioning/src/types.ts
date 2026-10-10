@@ -21,6 +21,11 @@ export interface CompileInput {
   /** Container images by catalog ref (`catalog://name`), resolved to immutable digests. */
   images?: Record<string, { uri: string; digest: string }>;
   policy?: PolicyConfig;
+  /**
+   * Provider feature flags for this tenant. A slot bound to a disabled provider is a blocking
+   * issue; omitted means every registered provider is allowed.
+   */
+  providerEnabled?: (provider: CloudProvider) => boolean;
 }
 
 /** Platform-wide policy knobs (spec §33). Policies are evaluated before any cloud mutation. */

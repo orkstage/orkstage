@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLOUD_PROVIDERS,
+  isFeatureFlag,
+  isProviderEnabled,
+  providerFlagKey,
+  resolveFeatureFlags,
   assertInstanceTransition,
   canStartDeployment,
   canStartDestroy,
@@ -117,5 +122,31 @@ describe('failure classes', () => {
   it('only retries transient failures', () => {
     expect(isRetryable('PROVIDER_RATE_LIMIT')).toBe(true);
     expect(isRetryable('POLICY_VIOLATION')).toBe(false);
+  });
+});
+
+describe('feature flags', () => {
+  it('ships AWS and simulation on, every other provider off', () => {
+    const flags = resolveFeatureFlags([]);
+    expect(isProviderEnabled(flags, 'aws')).toBe(true);
+    expect(isProviderEnabled(flags, 'mock')).toBe(true);
+    expect(CLOUD_PROVIDERS.filter((p) => isProviderEnabled(flags, p))).toEqual(['aws', 'mock']);
+  });
+
+  it('lets a tenant override win over the platform value', () => {
+    const overrides = [
+      { key: providerFlagKey('azure'), tenantId: null, enabled: true },
+      { key: providerFlagKey('azure'), tenantId: 't1', enabled: false },
+      { key: providerFlagKey('vercel'), tenantId: 't2', enabled: true },
+    ];
+    expect(isProviderEnabled(resolveFeatureFlags(overrides), 'azure')).toBe(true);
+    expect(isProviderEnabled(resolveFeatureFlags(overrides, 't1'), 'azure')).toBe(false);
+    expect(isProviderEnabled(resolveFeatureFlags(overrides, 't2'), 'vercel')).toBe(true);
+    expect(isProviderEnabled(resolveFeatureFlags(overrides, 't1'), 'vercel')).toBe(false);
+  });
+
+  it('knows its own keys', () => {
+    expect(isFeatureFlag('PROVIDER_GCP')).toBe(true);
+    expect(isFeatureFlag('PROVIDER_NOPE')).toBe(false);
   });
 });

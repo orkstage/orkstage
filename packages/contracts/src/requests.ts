@@ -115,6 +115,12 @@ export const runTriggerSchema = z.object({
   params: z.record(z.string(), z.union([z.string().max(500), z.number(), z.boolean()])).default({}),
 });
 
+/** Turns a feature flag on or off, platform wide or (with tenantId) for one tenant. */
+export const setFeatureFlagSchema = z.object({
+  enabled: z.boolean(),
+  tenantId: uuid.optional(),
+});
+
 /** Simulation controls, accepted only for resources on mock targets. */
 export const simulateSchema = z.object({
   resourceId: z.string().min(1),
