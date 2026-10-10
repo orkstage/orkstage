@@ -49,6 +49,13 @@ const schema = z
     ORKSTAGE_LICENSE_KEY: z.string().optional(),
     TOFU_TIMEOUT_MINUTES: z.coerce.number().int().min(1).max(240).default(45),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+    // Reverse proxies in front of the API (the console's rewrite counts as one). The client
+    // address is read that many hops back in X-Forwarded-For, so clients cannot spoof it.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+    // OpenAPI document and Swagger UI at /api/docs. Defaults to off in production.
+    API_DOCS_ENABLED: bool.optional(),
+    // Sessions end after this long without a request, besides the absolute 12 hour limit.
+    SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(1440).default(120),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   })
   .superRefine((c, ctx) => {

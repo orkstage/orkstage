@@ -30,6 +30,14 @@ describe('secrets', () => {
     await expect(r.resolve('vault://x')).rejects.toThrow(/Unsupported/);
   });
 
+  it('never resolves platform configuration through env://', async () => {
+    const r = new EnvSecretResolver({ ENCRYPTION_KEY: 'k', DATABASE_URL: 'postgres://x', OIDC_ENTRA_CLIENT_SECRET: 's', AWS_SECRET_ACCESS_KEY: 'a', ORK_AZURE: '{}' });
+    for (const name of ['ENCRYPTION_KEY', 'DATABASE_URL', 'OIDC_ENTRA_CLIENT_SECRET', 'AWS_SECRET_ACCESS_KEY']) {
+      await expect(r.resolve(`env://${name}`)).rejects.toThrow(/platform configuration/);
+    }
+    await expect(r.resolve('env://ORK_AZURE')).resolves.toBe('{}');
+  });
+
   it('reads aws-sm references, JSON keys and ARN regions, with a short cache', async () => {
     const calls: { region: string; id: string }[] = [];
     let t = 0;
@@ -113,6 +121,14 @@ describe('webhooks', () => {
     await expect(assertSafeWebhookUrl('https://[::1]/hook', false)).rejects.toThrow(/public/);
     await expect(assertSafeWebhookUrl('https://user:pw@example.com/', false)).rejects.toThrow(/credentials/);
     await expect(assertSafeWebhookUrl('https://93.184.215.14/hook', false)).resolves.toBeInstanceOf(URL);
+    // IPv6 forms that embed IPv4 must not smuggle private addresses through (URL normalizes these to hex).
+    await expect(assertSafeWebhookUrl('https://[::ffff:127.0.0.1]/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://[::ffff:a9fe:a9fe]/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://[64:ff9b::a00:1]/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://[2002:7f00:1::]/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://[fe90::1]/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://198.18.0.1/hook', false)).rejects.toThrow(/public/);
+    await expect(assertSafeWebhookUrl('https://[2606:4700::1111]/hook', false)).resolves.toBeInstanceOf(URL);
     await expect(assertSafeWebhookUrl('http://localhost:9999/hook', true)).resolves.toBeInstanceOf(URL);
   });
 });

@@ -17,7 +17,9 @@ async function bootstrap() {
 
   const adapter = new FastifyAdapter({
     genReqId: () => randomUUID(),
-    trustProxy: true,
+    // Trust exactly the proxies in front of the API: `req.ip` (rate limits, audit) is then the
+    // address the outermost trusted proxy saw, not a value the client can set.
+    trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
     bodyLimit: 1024 * 1024,
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
@@ -63,7 +65,7 @@ async function bootstrap() {
       .addGlobalParameters({ name: 'x-orkstage-csrf', in: 'header', required: false, description: 'Cookie sessions: send "1" on POST/PATCH/PUT/DELETE. Not needed with an API key.' })
       .build(),
   );
-  SwaggerModule.setup('api/docs', app, docs);
+  if (config.API_DOCS_ENABLED ?? config.NODE_ENV !== 'production') SwaggerModule.setup('api/docs', app, docs);
 
   await app.listen({ port: config.API_PORT, host: '0.0.0.0' });
 }

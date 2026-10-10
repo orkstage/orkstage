@@ -134,6 +134,7 @@ export class TemplatesController {
   }
 
   @Scope('templates:read')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post(':id/validate')
   @HttpCode(200)
   @ApiZodBody(validateTemplateSchema)

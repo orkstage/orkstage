@@ -2,8 +2,9 @@ import { listQuerySchema, type DeploymentDto, type DeploymentEventDto, type List
 import type { PrismaClient } from '@orkstage/database';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { conflict, notFound } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ZodQuery } from '../common/validation.js';
@@ -26,8 +27,7 @@ export class DeploymentsController {
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.deployment.findMany({
       where: {
-        ...tenantScope(p),
-        ...(q.tenantId ? { tenantId: q.tenantId } : {}),
+        ...scopedToTenant(p, q.tenantId),
         ...(q.instanceId ? { instanceId: q.instanceId } : {}),
         ...(q.status ? { status: q.status as never } : {}),
       },
@@ -84,6 +84,7 @@ export class DeploymentsController {
   }
 
   @Scope('instances:deploy')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post(':id/approve')
   @HttpCode(200)
   async approve(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {
@@ -117,6 +118,7 @@ export class DeploymentsController {
   }
 
   @Scope('instances:deploy')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/retry')
   @HttpCode(202)
   async retry(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {

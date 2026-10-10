@@ -19,7 +19,7 @@ import { Throttle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, tenantScope, Scope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { AppError, conflict, notFound, unprocessable } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -79,7 +79,7 @@ export class InstancesController {
   @Get()
   async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery) {
     const rows = await this.prisma.instance.findMany({
-      where: { ...tenantScope(p), ...(q.tenantId ? { tenantId: q.tenantId } : {}), ...(q.status ? { status: q.status as never } : {}) },
+      where: { ...scopedToTenant(p, q.tenantId), ...(q.status ? { status: q.status as never } : {}) },
       include: instanceInclude,
       orderBy: { id: 'desc' },
       take: q.limit + 1,

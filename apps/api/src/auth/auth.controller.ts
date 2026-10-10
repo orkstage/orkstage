@@ -175,8 +175,11 @@ export class AuthController {
     let user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       const domain = email.split('@')[1]!;
-      const tenant = await this.prisma.tenant.findFirst({ where: { allowedEmailDomains: { has: domain } } });
-      if (!tenant) return null;
+      // Auto join only when exactly one tenant claims the domain: with several, there is no safe way
+      // to tell which customer the person belongs to, so they need an explicit invitation instead.
+      const tenants = await this.prisma.tenant.findMany({ where: { allowedEmailDomains: { has: domain } }, select: { id: true }, take: 2 });
+      if (tenants.length !== 1) return null;
+      const tenant = tenants[0]!;
       user = await this.prisma.user.create({
         data: {
           email,

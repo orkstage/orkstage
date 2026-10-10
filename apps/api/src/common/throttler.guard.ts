@@ -1,0 +1,23 @@
+import { sha256 } from '@orkstage/domain';
+import { Injectable } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { SESSION_COOKIE } from './auth.js';
+
+/**
+ * Rate limit buckets per caller. Signed in traffic is counted per session or API key (a hash of
+ * the token): it cannot be spoofed with headers, and a made up token is rejected by AuthGuard
+ * anyway. Sign in routes count per client address, as resolved through TRUST_PROXY_HOPS.
+ */
+@Injectable()
+export class ClientThrottlerGuard extends ThrottlerGuard {
+  protected override async getTracker(req: Record<string, any>): Promise<string> {
+    const signingIn = typeof req.url === 'string' && req.url.includes('/auth/');
+    if (!signingIn) {
+      const auth = req.headers?.authorization;
+      if (typeof auth === 'string' && auth.startsWith('Bearer ')) return `key:${sha256(auth.slice(7)).slice(0, 32)}`;
+      const session = req.cookies?.[SESSION_COOKIE];
+      if (typeof session === 'string' && session) return `session:${sha256(session).slice(0, 32)}`;
+    }
+    return `ip:${String(req.ip)}`;
+  }
+}
