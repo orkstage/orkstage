@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const PLATFORM_PREFIX = 'co';
+export const PLATFORM_PREFIX = 'ork';
 
 /** Lowercase, dash-separated, alphanumeric slug. */
 export function slugify(value: string): string {

@@ -6,10 +6,10 @@ package is the source of truth, and this page is the map.
 
 ## Conventions
 
-- **Auth:** an opaque session token in the `co_session` cookie (`httpOnly`, `SameSite=Lax`), or
+- **Auth:** an opaque session token in the `orkstage_session` cookie (`httpOnly`, `SameSite=Lax`), or
   an API key (see [Integrations](#integrations-api-keys-webhooks-ci-imports)).
 - **CSRF:** every `POST`, `PATCH`, `PUT` and `DELETE` made with a session must send
-  `x-co-csrf: 1`. Browsers cannot add custom headers on another site's behalf without a CORS
+  `x-orkstage-csrf: 1`. Browsers cannot add custom headers on another site's behalf without a CORS
   preflight, and the API does not grant one to other origins.
 - **Correlation:** send `x-correlation-id` to correlate requests; the API returns
   `x-correlation-id` and `x-request-id` on every response.

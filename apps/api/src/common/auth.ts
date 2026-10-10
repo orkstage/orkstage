@@ -23,7 +23,7 @@ import { PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 import { AppError, forbidden } from './errors.js';
 
-export const SESSION_COOKIE = 'co_session';
+export const SESSION_COOKIE = 'orkstage_session';
 const IS_PUBLIC = 'co:isPublic';
 const SCOPE = 'co:apiKeyScope';
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -137,7 +137,7 @@ export class CsrfGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<FastifyRequest>();
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
     if (req.headers.authorization?.startsWith('Bearer ')) return true;
-    if (req.headers['x-co-csrf'] !== '1') throw new AppError(403, 'CSRF_REJECTED', 'Missing CSRF header.');
+    if (req.headers['x-orkstage-csrf'] !== '1') throw new AppError(403, 'CSRF_REJECTED', 'Missing CSRF header.');
     return true;
   }
 }

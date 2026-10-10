@@ -1,5 +1,5 @@
 # Project name kept from before the OrkStage rebrand so existing local volumes stay attached.
-name: cloud-orchestrator
+name: orkstage
 
 # Profiles:
 #   (none)         Postgres, Redis, Mailpit — run API/worker/web on the host (`pnpm dev`)
@@ -57,7 +57,7 @@ services:
     environment:
       MINISTACK_REGION: us-east-1
       # Containers MiniStack starts (RDS, ECS tasks, ElastiCache) join the compose network.
-      DOCKER_NETWORK: cloud-orchestrator_default
+      DOCKER_NETWORK: orkstage_default
       PERSIST_STATE: '1'
       STATE_DIR: /var/lib/ministack/state
       S3_PERSIST: '1'

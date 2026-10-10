@@ -56,11 +56,11 @@ async function bootstrap() {
       .setVersion('v1')
       .setDescription('OrkStage — command every stage of your cloud. Control plane for multi-cloud customer environments. See docs/API.md.')
       .addServer(config.API_PUBLIC_URL)
-      .addCookieAuth('co_session')
+      .addCookieAuth('orkstage_session')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'ork_<env>_<id>_<secret>', description: 'Organization API key (scoped). Sessions use the cookie instead.' }, 'apiKey')
       .addSecurityRequirements('apiKey')
       .addSecurityRequirements('cookie')
-      .addGlobalParameters({ name: 'x-co-csrf', in: 'header', required: false, description: 'Cookie sessions: send "1" on POST/PATCH/PUT/DELETE. Not needed with an API key.' })
+      .addGlobalParameters({ name: 'x-orkstage-csrf', in: 'header', required: false, description: 'Cookie sessions: send "1" on POST/PATCH/PUT/DELETE. Not needed with an API key.' })
       .build(),
   );
   SwaggerModule.setup('api/docs', app, docs);

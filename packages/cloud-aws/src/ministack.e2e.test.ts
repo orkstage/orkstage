@@ -27,7 +27,7 @@ function fixture() {
     modulesDir: resolve(__dirname, '../../../infra/tofu/modules'),
     workRoot: join(tmpdir(), 'orkstage-tofu-e2e'),
     pluginCacheVolume: 'orkstage-tofu-plugins',
-    network: 'cloud-orchestrator_default',
+    network: 'orkstage_default',
   });
   const adapter = new AwsAdapter({ resolveExternalId: async () => '', runner });
   const context: ProviderContext = { target, region: 'us-east-1', correlationId: 'e2e' };

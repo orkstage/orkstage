@@ -10,7 +10,7 @@ const target: CloudTarget = {
   id: 't1',
   provider: 'aws',
   name: 'Acme prod',
-  config: { accountId: '123456789012', roleArn: 'arn:aws:iam::123456789012:role/co-deploy' },
+  config: { accountId: '123456789012', roleArn: 'arn:aws:iam::123456789012:role/orkstage-deploy' },
   credentialRef: 'secret://targets/t1/external-id',
   allowedRegions: ['us-east-1'],
   defaultRegion: 'us-east-1',
@@ -30,7 +30,7 @@ const request = (over: Partial<ResourceRequest>): ResourceRequest => ({
   resourceId: 'api',
   serviceKind: 'compute.container-service',
   capability: 'ecs-fargate',
-  name: 'co-acme-prod-api',
+  name: 'ork-acme-prod-api',
   tags: { 'platform:managed': 'true', 'platform:environment': 'production' },
   spec: { image: 'registry/api@sha256:abc', cpu: 0.5, memoryMiB: 1024, replicas: 2, port: 8080 },
   dependencyOutputs: { network },
@@ -109,7 +109,7 @@ describe('OpenTofu stack rendering', () => {
       provider: { aws: { endpoints: Record<string, string>; default_tags: { tags: Record<string, string> } } };
     };
     expect(cfg.terraform.backend.s3.endpoints.s3).toBe('http://ministack:4566');
-    expect(cfg.terraform.backend.s3.key).toBe('orkstage/co-acme-prod-api.tfstate');
+    expect(cfg.terraform.backend.s3.key).toBe('orkstage/ork-acme-prod-api.tfstate');
     expect(cfg.provider.aws.endpoints.ecs).toBe('http://ministack:4566');
     expect(cfg.provider.aws.default_tags.tags['platform:managed']).toBe('true');
   });
@@ -153,7 +153,7 @@ describe('probePermissions', () => {
       return { EvaluationResults: cmd.input.ActionNames.map((a) => ({ EvalActionName: a, EvalDecision: denied.includes(a) ? 'implicitDeny' : 'allowed' })) };
     }) as never,
   });
-  const base = { roleArn: 'arn:aws:iam::123456789012:role/co-deploy', stateBucket: 'orkstage-state' };
+  const base = { roleArn: 'arn:aws:iam::123456789012:role/orkstage-deploy', stateBucket: 'orkstage-state' };
 
   it('fails a deployment that needs a denied action, naming the service and actions', async () => {
     const checks = await probePermissions({ ...base, iam: iamDenying(['rds:CreateDBInstance']), serviceKinds: ['database.postgresql', 'queue'] });
