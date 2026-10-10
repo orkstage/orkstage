@@ -12,6 +12,7 @@ const CATEGORY: Record<string, CostLine['category']> = {
   ingress: 'network',
   dns: 'network',
   queue: 'messaging',
+  'web.frontend': 'compute',
 };
 
 /**

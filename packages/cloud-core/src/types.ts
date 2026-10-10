@@ -24,6 +24,12 @@ export interface ProviderContext {
   signal?: AbortSignal;
   /** Progress sink for long operations (shown in the deployment log). Never pass secrets. */
   log?: (level: 'info' | 'warn' | 'error', message: string) => void;
+  /**
+   * Reads the credentials a dependency published through its `secret_ref` output, by resource id,
+   * from whichever provider owns it (e.g. a Vercel project reading a Supabase database password).
+   * Values are for the call only: never log, return or persist them.
+   */
+  dependencySecret?: (resourceId: string) => Promise<Record<string, string>>;
 }
 
 /** One implementation choice for a logical resource kind on a provider (spec §42.6). */
@@ -86,6 +92,42 @@ export interface ResourceIdentifier {
   capability: string;
   name: string;
   providerResourceId?: string;
+  /** Outputs recorded at the last successful apply, when the caller has them (saves a state read). */
+  outputs?: ResourceOutputs;
+}
+
+/** An operation run on an existing resource: what a template trigger or an operator asks for. */
+export interface ResourceActionRequest {
+  /** One of the adapter's `actions(capability)` names, e.g. `redeploy`. */
+  action: string;
+  params: Record<string, string | number | boolean>;
+}
+
+export interface ResourceActionResult {
+  /** Provider id of what was started (a deployment, a backup), when there is one. */
+  reference?: string;
+  status: 'started' | 'completed';
+  message: string;
+  url?: string;
+}
+
+export interface ResourceActionDescriptor {
+  name: string;
+  description: string;
+  /** Parameters the action accepts; anything else is rejected before the provider is called. */
+  params: { name: string; type: 'string' | 'number' | 'boolean'; required?: boolean; description?: string }[];
+}
+
+/** One rollout as the provider records it (Vercel deployment, Render deploy, Cloud Run revision). */
+export interface ProviderDeployment {
+  id: string;
+  status: 'queued' | 'building' | 'deploying' | 'live' | 'failed' | 'cancelled' | 'superseded';
+  createdAt: string;
+  finishedAt?: string;
+  url?: string;
+  /** Source revision, e.g. a commit SHA or an image digest. */
+  revision?: string;
+  message?: string;
 }
 
 export interface ResourceResult {
@@ -197,6 +239,20 @@ export interface CloudProviderAdapter {
 
   getLogs?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<LogLine[]>;
   getMetric?(ctx: ProviderContext, resource: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]>;
+
+  /**
+   * Reads a `secret_ref` this adapter published (e.g. a generated database password), so a
+   * resource on another provider can be wired to it. Returns named fields such as `password`
+   * or `url`. Callers must keep the values out of logs, outputs and the database.
+   */
+  readSecret?(ctx: ProviderContext, ref: string): Promise<Record<string, string>>;
+
+  /** Operations available on a capability (redeploy, restart, purge cache, ...): what triggers may run. */
+  actions?(capability: string): ResourceActionDescriptor[];
+  runAction?(ctx: ProviderContext, resource: ResourceIdentifier, request: ResourceActionRequest): Promise<ResourceActionResult>;
+
+  /** Recent rollouts, newest first, for platforms that keep a deployment history. */
+  listDeployments?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<ProviderDeployment[]>;
 }
 
 /** Error raised by adapters. The failure class drives retry and incident behaviour. */

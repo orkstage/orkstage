@@ -119,6 +119,37 @@ export const dnsResource = z.object({
   target: id,
 });
 
+/**
+ * A website, landing page or web app built from a Git repository and served by a frontend
+ * platform (Vercel, Render static sites). Dependencies listed in `dependsOn` reach it as
+ * environment variables: connection settings in plain text, credentials as encrypted values.
+ */
+export const webFrontendResource = z.object({
+  ...base,
+  type: z.literal('web.frontend'),
+  source: z.object({
+    /** Repository as `owner/name` on the platform's connected Git provider. */
+    repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'use owner/name'),
+    branch: z.string().min(1).default('main'),
+    /** Folder of the app inside a monorepo. */
+    rootDirectory: z.string().optional(),
+    gitProvider: z.enum(['github', 'gitlab', 'bitbucket']).default('github'),
+  }),
+  /** Framework preset, e.g. `nextjs`, `vite`, `astro`; omit to let the platform detect it. */
+  framework: z.string().max(40).optional(),
+  buildCommand: z.string().max(500).optional(),
+  installCommand: z.string().max(500).optional(),
+  outputDirectory: z.string().max(200).optional(),
+  nodeVersion: z.string().regex(/^\d+(\.x)?$/).optional(),
+  /** Plain settings. Credentials never go here: they come from dependencies or secret references. */
+  environment: z.record(z.string().regex(/^[A-Z_][A-Z0-9_]*$/), z.string().max(4000)).default({}),
+  domains: z.array(z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(20).default([]),
+  /** Build a preview for each pull request when the platform supports it. */
+  previewDeployments: z.boolean().default(true),
+  healthCheckPath: z.string().startsWith('/').default('/'),
+  critical: z.boolean().default(true),
+});
+
 export const templateResource = z.discriminatedUnion('type', [
   networkResource,
   containerServiceResource,
@@ -129,6 +160,7 @@ export const templateResource = z.discriminatedUnion('type', [
   objectStorageResource,
   ingressResource,
   dnsResource,
+  webFrontendResource,
 ]);
 
 export const RESOURCE_TYPES = [
@@ -141,6 +173,7 @@ export const RESOURCE_TYPES = [
   'object-storage',
   'ingress',
   'dns',
+  'web.frontend',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
@@ -158,6 +191,30 @@ export const connectivityRequirement = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   /** private-preferred falls back to TLS over a public endpoint with allowlisting when private links are not justified. */
   mode: z.enum(['private-required', 'private-preferred', 'secure']).default('private-preferred'),
+});
+
+/**
+ * A named operation on one resource (redeploy a frontend, restart a service, purge a cache),
+ * with default parameters. Operators run it from the console, CLI or API; `schedule` runs it on a
+ * cron; `webhook` lets an API key holder (a CI pipeline, a CMS) start it with its own parameters,
+ * limited to the names in `overridable`.
+ */
+export const templateTrigger = z.object({
+  name: id,
+  description: z.string().max(300).optional(),
+  resource: id,
+  /** Action offered by the resource's provider, e.g. `redeploy`. Checked at deploy time. */
+  action: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
+  params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
+  overridable: z.array(z.string()).default([]),
+  on: z
+    .object({
+      manual: z.boolean().default(true),
+      /** Five field cron expression in UTC, e.g. `0 3 * * *`. */
+      schedule: z.string().regex(/^(\S+\s+){4}\S+$/, 'five field cron expression').optional(),
+      webhook: z.boolean().default(false),
+    })
+    .default({ manual: true, webhook: false }),
 });
 
 export const templateVariable = z.object({
@@ -190,6 +247,7 @@ export const environmentTemplate = z.object({
     variables: z.array(templateVariable).default([]),
     resources: z.array(templateResource).min(1),
     connectivity: z.array(connectivityRequirement).default([]),
+    triggers: z.array(templateTrigger).default([]),
     observability: z
       .object({
         logs: z.boolean().default(true),
@@ -209,3 +267,5 @@ export type PostgresResource = z.infer<typeof postgresResource>;
 export type ConnectivityRequirement = z.infer<typeof connectivityRequirement>;
 export type PlacementSlot = z.infer<typeof placementSlot>;
 export type TemplateVariable = z.infer<typeof templateVariable>;
+export type TemplateTrigger = z.infer<typeof templateTrigger>;
+export type WebFrontendResource = z.infer<typeof webFrontendResource>;

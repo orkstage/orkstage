@@ -12,6 +12,8 @@ function componentFor(r: InstanceResource): { name: string; position: number } |
       return r.critical ? { name: 'API', position: 0 } : { name: 'Workers', position: 1 };
     case 'ingress':
       return { name: 'API', position: 0 };
+    case 'web.frontend':
+      return { name: 'Website', position: 0 };
     case 'database.postgresql':
       return { name: 'Database', position: 2 };
     case 'cache.redis':

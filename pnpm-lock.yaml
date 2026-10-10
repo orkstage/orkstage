@@ -367,6 +367,21 @@ importers:
         specifier: workspace:*
         version: link:../iac
 
+  packages/cloud-azure:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
   packages/cloud-core:
     dependencies:
       '@orkstage/domain':
@@ -375,6 +390,66 @@ importers:
       vitest:
         specifier: 5.0.3
         version: 5.0.3(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/cloud-coreweave:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
+  packages/cloud-digitalocean:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
+  packages/cloud-gcp:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
+  packages/cloud-magalu:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
 
   packages/cloud-mock:
     dependencies:
@@ -387,6 +462,78 @@ importers:
       '@orkstage/domain':
         specifier: workspace:*
         version: link:../domain
+
+  packages/cloud-oci:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
+  packages/cloud-render:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/cloud-supabase:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/cloud-tofu:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: 3.1146.0
+        version: 3.1146.0
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
+
+  packages/cloud-vercel:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/cloud-vultr:
+    dependencies:
+      '@orkstage/cloud-core':
+        specifier: workspace:*
+        version: link:../cloud-core
+      '@orkstage/cloud-tofu':
+        specifier: workspace:*
+        version: link:../cloud-tofu
+      '@orkstage/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@orkstage/iac':
+        specifier: workspace:*
+        version: link:../iac
 
   packages/contracts:
     dependencies:

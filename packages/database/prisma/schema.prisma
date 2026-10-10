@@ -255,6 +255,13 @@ enum CloudProvider {
   azure
   gcp
   oci
+  digitalocean
+  vultr
+  coreweave
+  magalu
+  vercel
+  render
+  supabase
   mock
 }
 
@@ -263,7 +270,7 @@ enum TargetStatus {
   DISABLED
 }
 
-/// An AWS account, Azure subscription, GCP project or OCI tenancy (spec §42.5).
+/// An AWS account, Azure subscription, GCP project, OCI compartment or platform team (spec §42.5).
 model CloudTarget {
   id             String        @id @default(uuid(7)) @db.Uuid
   /// Null for platform-shared targets; set when a target belongs to one tenant.

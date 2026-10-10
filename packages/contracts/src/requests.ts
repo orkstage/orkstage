@@ -13,7 +13,7 @@ const uuid = z.uuid();
 /** Secret references the platform can resolve: `env://NAME`, `aws-sm://<name-or-arn>[#jsonKey]`. */
 export const SECRET_REF_PATTERN = /^(env|aws-sm):\/\/\S+$/;
 
-export const PROVIDERS = ['aws', 'azure', 'gcp', 'oci', 'mock'] as const;
+export const PROVIDERS = ['aws', 'azure', 'gcp', 'oci', 'digitalocean', 'vultr', 'coreweave', 'magalu', 'vercel', 'render', 'supabase', 'mock'] as const;
 export const PLAN_CODES = ['FREE', 'SANDBOX', 'STARTER', 'GROWTH', 'SCALE'] as const;
 export const ENVIRONMENTS = ['production', 'staging', 'development', 'sandbox'] as const;
 export const HEALTH_STATES = ['HEALTHY', 'DEGRADED', 'UNHEALTHY', 'UNKNOWN', 'MAINTENANCE'] as const;
