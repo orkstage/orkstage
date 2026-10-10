@@ -1,6 +1,6 @@
 import type { ResourceOutputs, ResourceResult } from '@orkstage/cloud-core';
 import type { Deployment, InstanceStatus, StepStatus } from '@orkstage/database';
-import { assertInstanceTransition, summarizeSteps, type FailureClass } from '@orkstage/domain';
+import { assertInstanceTransition, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass } from '@orkstage/domain';
 import {
   describeProviderPlan,
   diffPlan,
@@ -121,9 +121,12 @@ export class DeploymentRunner {
         if (!regions.has(r.targetId)) regions.set(r.targetId, new Set());
         regions.get(r.targetId)!.add(r.region);
       }
+      // Feature flags can change between plan and run: check again here (apply only, never destroy).
+      const flags = resolveFeatureFlags(await prisma.featureFlag.findMany({ where: { OR: [{ tenantId: null }, { tenantId: d.tenantId }] } }), d.tenantId);
       for (const [targetId, rs] of regions) {
         const row = await prisma.cloudTarget.findUniqueOrThrow({ where: { id: targetId } });
         if (row.status !== 'ACTIVE') throw new PhaseFailure('VALIDATION_ERROR', `Cloud target ${row.name} is disabled.`);
+        if (!isProviderEnabled(flags, row.provider)) throw new PhaseFailure('VALIDATION_ERROR', `${row.provider} is disabled on this platform (feature flag ${providerFlagKey(row.provider)}).`);
         for (const region of rs) {
           const serviceKinds = [...new Set(resolved.resources.filter((r) => r.targetId === targetId && r.region === region).map((r) => r.type))];
           const result = await this.ctx.registry.get(row.provider).validateTarget({ target: toCloudTarget(row), region, correlationId: d.correlationId }, { serviceKinds });

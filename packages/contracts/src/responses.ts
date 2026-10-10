@@ -345,3 +345,26 @@ export interface TriggerRunDto {
   queuedAt: string;
   finishedAt: string | null;
 }
+
+export interface FeatureFlagDto {
+  key: string;
+  category: 'provider' | 'feature';
+  description: string;
+  provider: string | null;
+  defaultEnabled: boolean;
+  /** Platform wide override, or null when the default applies. */
+  platform: boolean | null;
+  /** Overrides for single tenants. */
+  tenants: { tenantId: string; tenantName: string; enabled: boolean }[];
+  /** Value for the whole platform (default or platform override). */
+  enabled: boolean;
+}
+
+export interface ProviderDto {
+  provider: string;
+  displayName: string;
+  kind: 'infrastructure' | 'platform' | 'simulation';
+  simulated: boolean;
+  /** False when the provider's feature flag is off for the caller's scope. */
+  enabled: boolean;
+}

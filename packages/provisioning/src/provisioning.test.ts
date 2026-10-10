@@ -381,3 +381,13 @@ describe('triggers', () => {
     expect(triggerAllows({ ...trigger, on: { manual: false, webhook: false, schedule: '0 3 * * *' } }, 'SCHEDULE')).toBe(true);
   });
 });
+
+describe('compiler: provider feature flags', () => {
+  it('blocks slots bound to a disabled provider and leaves enabled ones alone', () => {
+    const bindings = { primary: { target: { ...aws, provider: 'azure' as const }, region: 'us-east-1' } };
+    const off = compileInfrastructure({ ...input(templates['sandbox-min-cost']!, bindings), providerEnabled: (p) => p !== 'azure' }, registry());
+    expect(off.issues.some((i) => i.code === 'PROVIDER_DISABLED')).toBe(true);
+    const simulated = compileInfrastructure({ ...input(templates['sandbox-min-cost']!, { primary: { target: aws, region: 'us-east-1' } }), providerEnabled: (p) => p === 'mock' }, registry());
+    expect(simulated.issues.filter((i) => i.code === 'PROVIDER_DISABLED')).toEqual([]);
+  });
+});

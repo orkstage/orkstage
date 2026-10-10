@@ -15,6 +15,7 @@ import { toCloudTarget } from '@orkstage/runtime';
 import { applyVariables, environmentTemplate, type VariableValues } from '@orkstage/templates';
 import { Inject, Injectable } from '@nestjs/common';
 import { unprocessable } from '../common/errors.js';
+import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
 
 export interface CompileRequest {
@@ -37,6 +38,7 @@ export class CompileService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     private readonly adapters: Adapters,
+    private readonly flags: FeatureFlagsService,
   ) {}
 
   async compile(req: CompileRequest): Promise<ResolvedInfrastructure> {
@@ -82,6 +84,7 @@ export class CompileService {
         bindings,
         images,
         policy: (policySetting?.value ?? {}) as PolicyConfig,
+        providerEnabled: await this.flags.providerCheck(req.tenantId),
       },
       this.adapters.registry,
     );
