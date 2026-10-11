@@ -102,7 +102,13 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
         if (out.queue_url) environment[`${key}_URL`] = String(out.queue_url);
         if (out.bucket) environment[`${key}_BUCKET`] = String(out.bucket);
         if (out.endpoint) environment[`${key}_ENDPOINT`] = String(out.endpoint);
-        if (out.secret_ref) secrets[`${key}_CREDENTIALS`] = String(out.secret_ref);
+        if (out.secret_ref) {
+          // ECS reads only Secrets Manager (or SSM) ARNs. A reference owned by another provider (Key
+          // Vault, Secret Manager, a platform) is passed as a reference, never as a value.
+          const ref = String(out.secret_ref);
+          if (/^arn:aws[a-z-]*:(secretsmanager|ssm):/.test(ref)) secrets[`${key}_CREDENTIALS`] = ref;
+          else environment[`${key}_CREDENTIALS_REF`] = ref;
+        }
         // Simulated (non-AWS) dependencies expose camelCase outputs; pass their references too.
         if (out.secretRef) environment[`${key}_CREDENTIALS_REF`] = String(out.secretRef);
         if (out.queueUrl) environment[`${key}_URL`] = String(out.queueUrl);

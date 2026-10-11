@@ -186,14 +186,21 @@ export class InstancesController {
   @Scope('instances:read')
   @Post(':id/preview')
   @HttpCode(200)
-  async preview(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string) {
+  async preview(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @Query('templateVersionId') templateVersionId?: string) {
     const instance = await this.load(p, id, 'read');
+    // ?templateVersionId= previews an upgrade or rollback: the plan from what runs to that version.
+    if (templateVersionId) {
+      const version = await this.prisma.templateVersion.findUnique({ where: { id: templateVersionId } });
+      if (!version || version.status !== 'PUBLISHED' || version.templateId !== instance.templateVersion.template.id) {
+        throw unprocessable('INVALID_UPGRADE', 'Previews must target a published version of the same template.');
+      }
+    }
     const resolved = await this.compiler.compile({
       tenantId: instance.tenantId,
       instanceId: id,
       instanceSlug: instance.slug,
       environment: instance.environment,
-      templateVersionId: instance.templateVersionId,
+      templateVersionId: templateVersionId ?? instance.templateVersionId,
       variables: instance.variables as Record<string, string | number | boolean>,
       bindings: instance.bindings as Record<string, { targetId: string; region: string }>,
     });
@@ -226,9 +233,15 @@ export class InstancesController {
     if (!target || target.status !== 'PUBLISHED' || target.templateId !== instance.templateVersion.template.id) {
       throw unprocessable('INVALID_UPGRADE', 'Upgrades must target a published version of the same template.');
     }
-    const updated = await this.prisma.instance.update({ where: { id }, data: { templateVersionId: target.id }, include: instanceInclude });
-    await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: id, action: 'UPGRADE_TEMPLATE', correlationId, changes: { from: instance.templateVersion.version, to: target.version } });
-    return this.toDto(updated, (await this.simulatedMap([updated])).get(id) ?? false);
+    if (target.id === instance.templateVersionId) throw unprocessable('SAME_VERSION', `The instance already runs version ${target.version}.`);
+    // The instance keeps its current version until this deployment succeeds, so its record never
+    // claims a version that is not provisioned. The deployment's plan shows the changes, and
+    // production changes that delete or replace resources wait for approval.
+    authorize(p, 'deploy', 'Instance', { tenantId: instance.tenantId });
+    const { deployment } = await this.launcher.apply(instance, p, correlationId, target.id);
+    const action = compareVersions(target.version, instance.templateVersion.version) < 0 ? 'ROLLBACK_TEMPLATE' : 'UPGRADE_TEMPLATE';
+    await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: id, action, correlationId, changes: { from: instance.templateVersion.version, to: target.version, deploymentId: deployment.id } });
+    return toDeploymentSummary(deployment);
   }
 
   @Scope('instances:deploy')
@@ -368,4 +381,12 @@ export class InstancesController {
       updatedAt: i.updatedAt.toISOString(),
     };
   }
+}
+
+/** Semantic version order (template versions are x.y.z). */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  return 0;
 }
