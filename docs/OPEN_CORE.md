@@ -25,7 +25,7 @@ legal texts marked *draft* need review by counsel before any public release.
 | Area | Community (AGPL) | Enterprise (`ee/`) |
 |---|---|---|
 | Provisioning | Templates, visual builder, AWS through OpenTofu, mock provider, DAG, retries, drift detection | Policy packs (rule sets in the style of CIS and SOC 2), custom policy authoring, cost budgets per team |
-| Multicloud | Placement per resource, cross cloud strategy | Azure, OCI and GCP adapters: **to be decided**. The recommendation is Community, to drive adoption; revisit when the adapters exist |
+| Multicloud | Placement per resource, cross cloud strategy | The other provider adapters (now in preview): **to be decided**. The recommendation is Community, to drive adoption |
 | Governance | 7 built in roles, approvals for high risk production changes, audit log | Custom roles and fine grained permissions, multistep approval workflows, change windows, **audit export** (JSON or CSV, SIEM streaming) and retention policies |
 | Identity | Development login, OIDC (Entra, Google, GitLab through configuration) | SAML 2.0 SSO, SCIM provisioning, enforced SSO and MFA policies, session policies |
 | Organizations | One organization, many tenants | Multiple organizations, delegated administration, white label status pages with custom domains |

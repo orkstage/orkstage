@@ -13,7 +13,7 @@ flowchart TB
   compiler --> registry["Adapter registry (cloud-core)"]
   registry --> aws["AWS (OpenTofu)"]
   registry --> mock["Mock provider (simulation)"]
-  registry -.-> later["Azure, OCI, GCP (not yet)"]
+  registry --> preview["Azure, Google Cloud, OCI, DigitalOcean, Vultr, CoreWeave, Magalu Cloud, Vercel, Render, Supabase (preview)"]
 ```
 
 The API never runs cloud operations: it records intent and enqueues work for the worker.
