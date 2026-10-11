@@ -19,6 +19,10 @@ const schema = z
     OIDC_ENTRA_CLIENT_ID: z.string().optional(),
     OIDC_ENTRA_CLIENT_SECRET: z.string().optional(),
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+    // Deployments running at once per tenant and per provider region, across all workers (0 = no
+    // limit). Per cloud target limits are set on each target.
+    DEPLOY_LIMIT_PER_TENANT: z.coerce.number().int().min(0).default(5),
+    DEPLOY_LIMIT_PER_PROVIDER_REGION: z.coerce.number().int().min(0).default(20),
     SMTP_HOST: z.string().default('localhost'),
     SMTP_PORT: z.coerce.number().int().default(1025),
     SMTP_SECURE: bool.default(false),

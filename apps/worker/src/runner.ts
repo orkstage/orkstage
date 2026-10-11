@@ -19,7 +19,7 @@ import {
 import { toCloudTarget } from '@orkstage/runtime';
 import type { Logger } from 'pino';
 import { notify, systemAudit, type WorkerContext } from './context.js';
-import type { TargetSlots } from './slots.js';
+import { TargetSlots } from './slots.js';
 import { instanceHealth, syncStatusComponents } from './status.js';
 
 /** Thrown to park a job (e.g. waiting for a target slot); the job is retried later. */
@@ -83,9 +83,16 @@ export class DeploymentRunner {
     const limits = Object.fromEntries(
       (await prisma.cloudTarget.findMany({ where: { id: { in: targetIds } }, select: { id: true, maxConcurrentDeployments: true } })).map((t) => [t.id, t.maxConcurrentDeployments]),
     );
-    if (!(await this.slots.acquire(deploymentId, limits))) {
-      await this.event(deploymentId, 'info', null, 'Waiting for a free deployment slot on the cloud target.');
-      throw new RetryLater('target slots busy');
+    const scopes = TargetSlots.scopes({
+      tenantId: deployment.tenantId,
+      tenantLimit: this.ctx.config.DEPLOY_LIMIT_PER_TENANT,
+      targets: limits,
+      regions: resolved.resources.map((r) => ({ provider: r.provider, region: r.region })),
+      regionLimit: this.ctx.config.DEPLOY_LIMIT_PER_PROVIDER_REGION,
+    });
+    if (!(await this.slots.acquire(deploymentId, scopes))) {
+      await this.event(deploymentId, 'info', null, 'Waiting for a free deployment slot (cloud target, tenant or region limit).');
+      throw new RetryLater('deployment slots busy');
     }
 
     try {
@@ -98,7 +105,7 @@ export class DeploymentRunner {
       log.error({ err, failureClass: f.failureClass }, 'deployment failed');
       await this.fail(deployment, f.failureClass, f.message);
     } finally {
-      await this.slots.release(deploymentId, targetIds);
+      await this.slots.release(deploymentId, scopes);
     }
   }
 
