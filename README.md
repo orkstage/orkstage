@@ -52,12 +52,13 @@ Azure and its storage on OCI.
 | Area | State |
 |---|---|
 | AWS | **Real.** Provisioned with OpenTofu, locally against [MiniStack](https://ministack.org) or in your account through a cross account role. |
-| Azure, OCI | **Simulated** by a deterministic provider. Simulated resources are labeled everywhere. |
-| GCP | Planned. |
+| Azure, Google Cloud, OCI, DigitalOcean, Vultr, CoreWeave, Magalu Cloud | **Preview.** Adapters and OpenTofu modules covered by tests and `tofu validate`, not yet proven on live accounts. Off by default behind a feature flag per provider (`PROVIDER_<NAME>`). |
+| Vercel, Render, Supabase | **Preview.** Platform adapters through their APIs, same flags. |
+| Simulation provider | Imitates any provider without an account, for demos, tests and rehearsals. Simulated resources are labeled everywhere. |
 | `ork` CLI | **Preview.** Build it from source; no released binaries yet. |
 | Enterprise features | Audit export is available with a license key; the rest is planned. See [docs/OPEN_CORE.md](docs/OPEN_CORE.md). |
 
-The full gap analysis is in [docs/ROADMAP.md](docs/ROADMAP.md).
+What is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it works
 
@@ -77,7 +78,7 @@ flowchart LR
   worker --> pg
   worker --> runner["OpenTofu runner (throwaway containers)"]
   runner --> aws["AWS or MiniStack"]
-  worker --> sim["Simulated Azure and OCI"]
+  worker --> others["Other providers (preview) and the simulation provider"]
 ```
 
 The API records intent and enqueues work; it never calls a cloud itself. The worker compiles the
