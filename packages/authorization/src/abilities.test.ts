@@ -100,3 +100,15 @@ describe('marketplace', () => {
     expect(admin.can('publish', 'Template')).toBe(true);
   });
 });
+
+describe('tenant members', () => {
+  it('every member reads the team; only owners manage it; only admins read the audit log', () => {
+    const viewer = defineAbilityFor({ userId: 'v', platformRole: null, memberships: [{ tenantId: 'acme', role: 'CustomerViewer' }] } as never);
+    const owner = defineAbilityFor({ userId: 'o', platformRole: null, memberships: [{ tenantId: 'acme', role: 'CustomerOwner' }] } as never);
+    expect(viewer.can('read', subject('Member', { tenantId: 'acme' }))).toBe(true);
+    expect(viewer.can('read', subject('Member', { tenantId: 'globex' }))).toBe(false);
+    expect(viewer.can('create', subject('Member', { tenantId: 'acme' }))).toBe(false);
+    expect(viewer.can('read', subject('Audit', { tenantId: 'acme' }))).toBe(false);
+    expect(owner.can('create', subject('Member', { tenantId: 'acme' }))).toBe(true);
+  });
+});

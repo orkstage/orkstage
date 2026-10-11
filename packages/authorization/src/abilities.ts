@@ -119,7 +119,9 @@ export function defineAbilityFor(principal: Principal): AppAbility {
     can(['deploy', 'restart'], 'Instance', ops);
     can('deploy', 'Service', ops);
     can(['create', 'update', 'scale', 'destroy', 'approve'], 'Instance', admins);
-    can('read', ['Member', 'Audit'], admins);
+    // Every member sees who else is in the tenant; the audit log stays with owners and admins.
+    can('read', 'Member', all);
+    can('read', 'Audit', admins);
     can(['create', 'update', 'delete'], 'Member', owners);
     can('update', 'Tenant', owners);
     // Integrations: tenant admins manage their tenant's keys and webhooks; developers can import IaC.
