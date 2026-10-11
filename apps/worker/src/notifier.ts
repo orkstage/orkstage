@@ -1,4 +1,4 @@
-import type { NotificationJob } from '@orkstage/contracts';
+import type { InvitationEmailJob, NotificationJob } from '@orkstage/contracts';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';
 
@@ -45,6 +45,21 @@ export class Notifier {
       });
     }
     await this.deliverPending();
+  }
+
+  /** An invitation to someone who may not have an account yet. Throws so the queue retries. */
+  async sendInvitation(job: InvitationEmailJob): Promise<void> {
+    const expires = new Date(job.expiresAt).toUTCString();
+    await this.mail.sendMail({
+      from: this.ctx.config.EMAIL_FROM,
+      to: job.to,
+      subject: `${job.inviterName} invited you to ${job.tenantName} on OrkStage`,
+      text: `${job.inviterName} invited you to join ${job.tenantName} on OrkStage as ${job.role.replace('Customer', '').toLowerCase()}.
+
+Accept the invitation: ${job.link}
+
+Sign in with this email address (${job.to}). The link works once and expires on ${expires}. If you did not expect it, ignore this email.`,
+    });
   }
 
   async deliverPending(): Promise<void> {

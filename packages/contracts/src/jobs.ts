@@ -5,6 +5,7 @@ export const QUEUES = {
   notifications: 'notifications',
   drift: 'drift-scans',
   triggers: 'triggers',
+  emails: 'emails',
 } as const;
 
 /** Payloads carry ids only; the worker reloads authoritative state from the database. */
@@ -17,6 +18,20 @@ export interface DeploymentJob {
  * and trigger name and the worker records the run itself.
  */
 export type TriggerJob = { runId: string } | { instanceId: string; trigger: string };
+
+/**
+ * A one off email to someone who is not (yet) a member, such as an invitation. The job carries
+ * the invitation link, so it is removed from the queue as soon as it is sent or gives up.
+ */
+export interface InvitationEmailJob {
+  kind: 'invitation';
+  to: string;
+  tenantName: string;
+  inviterName: string;
+  role: string;
+  link: string;
+  expiresAt: string;
+}
 
 /**
  * Ask the worker to notify a tenant's responsible users. The worker resolves recipients and

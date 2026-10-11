@@ -1,4 +1,4 @@
-import { QUEUES, type DeploymentJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient, type PrismaClient } from '@orkstage/database';
 import {
   createAdapterRegistry,
@@ -42,12 +42,19 @@ export class Queues implements OnApplicationShutdown {
   readonly deployments: Queue<DeploymentJob>;
   readonly notifications: Queue<NotificationJob>;
   readonly triggers: Queue<TriggerJob>;
+  readonly emails: Queue<InvitationEmailJob>;
 
   constructor(@Inject(REDIS) redis: Redis) {
     const connection = redis.duplicate();
     this.deployments = new Queue<DeploymentJob>(QUEUES.deployments, { connection });
     this.notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection });
     this.triggers = new Queue<TriggerJob>(QUEUES.triggers, { connection });
+    this.emails = new Queue<InvitationEmailJob>(QUEUES.emails, { connection });
+  }
+
+  /** The job carries an invitation link: it leaves the queue as soon as it is sent or gives up. */
+  async enqueueInvitationEmail(job: InvitationEmailJob) {
+    await this.emails.add(job.kind, job, { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true });
   }
 
   /** jobId = run id: a repeated enqueue of the same run collapses into one job. */
@@ -75,7 +82,7 @@ export class Queues implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown() {
-    await Promise.all([this.deployments.close(), this.notifications.close(), this.triggers.close()]);
+    await Promise.all([this.deployments.close(), this.notifications.close(), this.triggers.close(), this.emails.close()]);
   }
 }
 
