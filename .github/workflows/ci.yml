@@ -9,6 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  # Secret scan of the whole history with gitleaks. Reviewed false positives go in .gitleaksignore.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
+          ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --no-banner --verbose
+
   build-test:
     runs-on: ubuntu-latest
     # Images come from mirror.gcr.io (Google's Docker Hub cache): anonymous pulls from Docker Hub
