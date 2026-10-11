@@ -592,6 +592,7 @@ model HealthCheckResult {
   checkedAt  DateTime    @default(now()) @db.Timestamptz(3)
 
   @@index([instanceId, checkedAt])
+  @@index([checkedAt])
 }
 
 // ───────────────────────────── Status & incidents ─────────────────────────────
@@ -657,6 +658,8 @@ model Incident {
 
   @@index([tenantId, openedAt])
   @@index([dedupKey, status])
+  // Plus a partial unique index in SQL (migration 20261011090000): one unresolved incident per
+  // dedupKey, so concurrent health ticks cannot open duplicates.
 }
 
 model IncidentUpdate {

@@ -135,7 +135,8 @@ export class HealthMonitor {
       if (recent) continue;
 
       const component = r.type === 'database.postgresql' ? 'Database' : r.type === 'compute.container-service' ? (r.critical ? 'API' : 'Workers') : r.resourceId;
-      const incident = await prisma.incident.create({
+      const incident = await prisma.incident
+        .create({
         data: {
           tenantId: instance.tenantId,
           instanceId: instance.id,
@@ -146,7 +147,14 @@ export class HealthMonitor {
           dedupKey,
           updates: { create: { status: 'INVESTIGATING', message: `Automated: ${r.consecutiveHealthFailures} consecutive failed health checks (${rule.name}).` } },
         },
-      });
+      })
+        // One open incident per dedup key is enforced by a unique index: if another tick won the
+        // race, its incident stands and this one is dropped.
+        .catch((err: { code?: string }) => {
+          if (err.code === 'P2002') return null;
+          throw err;
+        });
+      if (!incident) continue;
       if (rule.actions.includes('notify_owners')) {
         await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.opened', title: incident.title, body: 'We detected a problem and opened an incident. Follow updates on your status page.', link: `/incidents/${incident.id}`, data: { incidentId: incident.id, instanceId: instance.id, severity: incident.severity } });
       }
