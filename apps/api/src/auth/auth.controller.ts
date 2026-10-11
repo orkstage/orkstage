@@ -173,6 +173,15 @@ export class AuthController {
     if (!verified || !email.includes('@')) return null;
 
     let user = await this.prisma.user.findUnique({ where: { email } });
+    // Pending invitations for this address: the first SSO sign in creates the account with those
+    // memberships and accepts them (an explicit invitation wins over domain auto join).
+    const invitations = await this.prisma.invitation.findMany({ where: { email, acceptedAt: null, expiresAt: { gt: new Date() } } });
+    if (!user && invitations.length > 0) {
+      user = await this.prisma.user.create({
+        data: { email, name: String(claims.name ?? email), memberships: { create: invitations.map((i) => ({ tenantId: i.tenantId, role: i.role })) } },
+      });
+      await this.prisma.invitation.updateMany({ where: { id: { in: invitations.map((i) => i.id) } }, data: { acceptedAt: new Date() } });
+    }
     if (!user) {
       const domain = email.split('@')[1]!;
       // Auto join only when exactly one tenant claims the domain: with several, there is no safe way

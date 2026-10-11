@@ -1,4 +1,4 @@
-import { QUEUES, type DeploymentJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient } from '@orkstage/database';
 import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv, SecretBox } from '@orkstage/runtime';
 import { DelayedError, Queue, Worker } from 'bullmq';
@@ -104,10 +104,12 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 1, lockDuration: 120_000 },
   );
 
+  const emails = new Worker<InvitationEmailJob>(QUEUES.emails, async (job) => notifier.sendInvitation(job.data), { connection: redis.duplicate(), concurrency: 2 });
+
   // Trigger runs: provider actions are short API calls (they start work, they do not wait for it).
   const triggers = new Worker<TriggerJob>(QUEUES.triggers, async (job) => triggerRunner.handle(job.data), { connection: redis.duplicate(), concurrency: 4 });
 
-  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health], ['drift', drift], ['triggers', triggers]] as const) {
+  for (const [name, w] of [['deployments', deployments], ['notifications', notify], ['health', health], ['drift', drift], ['triggers', triggers], ['emails', emails]] as const) {
     w.on('failed', (job, err) => logger.error({ queue: name, jobId: job?.id, err: err.message }, 'job failed'));
     w.on('error', (err) => logger.error({ queue: name, err: err.message }, 'worker error'));
   }
@@ -115,7 +117,7 @@ async function main() {
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down: finishing in-flight jobs');
-    await Promise.all([deployments.close(), notify.close(), health.close(), drift.close(), triggers.close()]);
+    await Promise.all([deployments.close(), notify.close(), health.close(), drift.close(), triggers.close(), emails.close()]);
     await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close(), deploymentQueue.close()]);
     await prisma.$disconnect();
     redis.disconnect();
