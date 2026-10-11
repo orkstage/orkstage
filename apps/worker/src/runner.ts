@@ -211,6 +211,10 @@ export class DeploymentRunner {
       throw new PhaseFailure((first?.errorClass as FailureClass) ?? 'DEPLOYMENT_ERROR', first ? `${first.key}: ${first.errorMessage}` : 'Provisioning did not complete.');
     }
 
+    // Resources dropped from the template (an upgrade, a disabled resource) are deleted here; the
+    // plan already counted them as DELETE, so production approval covered them.
+    await this.phase(d, PHASE.prune, async () => this.prune(d, resolved));
+
     await this.moveInstance(d, 'DEPLOYING');
     await this.phase(d, PHASE.rollout, async () => {
       const services = resolved.resources.filter((r) => r.type === 'compute.container-service');
@@ -242,7 +246,8 @@ export class DeploymentRunner {
       const rows = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, status: 'ACTIVE' } });
       const outputs = Object.fromEntries(rows.map((r) => [r.resourceId, r.outputs]));
       await prisma.deployment.update({ where: { id: d.id }, data: { status: 'SUCCEEDED', finishedAt: new Date(), outputs: outputs as object } });
-      await prisma.instance.update({ where: { id: d.instanceId }, data: { desiredStateHash: resolved.desiredStateHash, health: instanceHealth(rows) } });
+      // The template version (an upgrade or rollback) becomes the instance's only now that it is applied.
+      await prisma.instance.update({ where: { id: d.instanceId }, data: { desiredStateHash: resolved.desiredStateHash, health: instanceHealth(rows), templateVersionId: d.templateVersionId } });
       await this.moveInstance(d, degraded ? 'DEGRADED' : 'READY');
       return degraded ? 'Instance is up but degraded.' : 'Instance is READY.';
     });
@@ -412,6 +417,70 @@ export class DeploymentRunner {
     return { degraded: unhealthyOther > 0, summary: unhealthyOther > 0 ? `${unhealthyOther} non-critical check(s) failed.` : 'All health and connectivity checks passed.' };
   }
 
+  /**
+   * Deletes resources the instance still has but the applied template no longer contains,
+   * dependents first (dependencies from the last successful apply). Protected instances keep
+   * them, with a warning, until the protection is removed.
+   */
+  private async prune(d: Deployment, resolved: ResolvedInfrastructure): Promise<string> {
+    const prisma = this.ctx.prisma;
+    const keep = new Set(resolved.resources.map((r) => r.id));
+    const rows = (await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, status: { in: ['ACTIVE', 'FAILED'] } } })).filter((r) => !keep.has(r.resourceId));
+    if (rows.length === 0) return 'Nothing to remove.';
+    const ids = rows.map((r) => r.resourceId);
+    const instance = await prisma.instance.findUniqueOrThrow({ where: { id: d.instanceId } });
+    if (instance.protectedFromDestroy) {
+      await this.event(d.id, 'warn', PHASE.prune, `Kept ${ids.join(', ')}: the instance is protected from destruction. Remove the protection and deploy again to delete them.`);
+      return `${rows.length} resource(s) kept because the instance is protected.`;
+    }
+
+    const last = await prisma.deployment.findFirst({ where: { instanceId: d.instanceId, kind: 'APPLY', status: 'SUCCEEDED', id: { not: d.id } }, orderBy: { queuedAt: 'desc' } });
+    const previous = new Map(((last?.resolved ?? null) as ResolvedInfrastructure | null)?.resources.map((r) => [r.id, r.dependsOn]) ?? []);
+    const removed = new Set(ids);
+    const targets = await prisma.cloudTarget.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.targetId))] } } });
+    const pruned: ResolvedInfrastructure = {
+      ...resolved,
+      targets: { ...resolved.targets, ...Object.fromEntries(targets.map((t) => [t.id, toCloudTarget(t)])) },
+      resources: rows.map((r) => ({
+        id: r.resourceId,
+        type: r.type,
+        slot: r.slot,
+        provider: r.provider,
+        simulatedProvider: r.simulatedProvider ?? undefined,
+        targetId: r.targetId,
+        targetName: targets.find((t) => t.id === r.targetId)?.name ?? r.targetId,
+        region: r.region,
+        capability: r.capability,
+        capabilityName: r.capabilityName,
+        name: r.name,
+        tags: {},
+        spec: {},
+        dependsOn: (previous.get(r.resourceId) ?? []).filter((dep) => removed.has(dep)),
+        critical: r.critical,
+        specHash: r.specHash ?? '',
+      })),
+    };
+    const outcome = await executeDestroy({
+      resolved: pruned,
+      registry: this.ctx.registry,
+      correlationId: d.correlationId,
+      providerIds: Object.fromEntries(rows.map((r) => [r.resourceId, r.providerResourceId ?? undefined])),
+      concurrency: this.ctx.config.WORKER_CONCURRENCY,
+      hooks: {
+        onStart: async (id) => this.event(d.id, 'info', PHASE.prune, `Deleting ${id} (no longer in the template)…`),
+        onSuccess: async (id) => {
+          await prisma.instanceResource.updateMany({ where: { instanceId: d.instanceId, resourceId: id }, data: { status: 'DELETED', knowledge: 'ACTUAL', health: 'UNKNOWN' } });
+          await this.event(d.id, 'info', PHASE.prune, `${id} deleted.`);
+        },
+        onFailure: async (id, f) => this.event(d.id, 'error', PHASE.prune, `${id} could not be deleted (${f.failureClass}): ${f.message}`),
+        onSkipped: async (id, reason) => this.event(d.id, 'warn', PHASE.prune, `${id} retained: ${reason}`),
+      },
+    });
+    const failed = Object.entries(outcome).filter(([, s]) => s !== 'SUCCEEDED').map(([id]) => id);
+    if (failed.length) throw new PhaseFailure('DEPLOYMENT_ERROR', `Could not delete ${failed.join(', ')}; they were retained. Retry the deployment.`);
+    return `${rows.length} resource(s) removed: ${ids.join(', ')}.`;
+  }
+
   // ───────────────────────────── DESTROY ─────────────────────────────
 
   private async destroy(d: Deployment, resolved: ResolvedInfrastructure, log: Logger) {
@@ -432,6 +501,20 @@ export class DeploymentRunner {
       return dbs.length ? `${dbs.length} database(s) checked.` : 'No databases to back up.';
     });
     await this.phase(d, PHASE.plan, async () => `Destroy plan: ${resolved.resources.length} resource(s), dependents first.`);
+
+    const current = await prisma.deployment.findUniqueOrThrow({ where: { id: d.id } });
+    if (current.approvalRequired) {
+      if (!current.approvedAt) {
+        await prisma.deployment.update({ where: { id: d.id }, data: { status: 'AWAITING_APPROVAL' } });
+        await this.step(d.id, PHASE.approval, 'RUNNING');
+        await this.event(d.id, 'warn', PHASE.approval, 'Destroying a production instance: waiting for approval.');
+        await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.awaiting_approval', title: 'Destroy awaiting approval', body: 'Destroying a production instance needs approval before anything is deleted.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+        log.info('destroy parked for approval');
+        return;
+      }
+      await this.step(d.id, PHASE.approval, 'SUCCEEDED');
+      await prisma.deployment.update({ where: { id: d.id }, data: { status: 'RUNNING' } });
+    }
 
     const rows = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId } });
     const outcome = await executeDestroy({
@@ -564,7 +647,9 @@ export class DeploymentRunner {
     await prisma.deployment.update({ where: { id: d.id }, data: { status: 'CANCELLED', finishedAt: new Date() } });
     await this.event(d.id, 'warn', null, 'Deployment cancelled. Completed resources were kept; nothing was rolled back automatically.');
     const instance = await prisma.instance.findUniqueOrThrow({ where: { id: d.instanceId } });
-    const failed = FAILED_STATE[instance.status];
+    // A destroy cancelled before deleting anything leaves a working instance: back to READY.
+    const deletedSome = d.kind === 'DESTROY' && (await prisma.deploymentStep.count({ where: { deploymentId: d.id, kind: 'RESOURCE', status: 'SUCCEEDED' } })) > 0;
+    const failed = d.kind === 'DESTROY' && !deletedSome && instance.status === 'DESTROYING' ? 'READY' : FAILED_STATE[instance.status];
     if (failed) {
       await prisma.$transaction([
         prisma.instance.update({ where: { id: instance.id }, data: { status: failed } }),

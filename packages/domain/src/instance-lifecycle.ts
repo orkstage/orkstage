@@ -50,7 +50,8 @@ const TRANSITIONS: Record<InstanceStatus, readonly InstanceStatus[]> = {
   PROVISION_FAILED: ['VALIDATING', 'DESTROYING'],
   DEPLOY_FAILED: ['VALIDATING', 'DESTROYING'],
   VERIFICATION_FAILED: ['VALIDATING', 'DESTROYING'],
-  DESTROYING: ['DESTROYED', 'DESTROY_FAILED'],
+  // READY: a destroy cancelled (or rejected) before any resource was deleted.
+  DESTROYING: ['DESTROYED', 'DESTROY_FAILED', 'READY'],
   DESTROY_FAILED: ['DESTROYING'],
   DESTROYED: [],
 };

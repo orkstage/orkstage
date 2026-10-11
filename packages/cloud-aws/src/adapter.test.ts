@@ -84,7 +84,7 @@ describe('OpenTofu stack rendering', () => {
       dependencyOutputs: {
         network,
         ingress: { kind: 'ingress', target_groups: JSON.stringify({ api: 'arn:tg' }), lb_sg_id: 'sg-lb' },
-        database: { kind: 'database.postgresql', host: 'db.internal', port: 5432, secret_ref: 'arn:secret' },
+        database: { kind: 'database.postgresql', host: 'db.internal', port: 5432, secret_ref: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' },
       },
     }));
     expect(module).toBe('container-service');
@@ -94,7 +94,7 @@ describe('OpenTofu stack rendering', () => {
       subnet_ids: ['subnet-a', 'subnet-b'],
       assign_public_ip: true,
       environment: { DATABASE_HOST: 'db.internal', DATABASE_PORT: '5432', PORT: '8080' },
-      secrets: { DATABASE_CREDENTIALS: 'arn:secret' },
+      secrets: { DATABASE_CREDENTIALS: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' },
     });
   });
 
@@ -202,5 +202,19 @@ describe('AwsAdapter.readSecret', () => {
     const adapter = new AwsAdapter({ resolveExternalId: async () => 'x', stsFactory: vi.fn() });
     await expect(adapter.readSecret(ctx, 'arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db')).rejects.toMatchObject({ code: 'AWS_SECRET_REF_INVALID' });
     await expect(adapter.readSecret(ctx, 'env://X')).rejects.toMatchObject({ code: 'AWS_SECRET_REF_INVALID' });
+  });
+});
+
+describe('container service dependency secrets', () => {
+  it('maps Secrets Manager ARNs to ECS secrets and passes other providers references as plain references', () => {
+    const { inputs } = moduleInputs(ctx, request({
+      dependencyOutputs: {
+        network,
+        db: { kind: 'database.postgresql', host: 'db', port: 5432, secret_ref: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' },
+        cache: { kind: 'cache.redis', host: 'redis.example', port: 6380, secret_ref: 'https://kv-ork.vault.azure.net/secrets/cache' },
+      },
+    }));
+    expect(inputs.secrets).toEqual({ DB_CREDENTIALS: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' });
+    expect((inputs.environment as Record<string, string>).CACHE_CREDENTIALS_REF).toBe('https://kv-ork.vault.azure.net/secrets/cache');
   });
 });

@@ -44,7 +44,11 @@ export class LauncherService {
     private readonly audit: AuditService,
   ) {}
 
-  async apply(instance: Instance, p: RequestPrincipal, correlationId: string): Promise<{ deployment: Deployment; reused: boolean }> {
+  /**
+   * Starts an apply. `templateVersionId` deploys another version of the instance's template (an
+   * upgrade or a rollback); the instance moves to it only when the apply succeeds.
+   */
+  async apply(instance: Instance, p: RequestPrincipal, correlationId: string, templateVersionId = instance.templateVersionId): Promise<{ deployment: Deployment; reused: boolean }> {
     if (instance.status === 'DESTROYED') {
       throw conflict('INSTANCE_DESTROYED', 'This instance has been destroyed. Create a new instance to deploy again.');
     }
@@ -56,7 +60,7 @@ export class LauncherService {
       instanceId: instance.id,
       instanceSlug: instance.slug,
       environment: instance.environment,
-      templateVersionId: instance.templateVersionId,
+      templateVersionId,
       variables: instance.variables as Record<string, string | number | boolean>,
       bindings: instance.bindings as Record<string, { targetId: string; region: string }>,
     });
@@ -73,7 +77,7 @@ export class LauncherService {
 
     const plan = diffPlan(resolved, await this.compiler.knownResources(instance.id));
     const approvalRequired = requiresApproval(instance.environment, plan);
-    const deployment = await this.create('APPLY', instance, resolved, { opKey, plan, approvalRequired, p, correlationId, deployable: DEPLOYABLE });
+    const deployment = await this.create('APPLY', instance, resolved, { opKey, plan, approvalRequired, p, correlationId, deployable: DEPLOYABLE, templateVersionId });
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: instance.id, action: 'DEPLOY', correlationId, changes: { deploymentId: deployment.id, plan: plan.counts, risk: plan.risk, approvalRequired } });
     return { deployment, reused: false };
   }
@@ -99,7 +103,8 @@ export class LauncherService {
     };
 
     const opKey = operationKey(instance.tenantId, instance.id, `destroy:${Date.now()}`);
-    const deployment = await this.create('DESTROY', instance, resolved, { opKey, plan: null, approvalRequired: false, p, correlationId, deployable: DESTROYABLE });
+    // Destroying production deletes customer data: it waits for an explicit approval (spec §62).
+    const deployment = await this.create('DESTROY', instance, resolved, { opKey, plan: null, approvalRequired: instance.environment === 'production', p, correlationId, deployable: DESTROYABLE });
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: instance.id, action: 'DESTROY', correlationId, changes: { deploymentId: deployment.id, resources: resources.length } });
     return deployment;
   }
@@ -121,6 +126,7 @@ export class LauncherService {
       deployable: previous.kind === 'APPLY' ? DEPLOYABLE : DESTROYABLE,
       onlyResources: steps.map((s) => s.key),
       retryOfId: previous.id,
+      templateVersionId: previous.templateVersionId,
     });
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Deployment', resourceId: previous.id, action: 'RETRY', correlationId, changes: { deploymentId: deployment.id, resources: steps.map((s) => s.key) } });
     return deployment;
@@ -139,6 +145,7 @@ export class LauncherService {
       deployable: InstanceStatus[];
       onlyResources?: string[];
       retryOfId?: string;
+      templateVersionId?: string;
     },
   ): Promise<Deployment> {
     const nextStatus: InstanceStatus = kind === 'APPLY' ? 'VALIDATING' : 'DESTROYING';
@@ -156,7 +163,7 @@ export class LauncherService {
           tenantId: instance.tenantId,
           instanceId: instance.id,
           kind,
-          templateVersionId: instance.templateVersionId,
+          templateVersionId: o.templateVersionId ?? instance.templateVersionId,
           requestedById: o.p.userId,
           correlationId: o.correlationId,
           operationKey: o.opKey,

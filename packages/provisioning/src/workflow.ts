@@ -19,6 +19,7 @@ export const PHASE = {
   plan: 'phase:plan',
   approval: 'phase:approval',
   backup: 'phase:backup',
+  prune: 'phase:prune',
   rollout: 'phase:rollout',
   configure: 'phase:configure',
   verify: 'phase:verify',
@@ -33,6 +34,7 @@ const NAMES: Record<string, string> = {
   [PHASE.plan]: 'Generate plan',
   [PHASE.approval]: 'Approval',
   [PHASE.backup]: 'Confirm backup policy',
+  [PHASE.prune]: 'Remove resources no longer in the template',
   [PHASE.rollout]: 'Application rollout',
   [PHASE.configure]: 'Configure secrets and connections',
   [PHASE.verify]: 'Health and connectivity verification',
@@ -65,7 +67,7 @@ export function workflowSteps(kind: WorkflowKind, resolved: ResolvedInfrastructu
       ? [
           ...phases([PHASE.validate, PHASE.targets, PHASE.plan, ...(approvalRequired ? [PHASE.approval] : [])]),
           ...resources,
-          ...phases([PHASE.rollout, PHASE.configure, PHASE.verify, PHASE.observability, PHASE.finalize]),
+          ...phases([PHASE.prune, PHASE.rollout, PHASE.configure, PHASE.verify, PHASE.observability, PHASE.finalize]),
         ]
       : [
           ...phases([PHASE.validate, PHASE.backup, PHASE.plan, ...(approvalRequired ? [PHASE.approval] : [])]),
