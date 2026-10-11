@@ -53,12 +53,19 @@ export function isFeatureFlag(key: string): boolean {
 
 /**
  * Effective value of every flag for one tenant (or the platform when `tenantId` is omitted):
- * the tenant's own override, else the platform override, else the default.
+ * the tenant's own override, else the platform override, else on when the tenant's plan lists the
+ * flag in its `featureFlags` entitlement, else the default. A platform override still wins over
+ * the plan, so a platform owner can switch something off for everyone.
  */
-export function resolveFeatureFlags(overrides: readonly FeatureFlagOverride[], tenantId?: string | null): Record<string, boolean> {
+export function resolveFeatureFlags(
+  overrides: readonly FeatureFlagOverride[],
+  tenantId?: string | null,
+  planFlags: readonly string[] = [],
+): Record<string, boolean> {
   const platform = new Map(overrides.filter((o) => o.tenantId === null).map((o) => [o.key, o.enabled]));
   const tenant = new Map(tenantId ? overrides.filter((o) => o.tenantId === tenantId).map((o) => [o.key, o.enabled]) : []);
-  return Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, tenant.get(f.key) ?? platform.get(f.key) ?? f.defaultEnabled]));
+  const plan = new Set(planFlags);
+  return Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, tenant.get(f.key) ?? platform.get(f.key) ?? (plan.has(f.key) || f.defaultEnabled)]));
 }
 
 export function isProviderEnabled(flags: Readonly<Record<string, boolean>>, provider: CloudProvider): boolean {

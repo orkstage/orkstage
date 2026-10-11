@@ -11,7 +11,7 @@ import {
 } from '@orkstage/contracts';
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
-import { DEFAULT_ENTITLEMENTS, isInstanceBusy, type Entitlements } from '@orkstage/domain';
+import { entitlementsFor, isInstanceBusy } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -103,7 +103,7 @@ export class InstancesController {
     const version = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
     if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
 
-    const entitlements = { ...DEFAULT_ENTITLEMENTS.FREE, ...(tenant.plan.entitlements as Partial<Entitlements>) };
+    const entitlements = entitlementsFor(tenant.plan.code, tenant.plan.entitlements);
     const active = await this.prisma.instance.count({ where: { tenantId: tenant.id, status: { not: 'DESTROYED' } } });
     if (active >= entitlements.maxInstances) {
       throw unprocessable('QUOTA_EXCEEDED', `The ${tenant.plan.code} plan allows ${entitlements.maxInstances} instance(s).`);

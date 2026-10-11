@@ -5,6 +5,8 @@ import {
   isProviderEnabled,
   providerFlagKey,
   resolveFeatureFlags,
+  entitlementsFor,
+  DEFAULT_ENTITLEMENTS,
   assertInstanceTransition,
   canStartDeployment,
   canStartDestroy,
@@ -131,6 +133,24 @@ describe('feature flags', () => {
     expect(isProviderEnabled(flags, 'aws')).toBe(true);
     expect(isProviderEnabled(flags, 'mock')).toBe(true);
     expect(CLOUD_PROVIDERS.filter((p) => isProviderEnabled(flags, p))).toEqual(['aws', 'mock']);
+  });
+
+  it('turns on the flags a plan lists, below platform and tenant overrides', () => {
+    const azure = providerFlagKey('azure');
+    expect(isProviderEnabled(resolveFeatureFlags([], 't1', [azure]), 'azure')).toBe(true);
+    expect(isProviderEnabled(resolveFeatureFlags([], 't1', []), 'azure')).toBe(false);
+    // A platform kill switch beats the plan; a tenant override beats both.
+    const off = [{ key: azure, tenantId: null, enabled: false }];
+    expect(isProviderEnabled(resolveFeatureFlags(off, 't1', [azure]), 'azure')).toBe(false);
+    expect(isProviderEnabled(resolveFeatureFlags([...off, { key: azure, tenantId: 't1', enabled: true }], 't1', [azure]), 'azure')).toBe(true);
+    // Unknown keys in a plan are ignored.
+    expect(Object.keys(resolveFeatureFlags([], 't1', ['NOT_A_FLAG']))).not.toContain('NOT_A_FLAG');
+  });
+
+  it('merges stored plan entitlements over the defaults of the plan code', () => {
+    expect(entitlementsFor('GROWTH', { featureFlags: ['TEMPLATE_MARKETPLACE'] }).featureFlags).toEqual(['TEMPLATE_MARKETPLACE']);
+    expect(entitlementsFor('GROWTH', null).maxInstances).toBe(DEFAULT_ENTITLEMENTS.GROWTH.maxInstances);
+    expect(entitlementsFor('UNKNOWN', {}).maxInstances).toBe(DEFAULT_ENTITLEMENTS.FREE.maxInstances);
   });
 
   it('lets a tenant override win over the platform value', () => {
