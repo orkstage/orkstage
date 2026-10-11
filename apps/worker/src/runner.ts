@@ -620,6 +620,14 @@ export class DeploymentRunner {
     ]);
   }
 
+  /** Fails a deployment from outside its job (the stuck deployment reaper). */
+  async abandon(deploymentId: string, message: string): Promise<void> {
+    const d = await this.ctx.prisma.deployment.findUnique({ where: { id: deploymentId } });
+    if (!d || d.status !== 'RUNNING') return;
+    await this.event(d.id, 'error', null, message);
+    await this.fail(d, 'TIMEOUT', message);
+  }
+
   private async fail(d: Deployment, failureClass: FailureClass, message: string) {
     const prisma = this.ctx.prisma;
     const steps = await prisma.deploymentStep.findMany({ where: { deploymentId: d.id } });

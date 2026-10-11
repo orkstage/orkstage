@@ -24,6 +24,8 @@ const schema = z
     SMTP_SECURE: bool.default(false),
     EMAIL_FROM: z.string().default('OrkStage <noreply@example.local>'),
     HEALTH_CHECK_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(30),
+    // Days of per resource health check history kept (uptime and trends); older rows are deleted.
+    HEALTH_HISTORY_DAYS: z.coerce.number().int().min(1).max(400).default(30),
     // Drift scans re-plan every applied resource on real providers (one OpenTofu plan each). 0 = off.
     DRIFT_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(360),
     // OpenTofu runner (worker only). Each command runs in a throwaway container.

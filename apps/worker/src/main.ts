@@ -5,6 +5,7 @@ import { DelayedError, Queue, Worker } from 'bullmq';
 import type { WorkerContext } from './context.js';
 import { DriftDetector } from './drift.js';
 import { HealthMonitor } from './health.js';
+import { Housekeeping } from './housekeeping.js';
 import { Notifier } from './notifier.js';
 import { DeploymentRunner, RetryLater } from './runner.js';
 import { TargetSlots } from './slots.js';
@@ -69,12 +70,15 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 4 },
   );
 
+  const deploymentQueue = new Queue<DeploymentJob>(QUEUES.deployments, { connection: redis.duplicate() });
+  const housekeeping = new Housekeeping(ctx, deploymentQueue, (id, message) => runner.abandon(id, message));
   const healthQueue = new Queue(QUEUES.health, { connection: redis.duplicate() });
   await healthQueue.upsertJobScheduler('health-tick', { every: config.HEALTH_CHECK_INTERVAL_SECONDS * 1000 }, { name: 'tick' });
   const health = new Worker(
     QUEUES.health,
     async () => {
       await monitor.tick();
+      await housekeeping.run();
       await notifier.deliverPending();
       await webhooks.deliverDue();
     },
@@ -112,7 +116,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down: finishing in-flight jobs');
     await Promise.all([deployments.close(), notify.close(), health.close(), drift.close(), triggers.close()]);
-    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close()]);
+    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close(), deploymentQueue.close()]);
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);
