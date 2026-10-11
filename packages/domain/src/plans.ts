@@ -150,3 +150,9 @@ export const DEFAULT_ENTITLEMENTS: Record<PlanCode, Entitlements> = {
     featureFlags: ['CUSTOM_TEMPLATES', 'ADVANCED_SCALING', 'DRIFT_DETECTION'],
   },
 };
+
+/** A plan's entitlements: the defaults for its code with the values stored on the plan on top. */
+export function entitlementsFor(code: string, stored: unknown): Entitlements {
+  const base = DEFAULT_ENTITLEMENTS[code as PlanCode] ?? DEFAULT_ENTITLEMENTS.FREE;
+  return { ...base, ...((stored ?? {}) as Partial<Entitlements>) };
+}
