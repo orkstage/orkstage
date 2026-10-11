@@ -1,0 +1,5 @@
+# Reviewed gitleaks findings that are not secrets (fingerprint per line). Add one only after review.
+ed7b01b76b512857d9045a12f2a28070d91b0204:packages/cloud-oci/src/adapter.test.ts:generic-api-key:201
+ed7b01b76b512857d9045a12f2a28070d91b0204:packages/cloud-oci/src/adapter.test.ts:generic-api-key:207
+d80e53fdfacf323b6e95cf68bb6f115640b94c18:packages/cloud-oci/src/adapter.test.ts:generic-api-key:201
+d80e53fdfacf323b6e95cf68bb6f115640b94c18:packages/cloud-oci/src/adapter.test.ts:generic-api-key:207
