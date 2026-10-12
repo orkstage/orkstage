@@ -3,11 +3,34 @@ import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templa
 import { createPrismaClient } from './index.js';
 
 /**
- * Idempotent local seed (spec §45). Everything here is demo data: simulated cloud targets,
- * sample images with placeholder digests, and demo users that can only sign in through the
- * dev login, which is disabled in production.
+ * Idempotent seed (spec §45).
+ *
+ * Always: plans, built in and marketplace templates, one organization, and the platform owner
+ * named by PLATFORM_OWNER_EMAIL (their first SSO sign in with that verified email links to it).
+ * Demo data (simulated cloud targets, sample images with placeholder digests, demo tenants and users
+ * that can only sign in through the dev login) is added outside production, or with
+ * SEED_DEMO_DATA=true; SEED_DEMO_DATA=false turns it off anywhere.
  */
 const prisma = createPrismaClient();
+
+const production = process.env.NODE_ENV === 'production';
+const withDemoData = process.env.SEED_DEMO_DATA ? process.env.SEED_DEMO_DATA === 'true' : !production;
+
+/** The first platform owner of a real installation (there is no dev login in production). */
+async function seedPlatformOwner() {
+  const email = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase();
+  if (!email) {
+    if (production) console.warn('No PLATFORM_OWNER_EMAIL: nobody can administer the platform yet. Set it and run the seed again.');
+    return;
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error(`PLATFORM_OWNER_EMAIL is not an email address: ${email}`);
+  await prisma.user.upsert({
+    where: { email },
+    update: { platformRole: 'PlatformOwner' },
+    create: { email, name: email, platformRole: 'PlatformOwner' },
+  });
+  console.log(`Platform owner: ${email} (sign in with SSO using this verified email).`);
+}
 
 async function main() {
   const plans = new Map<string, string>();
@@ -72,6 +95,15 @@ async function main() {
       update: listing,
       create: { ...listing, slug: m.slug, templateId: t.id, status: 'PUBLISHED', publisherName: 'OrkStage', publishedAt: new Date(), reviewedAt: new Date() },
     });
+  }
+
+  await seedPlatformOwner();
+  if (!withDemoData) {
+    if (!(await prisma.organization.findFirst())) {
+      await prisma.organization.create({ data: { name: process.env.ORGANIZATION_NAME?.trim() || 'Organization', slug: 'default' } });
+    }
+    console.log('Seed complete: plans, templates and the organization (no demo data; SEED_DEMO_DATA=true adds it).');
+    return;
   }
 
   const apps = [
