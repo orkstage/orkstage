@@ -1,12 +1,14 @@
 name: Security
 
 on:
-  push:
-    branches: [main]
+  # While the repositories are private, Actions minutes are paid: scan only when what is scanned
+  # changes, or on demand. At launch (free minutes for public repositories) remove the paths
+  # filter and add back a push trigger and a weekly schedule (cron '17 6 * * 1').
   pull_request:
-  # Weekly: new advisories against dependencies that did not change.
-  schedule:
-    - cron: '17 6 * * 1'
+    paths:
+      - pnpm-lock.yaml
+      - '**/package.json'
+      - .github/workflows/security.yml
   workflow_dispatch:
 
 permissions:
