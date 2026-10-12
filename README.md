@@ -55,7 +55,7 @@ Azure and its storage on OCI.
 | Azure, Google Cloud, OCI, DigitalOcean, Vultr, CoreWeave, Magalu Cloud | **Preview.** Adapters and OpenTofu modules covered by tests and `tofu validate`, not yet proven on live accounts. Off by default behind a feature flag per provider (`PROVIDER_<NAME>`). |
 | Vercel, Render, Supabase | **Preview.** Platform adapters through their APIs, same flags. |
 | Simulation provider | Imitates any provider without an account, for demos, tests and rehearsals. Simulated resources are labeled everywhere. |
-| `ork` CLI | **Preview.** Build it from source; no released binaries yet. |
+| `ork` CLI | **Preview.** Releases for Linux, macOS and Windows with install scripts (`curl -fsSL https://orkstage.io/install.sh \| sh`); signed once the signing certificates are configured. |
 | Enterprise features | Audit export is available with a license key; the rest is planned. See [docs/OPEN_CORE.md](docs/OPEN_CORE.md). |
 
 What is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
