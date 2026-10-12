@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest, type ResourceResult } from '@orkstage/cloud-core';
 import type { Autoscaling, CustomDomain, EnvVar, RenderApi, Service, ServiceType } from './api.js';
 import type { RenderTargetConfig } from './config.js';

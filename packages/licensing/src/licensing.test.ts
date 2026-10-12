@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { assembleLicenseKey, licenseSigningInput, Licensing, type LicensePayload } from './index.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DeploymentJob } from '@orkstage/contracts';
 import type { Queue } from 'bullmq';
 import { notify, systemAudit, type WorkerContext } from './context.js';

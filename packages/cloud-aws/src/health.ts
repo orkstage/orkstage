@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { CloudWatchLogsClient, FilterLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { DescribeVpcsCommand, EC2Client } from '@aws-sdk/client-ec2';
 import { DescribeRepositoriesCommand, ECRClient } from '@aws-sdk/client-ecr';

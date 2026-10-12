@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 ﻿import { DEFAULT_ENTITLEMENTS, type PlanCode } from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';
 import {

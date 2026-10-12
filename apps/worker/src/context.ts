@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AdapterRegistry } from '@orkstage/cloud-core';
 import type { NotificationJob } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';

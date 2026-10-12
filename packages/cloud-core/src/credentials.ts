@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type ProviderContext } from './types.js';
 import type { CloudProvider } from '@orkstage/domain';
 

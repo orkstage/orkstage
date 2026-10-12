@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { InvitationEmailJob, NotificationJob } from '@orkstage/contracts';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';

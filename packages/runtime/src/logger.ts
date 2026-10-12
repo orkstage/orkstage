@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { pino, type LoggerOptions } from 'pino';
 
 /** Paths that must never reach logs (spec §54). */

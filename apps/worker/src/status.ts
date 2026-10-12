@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { InstanceResource } from '@orkstage/database';
 import { deriveInstanceHealth, healthToStatus, worstStatus, type HealthState, type StatusState } from '@orkstage/domain';
 import type { WorkerContext } from './context.js';

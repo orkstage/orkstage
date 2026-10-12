@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { effectiveProvider } from './connectivity.js';
 import type { ResolvedInfrastructure, ResolvedResource } from './types.js';
 

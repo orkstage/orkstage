@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 
 /** API keys, webhooks, CI intake and imports — see docs/specs/integration-api.md. */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { environmentTemplate, type EnvironmentTemplate } from './schema.js';
 import type { ValidationIssue } from './validation.js';
 

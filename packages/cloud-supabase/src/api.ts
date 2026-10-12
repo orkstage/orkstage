@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { failureClassForStatus, ProviderError, redact } from '@orkstage/cloud-core';
 import { apiUrl, MANAGEMENT_API } from './config.js';
 

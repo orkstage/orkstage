@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DeploymentSummaryDto } from '@orkstage/contracts';
 import type { Deployment, Instance, InstanceStatus, PrismaClient } from '@orkstage/database';
 import { canStartDeployment, canStartDestroy, operationKey } from '@orkstage/domain';

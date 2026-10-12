@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AbilityBuilder, createMongoAbility, type MongoAbility, type RawRuleOf } from '@casl/ability';
 
 /**

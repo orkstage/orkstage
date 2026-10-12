@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AwsAdapter } from '@orkstage/cloud-aws';
 import { AzureAdapter } from '@orkstage/cloud-azure';
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';

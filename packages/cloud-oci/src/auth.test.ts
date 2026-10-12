@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash, createVerify, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { OciClient, parsePrivateKey, signRequest, signingString, type OciSigningKey } from './auth.js';

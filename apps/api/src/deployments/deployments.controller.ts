@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { listQuerySchema, type DeploymentDto, type DeploymentEventDto, type ListQuery } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';

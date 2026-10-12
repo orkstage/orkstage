@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, byKind, dependencyEnvironment, needKind, type ProviderContext, type ResourceRequest } from '@orkstage/cloud-core';
 import type { ModuleCall, RootParts } from '@orkstage/cloud-tofu';
 import { fitName, sha256 } from '@orkstage/domain';

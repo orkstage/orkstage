@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { InvalidTransitionError } from './errors.js';
 
 /** Instance lifecycle states (spec §15). */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Response shapes returned by the API (dates are ISO strings). */
 
 export interface ApiErrorBody {

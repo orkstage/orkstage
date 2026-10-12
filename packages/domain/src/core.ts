@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Browser-safe subset of the domain (no Node built-ins). The web console imports this via
  * `@orkstage/domain/core`; server code keeps using `@orkstage/domain`.

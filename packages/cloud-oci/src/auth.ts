@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash, createPrivateKey, createSign, type KeyObject } from 'node:crypto';
 import { HttpError, ProviderError, redact } from '@orkstage/cloud-core';
 

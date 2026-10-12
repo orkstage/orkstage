@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceActionDescriptor } from '@orkstage/cloud-core';
 import type { TemplateTrigger } from '@orkstage/templates';
 

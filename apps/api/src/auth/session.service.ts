@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from '@orkstage/database';
 import { sha256 } from '@orkstage/domain';
 import type { PlatformConfig } from '@orkstage/runtime';

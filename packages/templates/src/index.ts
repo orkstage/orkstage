@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Browser-safe: schema, validation, graph and variables. The filesystem loader for built-in
 // templates is a separate entry point (`@orkstage/templates/builtin`).
 export * from './schema.js';

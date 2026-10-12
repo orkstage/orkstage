@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { failureClassForStatus, ProviderError, redact, safeMessage } from '@orkstage/cloud-core';
 import type { FailureClass } from '@orkstage/domain';
 import { VERCEL_API } from './config.js';

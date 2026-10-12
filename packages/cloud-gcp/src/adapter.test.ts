@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
 import { stateKeyFor } from '@orkstage/cloud-tofu';

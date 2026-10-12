@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createIncidentSchema, incidentUpdateSchema, listQuerySchema, type IncidentDto, type ListQuery } from '@orkstage/contracts';
 import type { Incident, IncidentUpdate, PrismaClient } from '@orkstage/database';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createTenantSchema, updateTenantSchema, type PlanDto, type TenantDto } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';

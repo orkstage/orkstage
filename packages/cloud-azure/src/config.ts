@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, TargetValidationCheck } from '@orkstage/cloud-core';
 
 /** Non secret Azure target configuration stored on the cloud target. */

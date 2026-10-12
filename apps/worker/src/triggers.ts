@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { TriggerJob } from '@orkstage/contracts';
 import { resolveTriggerParams, triggerAllows, triggerSchedulerId } from '@orkstage/provisioning';

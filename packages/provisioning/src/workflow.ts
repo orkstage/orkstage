@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DeploymentPlan } from './plan.js';
 import type { ResolvedInfrastructure } from './types.js';
 

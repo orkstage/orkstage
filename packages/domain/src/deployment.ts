@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { InvalidTransitionError } from './errors.js';
 
 export const DEPLOYMENT_KINDS = ['APPLY', 'DESTROY'] as const;

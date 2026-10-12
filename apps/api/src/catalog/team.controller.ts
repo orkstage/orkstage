@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inviteMemberSchema, updateMemberSchema, type InvitationCreatedDto, type InvitationDto, type InvitationPreviewDto, type MemberDto, type TeamDto, type TenantRoleName } from '@orkstage/contracts';
 import type { Invitation, PrismaClient } from '@orkstage/database';
 import { sha256 } from '@orkstage/domain';

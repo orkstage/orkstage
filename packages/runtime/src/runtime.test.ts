@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, verifyWebhook } from './index.js';
 

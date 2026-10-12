@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
 import { fitName, sha256 } from '@orkstage/domain';
 import { awsConfig, EMULATED_SERVICES, isEmulator, stateBucketFor } from './config.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { RequestPrincipal } from '../types.js';
 
 type Scoped = Pick<RequestPrincipal, 'platformRole' | 'memberships'>;

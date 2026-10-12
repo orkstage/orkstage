@@ -25,6 +25,9 @@ jobs:
           docker run --rm -v "$PWD:/repo" -w /repo
           -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
           ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --no-banner --verbose
+      # Every source file has an SPDX license header; core code does not import ee/ (scripts/spdx.sh).
+      - name: License headers and the ee/ boundary
+        run: bash scripts/spdx.sh
 
   build-test:
     runs-on: ubuntu-latest

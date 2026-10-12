@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from '@orkstage/database';
 import { entitlementsFor, isProviderEnabled, PROVIDER_INFO, providerFlagKey, resolveFeatureFlags, type CloudProvider } from '@orkstage/domain';
 import { Inject, Injectable } from '@nestjs/common';

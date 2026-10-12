@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export * from './config.js';
 export * from './logger.js';
 export * from './secrets.js';

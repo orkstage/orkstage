@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 
 /** Roles inside a tenant (customer side). Platform roles are managed separately. */

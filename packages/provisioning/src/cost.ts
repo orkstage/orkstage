@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudCapability } from '@orkstage/cloud-core';
 import type { TemplateResource } from '@orkstage/templates';
 import type { CostEstimate, CostLine } from './types.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { listQuerySchema, runTriggerSchema, type ListQuery, type TriggerDto, type TriggerRunDto } from '@orkstage/contracts';
 import type { PrismaClient, TriggerRun } from '@orkstage/database';
 import { resolveTriggerParams, triggerAllows } from '@orkstage/provisioning';

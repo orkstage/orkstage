@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash } from 'node:crypto';
 import { HttpError, ProviderError, TokenCache, failureClassForStatus, redact, requestJson } from '@orkstage/cloud-core';
 import type { AzureCredentials, AzureTargetConfig } from './config.js';

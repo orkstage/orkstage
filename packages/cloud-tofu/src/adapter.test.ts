@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { dependencyEnvironment, readCredentialFields, redact, secretEnvironment, ProviderError, type CloudCapability, type CloudTarget, type ProviderContext, type ResourceRequest } from '@orkstage/cloud-core';
 import { TofuError, type TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';

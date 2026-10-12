@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudCapability } from '@orkstage/cloud-core';
 
 const SOURCE = 'Static AWS list prices, us-east-1, on-demand, approximate (2026). Not an invoice.';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createApiKeySchema, type ApiKeyDto } from '@orkstage/contracts';
 import type { ApiKey, PrismaClient } from '@orkstage/database';
 import { sha256 } from '@orkstage/domain';

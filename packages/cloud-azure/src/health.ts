@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { httpHealth, type HealthResult, type LogLine, type ResourceOutputs } from '@orkstage/cloud-core';
 import type { HealthState } from '@orkstage/domain';
 import { ARM, azureJson } from './auth.js';

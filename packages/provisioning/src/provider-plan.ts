@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AdapterRegistry, ResourceOutputs, ResourcePlan } from '@orkstage/cloud-core';
 import { idempotencyKeyFor } from './executor.js';
 import type { ResolvedInfrastructure } from './types.js';

@@ -21,7 +21,8 @@
     "db:seed": "pnpm --filter @orkstage/database run seed",
     "local:up": "docker compose -f infra/local/docker-compose.yml up -d --wait",
     "local:aws": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator up -d --wait ministack",
-    "local:down": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator down"
+    "local:down": "docker compose -f infra/local/docker-compose.yml --profile aws-emulator down",
+    "check:spdx": "bash scripts/spdx.sh"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

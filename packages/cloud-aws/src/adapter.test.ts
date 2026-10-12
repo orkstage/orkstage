@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AssumeRoleCommand } from '@aws-sdk/client-sts';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
 import { describe, expect, it, vi } from 'vitest';

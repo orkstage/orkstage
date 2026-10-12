@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { HttpError, ProviderError, failureClassForStatus, requestJson, safeMessage } from '@orkstage/cloud-core';
 
 export const VULTR_API = 'https://api.vultr.com/v2';
