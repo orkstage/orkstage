@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
 import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@orkstage/cloud-mock';
 import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';

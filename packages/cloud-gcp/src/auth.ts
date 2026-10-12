@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createSign } from 'node:crypto';
 import { requestJson, TokenCache } from '@orkstage/cloud-core';
 import type { GcpCredentials } from './config.js';

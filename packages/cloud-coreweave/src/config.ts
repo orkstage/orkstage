@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, TargetValidationCheck } from '@orkstage/cloud-core';
 
 /** CoreWeave Cloud API base URL (CKS, VPC and identity endpoints). */

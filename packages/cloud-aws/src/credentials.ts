@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AssumeRoleCommand, STSClient } from '@aws-sdk/client-sts';
 import { ProviderError, type ProviderContext } from '@orkstage/cloud-core';
 import { awsConfig, isEmulator } from './config.js';

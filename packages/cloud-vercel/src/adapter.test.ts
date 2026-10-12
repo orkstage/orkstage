@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { runAdapterContract } from '@orkstage/cloud-core/testing';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
 import { describe, expect, it } from 'vitest';

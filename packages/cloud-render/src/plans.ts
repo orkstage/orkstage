@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Render compute plans for web and private services, cheapest first: [id, vCPU, memory MiB]. */
 const SERVICE_PLANS: [string, number, number][] = [
   ['0.5c-512mb', 0.5, 512],

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget } from '@orkstage/cloud-core';
 
 /** Non-secret AWS target configuration stored on the cloud target. */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** A placement slot as validation sees it: which providers may host it. */
 export interface SlotProviders {
   name: string;

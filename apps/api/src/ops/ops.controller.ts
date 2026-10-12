@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto, type StatusPageDto } from '@orkstage/contracts';
 import type { AuditEvent, PrismaClient } from '@orkstage/database';
 import { worstStatus, type StatusState } from '@orkstage/domain';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as contracts from '@orkstage/contracts';
 import * as domain from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';

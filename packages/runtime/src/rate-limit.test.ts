@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Redis } from 'ioredis';
 import { afterAll, describe, expect, it } from 'vitest';
 import { RedisRateLimitStorage } from './rate-limit.js';

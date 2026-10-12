@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export const PLAN_CODES = ['FREE', 'SANDBOX', 'STARTER', 'GROWTH', 'SCALE'] as const;
 export type PlanCode = (typeof PLAN_CODES)[number];
 

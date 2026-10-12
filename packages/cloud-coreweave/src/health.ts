@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { HttpError, httpHealth, now, safeMessage, type HealthResult, type LogLine, type ResourceOutputs } from '@orkstage/cloud-core';
 import type { StateStore } from '@orkstage/cloud-tofu';
 import type { HealthState } from '@orkstage/domain';

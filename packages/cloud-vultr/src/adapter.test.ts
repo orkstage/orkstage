@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceIdentifier, ResourceRequest } from '@orkstage/cloud-core';
 import { stateKeyFor, type StateStore } from '@orkstage/cloud-tofu';
 import type { TofuRunner } from '@orkstage/iac';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Entitlements, PlanCode } from '@orkstage/domain/core';
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';

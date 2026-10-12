@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash } from 'node:crypto';
 
 /** JSON serialization with sorted object keys, so equal values always hash equally. */

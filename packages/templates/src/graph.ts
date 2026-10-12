@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { EnvironmentTemplate, TemplateResource } from './schema.js';
 
 /** Resource types that live inside a network and therefore depend on it implicitly. */

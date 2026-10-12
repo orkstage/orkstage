@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, redact, safeMessage } from '@orkstage/cloud-core';
 import type { CloudProvider, FailureClass } from '@orkstage/domain';
 import { TofuError } from '@orkstage/iac';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient } from '@orkstage/database';
 import { createAdapterRegistry, createLogger, createRedis, createSecretResolver, createTofuRunner, loadConfig, loadDotEnv, SecretBox } from '@orkstage/runtime';

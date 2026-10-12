@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, requestJson } from '@orkstage/cloud-core';
 
 /** How OpenTofu and the control plane reach the Kubernetes API of a CKS cluster. */

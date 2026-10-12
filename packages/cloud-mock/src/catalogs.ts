@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { AWS_CAPABILITIES } from '@orkstage/cloud-aws/catalog';
 import { AZURE_CAPABILITIES } from '@orkstage/cloud-azure/catalog';
 import type { CloudCapability } from '@orkstage/cloud-core';

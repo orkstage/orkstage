@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest, type ResourceResult } from '@orkstage/cloud-core';
 import type { IpRule, KeyValue, Postgres, RenderApi } from './api.js';
 import { KEY_VALUE_PLANS, POSTGRES_PLANS, postgresDiskGb, postgresSupportsHa } from './plans.js';

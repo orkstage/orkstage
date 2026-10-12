@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Failure classification shared by API responses, deployment records and incidents (spec §37). */
 export const FAILURE_CLASSES = [
   'VALIDATION_ERROR',

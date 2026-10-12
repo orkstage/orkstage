@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DriftChange, ResourceOutputs } from '@orkstage/cloud-core';
 import type { InstanceResource } from '@orkstage/database';
 import { idempotencyKeyFor, type ResolvedInfrastructure } from '@orkstage/provisioning';

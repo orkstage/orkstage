@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createCloudTargetSchema, validateTargetSchema, type ApplicationDto, type CapabilityDto, type CloudTargetDto, type ProviderDto } from '@orkstage/contracts';
 import { PROVIDER_INFO } from '@orkstage/domain';
 import type { CloudTarget as CloudTargetRow, PrismaClient } from '@orkstage/database';

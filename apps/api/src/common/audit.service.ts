@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from '@orkstage/database';
 import { Inject, Injectable } from '@nestjs/common';
 import { PRISMA } from '../infra/infra.module.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { LogLine } from '@orkstage/cloud-core';
 import type { HealthState } from '@orkstage/domain';
 import type { ProjectStatus, ServiceHealth } from './api.js';

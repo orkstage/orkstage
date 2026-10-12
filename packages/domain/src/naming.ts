@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash } from 'node:crypto';
 
 export const PLATFORM_PREFIX = 'ork';

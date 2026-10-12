@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ConnectivityRequirement } from '@orkstage/templates';
 import type { ResolvedConnectivity, ResolvedResource } from './types.js';
 

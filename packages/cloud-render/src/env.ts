@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { dependencyEnvironment, envKey, secretEnvironment, type ProviderContext, type ResourceRequest } from '@orkstage/cloud-core';
 import type { RenderApi } from './api.js';
 import { parseSecretRef, readRenderSecret } from './datastores.js';

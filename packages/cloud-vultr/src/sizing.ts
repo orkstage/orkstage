@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError } from '@orkstage/cloud-core';
 import type { VultrDatabasePlan, VultrObjectStorageCluster, VultrObjectStorageTier } from './api.js';
 

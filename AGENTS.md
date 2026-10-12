@@ -119,6 +119,16 @@ build` before typechecking its dependents.
   punctuation, no hyphenated prose words ("open source", "multicloud"), no emoji, sentence case
   headings.
 
+## License headers
+
+Every source file starts with an SPDX header: `AGPL-3.0-only`, or
+`LicenseRef-OrkStage-Enterprise` inside `ee/`. Code outside `ee/` never imports from it, except
+`apps/api/src/app.module.ts`. CI runs the check; to add missing headers:
+
+```bash
+bash scripts/spdx.sh --fix
+```
+
 ## Git workflow
 
 Branch from `main`, open a pull request, squash merge when CI (`build-test`) is green. Direct

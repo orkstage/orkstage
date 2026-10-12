@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { csv, httpHealth, now, requestJson, type HealthResult, type LogLine, type ResourceOutputs } from '@orkstage/cloud-core';
 import { S3CompatibleStateStore } from '@orkstage/cloud-tofu';
 import type { HealthState } from '@orkstage/domain';

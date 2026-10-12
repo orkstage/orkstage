@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { httpHealth, now, redact, type HealthResult, type LogLine, type ProviderDeployment } from '@orkstage/cloud-core';
 import type { Deployment, DeploymentEvent, ReadyState } from './api.js';
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Providers known to the platform. Infrastructure clouds are provisioned with OpenTofu modules;
  * application platforms (Vercel, Render, Supabase) are driven through their own APIs. `mock` is a

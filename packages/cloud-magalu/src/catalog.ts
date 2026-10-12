@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudCapability } from '@orkstage/cloud-core';
 
 const SOURCE = 'Static Magalu Cloud list prices, br-se1, approximate (2026). Not an invoice.';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs, ResourceResult } from '@orkstage/cloud-core';
 import type { Deployment, InstanceStatus, StepStatus } from '@orkstage/database';
 import { assertInstanceTransition, entitlementsFor, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass } from '@orkstage/domain';

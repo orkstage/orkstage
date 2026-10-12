@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { applyDecorators, Body, Query, type PipeTransform } from '@nestjs/common';
 import { ApiBody } from '@nestjs/swagger';
 import { z, type ZodType } from 'zod';

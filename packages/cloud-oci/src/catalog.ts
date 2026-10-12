@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudCapability } from '@orkstage/cloud-core';
 
 const SOURCE = 'Static OCI list prices, us-ashburn-1, approximate (2026). Not an invoice.';

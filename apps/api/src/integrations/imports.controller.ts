@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createImportSchema, importToTemplateSchema, type ImportDto, type ScanReport } from '@orkstage/contracts';
 import type { ImportJob, PrismaClient } from '@orkstage/database';
 import { parseTemplate } from '@orkstage/templates';

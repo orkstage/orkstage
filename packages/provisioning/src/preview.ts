@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AdapterRegistry, CloudTarget } from '@orkstage/cloud-core';
 import { DEFAULT_ENTITLEMENTS, isCloudProvider, PROVIDER_INFO, type CloudProvider, type PlanCode } from '@orkstage/domain';
 import type { EnvironmentTemplate } from '@orkstage/templates';

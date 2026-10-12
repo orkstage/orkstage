@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudProvider } from '@orkstage/domain';
 import type { CloudProviderAdapter } from './types.js';
 

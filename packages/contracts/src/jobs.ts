@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Queue names and job payloads shared by the API (producer) and worker (consumer). */
 export const QUEUES = {
   deployments: 'deployments',

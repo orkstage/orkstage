@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createWebhookSchema, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@orkstage/contracts';
 import type { PrismaClient, WebhookDelivery, WebhookEndpoint } from '@orkstage/database';
 import { assertSafeWebhookUrl, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError } from '@orkstage/runtime';

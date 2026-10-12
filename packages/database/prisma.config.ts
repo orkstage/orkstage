@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { defineConfig } from 'prisma/config';
 
 // Prisma 7 does not load .env files itself.

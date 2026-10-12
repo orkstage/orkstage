@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { devLoginSchema, type MeResponse } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import type { PlatformConfig } from '@orkstage/runtime';

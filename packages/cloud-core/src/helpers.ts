@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudProvider, FailureClass } from '@orkstage/domain';
 import { ProviderError, type HealthResult, type ResourceOutputs } from './types.js';
 

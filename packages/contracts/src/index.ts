@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export * from './requests.js';
 export * from './responses.js';
 export * from './jobs.js';

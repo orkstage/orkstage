@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
 import { TemplateValidationService } from '../catalog/template-validation.service.js';
 import { ApiKeysController } from './api-keys.controller.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEFAULT_ENTITLEMENTS, PLAN_CODES } from '@orkstage/domain';
 import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import { createPrismaClient } from './index.js';

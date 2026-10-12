@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PreviewDto } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import type { Entitlements, PlanCode } from '@orkstage/domain';

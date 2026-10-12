@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Health of a resource, service, instance or cloud target (spec §64). */
 export const HEALTH_STATES = ['HEALTHY', 'DEGRADED', 'UNHEALTHY', 'UNKNOWN', 'MAINTENANCE'] as const;
 export type HealthState = (typeof HEALTH_STATES)[number];

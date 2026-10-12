@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type AdapterRegistry, type ProviderContext, type ResourceOutputs, type ResourceResult } from '@orkstage/cloud-core';
 import { DomainError, isRetryable, operationKey, type FailureClass, type StepStatus } from '@orkstage/domain';
 import type { ResolvedInfrastructure, ResolvedResource } from './types.js';

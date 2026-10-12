@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { setFeatureFlagSchema, type FeatureFlagDto } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import { FEATURE_FLAGS, isFeatureFlag } from '@orkstage/domain';

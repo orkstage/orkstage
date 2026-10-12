@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { dependencyEnvironment, ProviderError, secretEnvironment, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
 import { createHmac } from 'node:crypto';
 import { apiStatus, seg, type EnvVar, type Project, type ProjectLink, type VercelApi } from './api.js';

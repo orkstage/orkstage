@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
 import { DeploymentsController } from '../deployments/deployments.controller.js';
 import { LauncherService } from '../deployments/launcher.service.js';

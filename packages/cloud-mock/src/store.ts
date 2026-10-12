@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Where the mock provider keeps its simulated cloud. Production workers back this with Redis
  * so simulated resources survive worker restarts and are shared across processes.

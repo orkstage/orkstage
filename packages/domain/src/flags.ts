@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { CLOUD_PROVIDERS, PROVIDER_INFO, type CloudProvider } from './providers.js';
 
 export type FeatureFlagCategory = 'provider' | 'feature';

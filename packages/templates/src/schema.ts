@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { CLOUD_PROVIDERS, PLAN_CODES } from '@orkstage/domain/core';
 import { z } from 'zod';
 
