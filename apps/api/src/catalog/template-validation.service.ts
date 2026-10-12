@@ -6,11 +6,13 @@ import { toCloudTarget } from '@orkstage/runtime';
 import { validateTemplate } from '@orkstage/templates';
 import { Inject, Injectable } from '@nestjs/common';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
+import { chooseBindings } from './target-choice.js';
 
 /**
  * The full template validation pipeline (spec §19), shared by publishing, stateless validation
  * (CLI/CI) and IaC import: schema → semantic → plan compatibility per declared plan →
- * capability + security policy, compiled against shared cloud targets compatible with each slot.
+ * capability + security policy, compiled against shared cloud targets compatible with each slot
+ * (the target per slot that leaves the fewest errors, see chooseBindings).
  */
 @Injectable()
 export class TemplateValidationService {
@@ -26,33 +28,42 @@ export class TemplateValidationService {
     const issues: ValidationIssueDto[] = [...base.issues];
 
     const plans = await this.prisma.plan.findMany({ where: { code: { in: plansFilter ?? template.spec.plans } } });
-    const targets = await this.prisma.cloudTarget.findMany({ where: { status: 'ACTIVE', tenantId: null } });
+    // Real providers before simulation, oldest first, so the choice below is stable.
+    const targets = (await this.prisma.cloudTarget.findMany({ where: { status: 'ACTIVE', tenantId: null }, orderBy: { createdAt: 'asc' } })).sort(
+      (a, b) => Number(a.provider === 'mock') - Number(b.provider === 'mock'),
+    );
 
     for (const plan of plans) {
       const entitlements = plan.entitlements as unknown as Entitlements;
       const planReport = validateTemplate(template, { code: plan.code as PlanCode, entitlements });
       issues.push(...planReport.issues.filter((i) => i.stage === 'plan').map((i) => ({ ...i, message: `[${plan.code}] ${i.message}` })));
 
-      const bindings: Record<string, { target: ReturnType<typeof toCloudTarget>; region: string }> = {};
-      for (const slot of template.spec.placements) {
-        const t = targets.find((x) => slot.providers.length === 0 || slot.providers.includes(x.provider));
-        if (t) bindings[slot.name] = { target: toCloudTarget(t), region: t.defaultRegion };
-      }
-      if (Object.keys(bindings).length < template.spec.placements.length) {
+      const compile = (choice: Readonly<Record<string, (typeof targets)[number]>>) =>
+        compileInfrastructure(
+          {
+            template,
+            plan: { code: plan.code as PlanCode, entitlements },
+            organizationId: 'validation',
+            tenant: { id: 'validation', slug: 'validation' },
+            instance: { id: 'validation', slug: 'validation', environment: template.metadata.nonProduction ? 'sandbox' : 'production' },
+            bindings: Object.fromEntries(Object.entries(choice).map(([slot, t]) => [slot, { target: toCloudTarget(t), region: t.defaultRegion }])),
+          },
+          this.adapters.registry,
+        );
+      const blocking = (r: ReturnType<typeof compile>) => r.issues.filter((i) => (i.stage === 'capability' || i.stage === 'policy') && i.severity === 'error').length;
+      const compiled = new Map<string, ReturnType<typeof compile>>();
+      const compileOnce = (choice: Readonly<Record<string, (typeof targets)[number]>>) => {
+        const key = template.spec.placements.map((s) => choice[s.name]!.id).join(',');
+        if (!compiled.has(key)) compiled.set(key, compile(choice));
+        return compiled.get(key)!;
+      };
+      // The template is valid when some compatible shared target can host each slot.
+      const choice = chooseBindings(template.spec.placements, targets, (c) => blocking(compileOnce(c)));
+      if (!choice) {
         issues.push({ stage: 'capability', severity: 'warning', code: 'NO_TARGET_FOR_SLOT', message: 'No shared cloud target is compatible with every placement slot; capability checks were partial.' });
         continue;
       }
-      const resolved = compileInfrastructure(
-        {
-          template,
-          plan: { code: plan.code as PlanCode, entitlements },
-          organizationId: 'validation',
-          tenant: { id: 'validation', slug: 'validation' },
-          instance: { id: 'validation', slug: 'validation', environment: template.metadata.nonProduction ? 'sandbox' : 'production' },
-          bindings,
-        },
-        this.adapters.registry,
-      );
+      const resolved = compileOnce(choice);
       issues.push(
         ...resolved.issues
           .filter((i) => i.stage === 'capability' || i.stage === 'policy')
