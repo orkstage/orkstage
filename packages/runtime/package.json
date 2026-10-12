@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "3.1146.0",
+    "@aws-sdk/client-secrets-manager": "3.1148.0",
     "@orkstage/cloud-aws": "workspace:*",
     "@orkstage/cloud-azure": "workspace:*",
     "@orkstage/cloud-core": "workspace:*",
