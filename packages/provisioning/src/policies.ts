@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { CloudCapability } from '@orkstage/cloud-core';
+import type { CloudCapability, CloudTarget } from '@orkstage/cloud-core';
 import type { Entitlements } from '@orkstage/domain';
 import type { EnvironmentTemplate, TemplateResource } from '@orkstage/templates';
 import { effectiveProvider } from './connectivity.js';
@@ -23,6 +23,8 @@ export interface PolicyInput {
   cost: CostEstimate;
   config: PolicyConfig;
   targetRegions: Map<string, string[]>;
+  /** The bound targets, for checks on the target itself (its environment). */
+  targets: CloudTarget[];
 }
 
 type Policy = (input: PolicyInput) => PolicyResult[];
@@ -49,6 +51,23 @@ export const POLICIES: Record<string, Policy> = {
         ? { policy: 'no-public-database', status: 'warn' as const, resourceId: r.id, message: `Database "${r.id}" is reachable over TLS for ${crossCloudTls.map((c) => c.from).join(', ')} on another provider.` }
         : { policy: 'no-public-database', status: 'fail' as const, resourceId: r.id, message: `Database "${r.id}" must not be publicly accessible.` };
     });
+  },
+
+  /**
+   * Accounts are separated by environment: an instance only deploys into targets of its own
+   * environment, or targets marked `any`. A production instance never lands in a development
+   * account, and a development instance never touches the production one.
+   */
+  'target-environment': ({ environment, resources, targets }) => {
+    const used = new Set(resources.map((r) => r.targetId));
+    const bad = targets.filter((t) => used.has(t.id) && t.environment && t.environment !== 'any' && t.environment !== environment);
+    return bad.length
+      ? bad.map((t) => ({
+          policy: 'target-environment',
+          status: 'fail' as const,
+          message: `Cloud target "${t.name}" is for ${t.environment}, but this instance is ${environment}. Bind a ${environment} target, or mark the target for any environment.`,
+        }))
+      : [pass('target-environment', 'Every cloud target serves this environment.')];
   },
 
   'no-public-storage': ({ sources }) => {

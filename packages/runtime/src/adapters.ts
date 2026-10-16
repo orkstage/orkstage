@@ -86,6 +86,7 @@ export function toCloudTarget(row: {
   credentialRef: string | null;
   allowedRegions: string[];
   defaultRegion: string;
+  environment?: string;
 }): CloudTarget {
   return {
     id: row.id,
@@ -93,6 +94,7 @@ export function toCloudTarget(row: {
     name: row.name,
     config: (row.config ?? {}) as Record<string, unknown>,
     credentialRef: row.credentialRef ?? undefined,
+    environment: row.environment,
     allowedRegions: row.allowedRegions,
     defaultRegion: row.defaultRegion,
   };

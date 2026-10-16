@@ -194,7 +194,7 @@ async function main() {
         data: {
           provider: 'mock',
           name: t.name,
-          environment: 'simulation',
+          environment: 'any',
           config: { simulate: t.simulate, seed: t.simulate, latencyMs: { min: 600, max: 2200 } },
           allowedRegions: t.regions,
           defaultRegion: t.regions[0]!,
@@ -254,7 +254,7 @@ async function main() {
       data: {
         provider: 'aws',
         name: localAwsName,
-        environment: 'local-emulator',
+        environment: 'any',
         config: {
           accountId: '000000000000',
           emulator: 'ministack',

@@ -173,6 +173,7 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
           cost,
           config: input.policy ?? {},
           targetRegions: new Map(Object.values(targets).map((t) => [t.id, t.allowedRegions])),
+          targets: Object.values(targets),
         })
       : [];
   for (const p of policyResults) {

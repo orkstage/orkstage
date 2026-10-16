@@ -10,7 +10,7 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
-import { notFound, unprocessable } from '../common/errors.js';
+import { conflict, notFound, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
 import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
@@ -83,6 +83,8 @@ export class CloudController {
     if (!body.allowedRegions.includes(body.defaultRegion)) throw unprocessable('INVALID_REGION', 'defaultRegion must be one of allowedRegions.');
     if (!this.adapters.registry.has(body.provider)) throw unprocessable('NO_ADAPTER', `No adapter is installed for ${body.provider} yet.`);
     await this.flags.assertProvider(body.provider, body.tenantId);
+    const clash = await this.prisma.cloudTarget.findFirst({ where: { tenantId: body.tenantId ?? null, name: { equals: body.name, mode: 'insensitive' } }, select: { id: true } });
+    if (clash) throw conflict('TARGET_NAME_TAKEN', `A cloud target named "${body.name}" already exists here.`);
     const row = await this.prisma.cloudTarget.create({ data: { ...body, config: body.config as object } });
     await this.audit.record({ principal: p, tenantId: row.tenantId, resourceType: 'CloudTarget', resourceId: row.id, action: 'CREATE', correlationId, changes: { provider: row.provider, name: row.name, regions: row.allowedRegions } });
     return this.toDto(row);

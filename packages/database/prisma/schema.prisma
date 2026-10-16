@@ -278,7 +278,8 @@ model CloudTarget {
   tenantId       String?       @db.Uuid
   provider       CloudProvider
   name           String
-  environment    String        @default("production")
+  /// The instance environment this target serves (production, staging, development, sandbox) or any.
+  environment    String        @default("any")
   /// Non-secret configuration (account id, role ARN, subscription id, simulation settings).
   config         Json
   /// Reference into the secret store. Raw credentials are never stored here (spec §11).
