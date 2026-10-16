@@ -1,0 +1,21 @@
+name: Community
+
+# Labels by path, the contribution policy (CONTRIBUTING.md, "AI assisted contributions"), a welcome
+# for newcomers and stale handling, shared by every OrkStage repository:
+# https://github.com/orkstage/.github/blob/main/.github/workflows/community.yml
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+  issues:
+    types: [opened]
+  schedule:
+    - cron: '41 4 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  community:
+    uses: orkstage/.github/.github/workflows/community.yml@main
