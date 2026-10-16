@@ -6,9 +6,8 @@ metadata:
   displayName: Sandbox (minimum cost)
   description: Realistic application testing at low monthly cost, easy to reset. Not for production.
   nonProduction: true
-  profile: dedicated-sandbox
+  tags: [sandbox]
 spec:
-  plans: [SANDBOX, STARTER]
   placements:
     - name: primary
   variables:

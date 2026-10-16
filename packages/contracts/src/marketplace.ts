@@ -78,7 +78,6 @@ export interface ListingSummaryDto {
   version: string | null;
   /** Providers the template's placement slots allow (empty means any). */
   providers: string[];
-  plans: string[];
   resourceCount: number;
   /** Approximate monthly cost on the first allowed provider of each slot, or null when unknown. */
   estimatedMonthlyCost: number | null;

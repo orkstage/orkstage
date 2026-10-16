@@ -5,9 +5,8 @@ metadata:
   version: 1.0.0
   displayName: Growth standard
   description: Higher resilience and performance — multiple replicas, autoscaling, zone-redundant database.
-  profile: growth
+  tags: [growth]
 spec:
-  plans: [GROWTH, SCALE]
   placements:
     - name: primary
       providers: [aws, azure, gcp, mock]

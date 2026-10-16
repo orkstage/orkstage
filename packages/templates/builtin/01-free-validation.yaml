@@ -8,9 +8,8 @@ metadata:
     Proves the platform at minimum cost. Single region, one small API replica, smallest
     database, no HA, short retention. NOT FOR PRODUCTION.
   nonProduction: true
-  profile: shared-sandbox
+  tags: [sandbox, low cost]
 spec:
-  plans: [FREE, SANDBOX]
   placements:
     - name: primary
       description: Everything runs in one account and region.

@@ -9,9 +9,8 @@ metadata:
     dead letter queue, a webhook dispatcher and a highly available database with long backup
     retention. Everything sits on a private network with NAT egress. A starting point for PCI DSS
     scope reduction; it is not a certified environment.
-  profile: growth
+  tags: [growth]
 spec:
-  plans: [GROWTH, SCALE]
   placements:
     - name: primary
       providers: [aws, azure, gcp, oci, mock]

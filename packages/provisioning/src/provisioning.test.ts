@@ -419,8 +419,11 @@ describe('compiler: provider feature flags', () => {
 });
 
 describe('compiler: marketplace templates', () => {
-  it.each(loadMarketplaceTemplates().map((s) => [s.slug, s.template] as const))('%s compiles for each of its plans in preview', (_slug, template) => {
-    for (const plan of template.spec.plans) {
+  // The size tag of a marketplace template names the smallest plan it fits.
+  const SIZE_TAGS = { sandbox: 'SANDBOX', starter: 'STARTER', growth: 'GROWTH', scale: 'SCALE' } as const;
+  it.each(loadMarketplaceTemplates().map((s) => [s.slug, s.template] as const))('%s compiles in preview, also on the plan its size tag names', (_slug, template) => {
+    const size = template.metadata.tags.find((t): t is keyof typeof SIZE_TAGS => t in SIZE_TAGS);
+    for (const plan of [undefined, SIZE_TAGS[size!]]) {
       const preview = previewTemplate(template, registry(), plan);
       expect(preview.resolved.issues.filter((i) => i.severity === 'error'), plan).toEqual([]);
       expect(preview.cost.total).toBeGreaterThan(0);

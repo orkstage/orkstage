@@ -5,6 +5,7 @@ import {
   activeResources,
   buildDependencyGraph,
   topologicalLevels,
+  hasErrors,
   validatePlanCompatibility,
   validateSemantics,
   type TemplateResource,
@@ -53,7 +54,7 @@ function isCritical(r: TemplateResource): boolean {
 export function compileInfrastructure(input: CompileInput, registry: AdapterRegistry): ResolvedInfrastructure {
   const { template, plan, tenant, instance, bindings } = input;
   const issues: ValidationIssue[] = [...validateSemantics(template)];
-  if (issues.length === 0) issues.push(...validatePlanCompatibility(template, plan.code, plan.entitlements));
+  if (!hasErrors(issues)) issues.push(...validatePlanCompatibility(template, plan.code, plan.entitlements));
 
   const capabilityIssue = (resourceId: string, message: string, suggestions: string[] = []) =>
     issues.push({ stage: 'capability', severity: 'error', code: 'CAPABILITY_UNAVAILABLE', message, path: `spec.resources.${resourceId}`, suggestions });

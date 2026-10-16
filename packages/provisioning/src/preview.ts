@@ -17,11 +17,11 @@ export interface TemplatePreview {
 /**
  * What a template would look like without any account: each placement slot is bound to a
  * simulation target imitating the first provider the slot allows (AWS when it allows any), in a
- * representative region, under the first plan the template lists. Used for marketplace cards and
- * pages; nothing is created.
+ * representative region, under the most generous plan unless one is given. Used for marketplace
+ * cards and pages; nothing is created.
  */
 export function previewTemplate(template: EnvironmentTemplate, registry: AdapterRegistry, plan?: PlanCode): TemplatePreview {
-  const planCode = plan ?? template.spec.plans[0] ?? 'GROWTH';
+  const planCode = plan ?? 'SCALE';
   const placements: Record<string, CloudProvider> = {};
   const bindings: Record<string, { target: CloudTarget; region: string }> = {};
   for (const slot of template.spec.placements) {

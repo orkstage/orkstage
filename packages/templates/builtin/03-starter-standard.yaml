@@ -5,9 +5,8 @@ metadata:
   version: 1.0.0
   displayName: Starter standard
   description: Balanced production environment with a dedicated network, managed Postgres, cache and queue.
-  profile: starter
+  tags: [starter]
 spec:
-  plans: [STARTER, GROWTH]
   placements:
     - name: primary
       providers: [aws, azure, gcp, mock]
