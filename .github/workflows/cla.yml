@@ -1,0 +1,42 @@
+name: CLA
+
+# Contributors accept the OrkStage Contributor License Agreement once, by commenting on their first
+# pull request: https://github.com/orkstage/.github/blob/main/CLA.md. Signatures are kept on the
+# cla-signatures branch of this repository.
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    # Private repositories have no outside contributors; the job starts once a repository is public.
+    # pull_request_target is safe here: the job never checks out the pull request's code.
+    if: >-
+      github.event.repository.visibility == 'public' && (
+        github.event_name == 'pull_request_target' ||
+        github.event.comment.body == 'recheck' ||
+        github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-signatures: signatures/version1/cla.json
+          path-to-document: https://github.com/orkstage/.github/blob/main/CLA.md
+          branch: cla-signatures
+          allowlist: paulowdev,dependabot[bot],github-actions[bot]
+          custom-notsigned-prcomment: >-
+            Thank you for your contribution. Before it can be merged, please read the
+            [OrkStage Contributor License Agreement](https://github.com/orkstage/.github/blob/main/CLA.md)
+            and accept it by commenting on this pull request with the sentence below. You do this once;
+            it covers your later contributions to every OrkStage repository.
+          lock-pullrequest-aftermerge: false

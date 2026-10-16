@@ -1,34 +1,68 @@
-OrkStage Enterprise License — DRAFT (requires legal review before publication)
+OrkStage Enterprise License
 
-Copyright (c) 2026 OrkStage
+Version 1.0
 
-This license applies to all files in this directory and its subdirectories ("Enterprise
-Software"). All other OrkStage files are licensed under the GNU Affero General Public License
-v3.0 (see the LICENSE file at the repository root).
+Copyright (c) 2026 Paulo Costa (OrkStage)
 
-1. Evaluation and development. You may use, copy and modify the Enterprise Software for
-   development and testing purposes, and to evaluate it for up to 30 days, without a
-   subscription.
+This license applies to every file in a directory named "ee" in an OrkStage repository, and in
+its subdirectories (the "Enterprise Software"). All other OrkStage files are licensed under the
+GNU Affero General Public License version 3 (see the LICENSE file at the repository root), or
+under the license stated in their repository.
 
-2. Production use. Use of the Enterprise Software in production requires a valid OrkStage
-   Enterprise subscription covering the number of instances, organizations or other units
-   stated in your order. A license key enables the features you subscribed to.
+1. Definitions.
+   "Licensor" means Paulo Costa, who publishes OrkStage, or the company to which OrkStage is
+   transferred. "You" means the person or organization using the Enterprise Software.
+   "Production" means any use other than development, testing or evaluation, including serving
+   your own or your customers' workloads. "Subscription" means a paid OrkStage Enterprise order
+   with the Licensor, or one of its resellers, that is in effect and covers your use.
+   "License Key" means the signed key the Licensor issues for a Subscription.
 
-3. Modifications. You may modify the Enterprise Software for your own use. Modified versions
-   remain subject to this license. You may not remove, disable or circumvent license-key
-   checks or the features they protect.
+2. Development, testing and evaluation. You may use, copy and modify the Enterprise Software
+   without a Subscription for developing and testing OrkStage or your integrations with it, and
+   to evaluate the Enterprise Software for up to 30 days per organization.
 
-4. Restrictions. You may not sell, sublicense, distribute, or offer the Enterprise Software, or
-   any modified version, as a hosted or managed service to third parties.
+3. Production. Production use of the Enterprise Software requires a Subscription that covers the
+   instances, organizations or other units stated in your order, used with the License Key
+   issued for it. The Subscription's terms (price, units, duration and support) are in your
+   order; where they conflict with this license, the order prevails.
 
-5. Contributions. Contributions to the Enterprise Software are accepted under the OrkStage
-   Contributor License Agreement.
+4. Modifications. You may modify the Enterprise Software for your own use. Modified versions
+   remain Enterprise Software under this license. You may contribute modifications back under the
+   OrkStage Contributor License Agreement.
 
-6. No warranty. THE ENTERPRISE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE ENTERPRISE SOFTWARE.
+5. Restrictions. You may not:
+   (a) remove, disable, bypass or circumvent the License Key checks, or the features they
+       protect, or help others to do so;
+   (b) sell, rent, sublicense or distribute the Enterprise Software, or a modified version, except
+       inside your own organization;
+   (c) offer the Enterprise Software, or a modified version, to third parties as a hosted or
+       managed service, unless your order allows it;
+   (d) remove or change copyright, license or trademark notices.
 
-7. Termination. This license terminates automatically if you breach it. Upon termination you
-   must stop using the Enterprise Software in production.
+6. Open source parts. Nothing in this license limits your rights under the GNU Affero General
+   Public License or the other open source licenses for files outside "ee" directories.
 
-Contact: hello@orkstage.io
+7. Trademarks. This license does not grant rights to the OrkStage name or logos; see the OrkStage
+   trademark policy (https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
+
+8. When a Subscription ends. When your Subscription expires you have a grace period of 14 days, as
+   the software shows; after it, the Enterprise features switch off and you must stop their
+   Production use. Your data is never deleted or locked by this, and the open source parts keep
+   working.
+
+9. Termination. This license ends automatically if you breach it and do not cure the breach
+   within 30 days after the Licensor notifies you. When it ends, you must stop using the
+   Enterprise Software, except as section 2 allows after a new evaluation is agreed.
+
+10. No warranty and limitation of liability. THE ENTERPRISE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+    WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+    A PARTICULAR PURPOSE AND NON INFRINGEMENT. TO THE EXTENT THE LAW ALLOWS, THE LICENSOR IS NOT
+    LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES, OR LOSS OF DATA OR
+    PROFITS, AND ITS TOTAL LIABILITY IS LIMITED TO THE FEES YOU PAID FOR THE SUBSCRIPTION IN THE
+    12 MONTHS BEFORE THE CLAIM. A Subscription order may provide different warranties or support.
+
+11. Law. This license is governed by the laws of the State of Delaware, United States, without
+    regard to its conflict of laws rules, and the courts of the State of Delaware have
+    jurisdiction over any dispute about it.
+
+Questions and Subscriptions: legal@orkstage.io

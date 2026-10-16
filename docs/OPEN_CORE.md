@@ -2,7 +2,8 @@
 
 **Model:** an AGPL-3.0 core plus commercial Enterprise features in `ee/` directories, the model
 used by Formbricks, Cal.com and other projects. Decided on October 5, 2026. This document is the plan;
-legal texts marked *draft* need review by counsel before any public release.
+the legal texts are adopted as version 1.0: the [Enterprise License](../apps/api/src/ee/LICENSE),
+the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [trademark policy](https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
 
 ## 1. Principles
 
@@ -72,7 +73,8 @@ stays private.
 
 - **CLA required** (CLA Assistant bot). Because the company distributes the core under both the
   AGPL and a commercial license, it needs the right to relicense contributions, and a DCO alone
-  does not grant that. Keep the CLA short, in the style of the Apache ICLA (*draft needed*).
+  does not grant that. The [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) follows the Apache ICLA model, with an organization
+  section, and CLA Assistant Lite (`.github/workflows/cla.yml` in every repository) records it.
 - Contributions to `ee/` are accepted under the same CLA.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) and `SECURITY.md` (private
   disclosure to security@orkstage.io) live in the organization's `.github` repository; each
@@ -81,7 +83,7 @@ stays private.
 ## 6. Trademark
 
 "OrkStage" and the logo are trademarks; forks must use another name. Publish a short trademark
-policy (*draft*), similar to those of other open core projects.
+policy: [TRADEMARKS.md](https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
 
 ## 7. Editions and pricing (to validate)
 
@@ -94,13 +96,13 @@ policy (*draft*), similar to those of other open core projects.
 ## 8. Implementation checklist
 
 - [x] Root `LICENSE` (AGPL-3.0, official text)
-- [x] `ee/LICENSE` (*draft* OrkStage Enterprise License)
+- [x] `ee/LICENSE` (OrkStage Enterprise License 1.0)
 - [x] `packages/licensing`: offline Ed25519 license verification, feature checks, tests
 - [x] `GET /api/v1/license` and `402 ENTERPRISE_REQUIRED`
 - [x] First EE module: audit export (`ee/api`)
 - [ ] License headers and SPDX identifiers in source files (`SPDX-License-Identifier: AGPL-3.0-only`)
 - [x] CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and SUPPORT in the organization [`.github`](https://github.com/orkstage/.github) repository
-- [ ] CLA bot, CLA text and trademark policy (*legal review*)
+- [x] CLA bot, CLA text and trademark policy (version 1.0)
 - [x] Console: edition badge
 - [ ] Console: upgrade states for EE features, license settings page
 - [ ] `orkstage-licensing` private signing tool

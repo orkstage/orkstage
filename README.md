@@ -207,8 +207,9 @@ security@orkstage.io. See the [security policy](https://github.com/orkstage/.git
 
 OrkStage is open core. Everything in this repository is licensed under the
 [GNU AGPL-3.0](LICENSE), except directories named `ee/`, which are under the OrkStage Enterprise
-License ([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE), draft) and are activated with a
+License ([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE)) and are activated with a
 license key (`ORKSTAGE_LICENSE_KEY`). Without a key you run the full Community edition. The
 licensing model and the feature split are in [docs/OPEN_CORE.md](docs/OPEN_CORE.md).
 
-"OrkStage" and the OrkStage logo are trademarks of the OrkStage project.
+"OrkStage" and the OrkStage logo are trademarks; see the [trademark policy](https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
+Contributions are accepted under the [OrkStage CLA](https://github.com/orkstage/.github/blob/main/CLA.md).
