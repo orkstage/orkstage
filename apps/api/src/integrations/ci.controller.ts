@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { APPLICATION_NAME, publishApplicationVersionSchema, upsertApplicationSchema, validateSourceSchema } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
-import type { PlanCode } from '@orkstage/domain';
 import { Controller, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
@@ -30,7 +29,8 @@ export class CiController {
   @ApiZodBody(validateSourceSchema)
   async validate(@CurrentPrincipal() p: RequestPrincipal, @ZodBody(validateSourceSchema) body: z.infer<typeof validateSourceSchema>) {
     authorize(p, 'read', 'Template');
-    return this.validation.validate(body.source, body.planCode ? [body.planCode as PlanCode] : undefined);
+    if (body.tenantId) authorize(p, 'read', 'Tenant', { tenantId: body.tenantId });
+    return this.validation.validate(body.source, body.tenantId);
   }
 
   /**

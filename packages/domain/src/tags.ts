@@ -6,7 +6,6 @@ export interface TagContext {
   resourceId: string;
   deploymentId?: string;
   environment: string;
-  plan: string;
   templateName: string;
   templateVersion: string;
 }
@@ -23,7 +22,6 @@ export function standardTags(ctx: TagContext): Record<string, string> {
     'platform:instance-id': ctx.instanceId,
     'platform:resource-id': ctx.resourceId,
     'platform:environment': ctx.environment,
-    'platform:plan': ctx.plan,
     'platform:template': ctx.templateName,
     'platform:template-version': ctx.templateVersion,
   };

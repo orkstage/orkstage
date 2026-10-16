@@ -26,7 +26,7 @@ framework. Provider code lives only in the `cloud-*` packages (spec §3, §42.16
 ```text
 Template (provider neutral, versioned)
   + variables  ─▶ applyVariables
-  + plan       ─▶ plan compatibility (entitlements)
+  + tenant     ─▶ tenant limits and features (ADR 0007)
   + bindings   ─▶ placement slot → cloud target + region      (per resource, not per instance)
                ─▶ capability resolution per resource          (adapter catalog, regional gaps)
                ─▶ names, standard tags, resolved spec, spec hash

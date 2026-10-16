@@ -6,7 +6,7 @@ import {
   buildDependencyGraph,
   topologicalLevels,
   hasErrors,
-  validatePlanCompatibility,
+  validateLimits,
   validateSemantics,
   type TemplateResource,
   type ValidationIssue,
@@ -52,9 +52,9 @@ function isCritical(r: TemplateResource): boolean {
  * created.
  */
 export function compileInfrastructure(input: CompileInput, registry: AdapterRegistry): ResolvedInfrastructure {
-  const { template, plan, tenant, instance, bindings } = input;
+  const { template, limits, features, tenant, instance, bindings } = input;
   const issues: ValidationIssue[] = [...validateSemantics(template)];
-  if (!hasErrors(issues)) issues.push(...validatePlanCompatibility(template, plan.code, plan.entitlements));
+  if (!hasErrors(issues)) issues.push(...validateLimits(template, { limits, features }));
 
   const capabilityIssue = (resourceId: string, message: string, suggestions: string[] = []) =>
     issues.push({ stage: 'capability', severity: 'error', code: 'CAPABILITY_UNAVAILABLE', message, path: `spec.resources.${resourceId}`, suggestions });
@@ -134,7 +134,6 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
         instanceId: instance.id,
         resourceId: r.id,
         environment: instance.environment,
-        plan: plan.code,
         templateName: template.metadata.name,
         templateVersion: template.metadata.version,
       }),
@@ -166,7 +165,7 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
       ? evaluatePolicies({
           template,
           environment: instance.environment,
-          entitlements: plan.entitlements,
+          features,
           resources,
           sources,
           capabilities,
@@ -188,7 +187,6 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
 
   return {
     template: { name: template.metadata.name, version: template.metadata.version },
-    plan: plan.code,
     environment: instance.environment,
     resources,
     levels,

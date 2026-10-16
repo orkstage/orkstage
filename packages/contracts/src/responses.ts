@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { TenantLimitsInput } from './requests.js';
 /** Response shapes returned by the API (dates are ISO strings). */
 
 export interface ApiErrorBody {
@@ -25,18 +26,12 @@ export interface MeResponse {
   apiKey?: { id: string; name: string; prefix: string; scopes: string[] };
 }
 
-export interface PlanDto {
-  id: string;
-  code: string;
-  name: string;
-  entitlements: Record<string, unknown>;
-}
-
 export interface TenantDto {
   id: string;
   name: string;
   slug: string;
-  plan: { code: string; name: string };
+  /** Optional limits (ADR 0007); a missing field is no limit. */
+  limits: TenantLimitsInput;
   instanceCount: number;
   createdAt: string;
 }

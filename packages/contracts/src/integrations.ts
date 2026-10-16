@@ -73,7 +73,8 @@ export const publishApplicationVersionSchema = z.object({
 
 export const validateSourceSchema = z.object({
   source: z.string().min(1).max(200_000),
-  planCode: z.enum(['FREE', 'SANDBOX', 'STARTER', 'GROWTH', 'SCALE']).optional(),
+  /** Also check this tenant's limits and features (ADR 0007). */
+  tenantId: z.uuid().optional(),
 });
 
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;

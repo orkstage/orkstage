@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { AdapterRegistry, CloudTarget } from '@orkstage/cloud-core';
-import { DEFAULT_ENTITLEMENTS, isCloudProvider, PROVIDER_INFO, type CloudProvider, type PlanCode } from '@orkstage/domain';
+import { ALL_FEATURES, isCloudProvider, PROVIDER_INFO, type CloudProvider } from '@orkstage/domain';
 import type { EnvironmentTemplate } from '@orkstage/templates';
 import { compileInfrastructure } from './compiler.js';
 import type { CostEstimate, ResolvedInfrastructure } from './types.js';
@@ -17,11 +17,10 @@ export interface TemplatePreview {
 /**
  * What a template would look like without any account: each placement slot is bound to a
  * simulation target imitating the first provider the slot allows (AWS when it allows any), in a
- * representative region, under the most generous plan unless one is given. Used for marketplace
+ * representative region, with no tenant limits and every feature allowed. Used for marketplace
  * cards and pages; nothing is created.
  */
-export function previewTemplate(template: EnvironmentTemplate, registry: AdapterRegistry, plan?: PlanCode): TemplatePreview {
-  const planCode = plan ?? 'SCALE';
+export function previewTemplate(template: EnvironmentTemplate, registry: AdapterRegistry): TemplatePreview {
   const placements: Record<string, CloudProvider> = {};
   const bindings: Record<string, { target: CloudTarget; region: string }> = {};
   for (const slot of template.spec.placements) {
@@ -36,7 +35,8 @@ export function previewTemplate(template: EnvironmentTemplate, registry: Adapter
   const resolved = compileInfrastructure(
     {
       template,
-      plan: { code: planCode, entitlements: DEFAULT_ENTITLEMENTS[planCode] },
+      limits: {},
+      features: ALL_FEATURES,
       organizationId: 'preview',
       tenant: { id: 'preview', slug: 'preview' },
       instance: { id: 'preview', slug: 'preview', environment: 'production' },

@@ -6,8 +6,8 @@ import {
   isProviderEnabled,
   providerFlagKey,
   resolveFeatureFlags,
-  entitlementsFor,
-  DEFAULT_ENTITLEMENTS,
+  readTenantLimits,
+  tenantFeatures,
   assertInstanceTransition,
   canStartDeployment,
   canStartDestroy,
@@ -136,22 +136,19 @@ describe('feature flags', () => {
     expect(CLOUD_PROVIDERS.filter((p) => isProviderEnabled(flags, p))).toEqual(['aws', 'mock']);
   });
 
-  it('turns on the flags a plan lists, below platform and tenant overrides', () => {
-    const azure = providerFlagKey('azure');
-    expect(isProviderEnabled(resolveFeatureFlags([], 't1', [azure]), 'azure')).toBe(true);
-    expect(isProviderEnabled(resolveFeatureFlags([], 't1', []), 'azure')).toBe(false);
-    // A platform kill switch beats the plan; a tenant override beats both.
-    const off = [{ key: azure, tenantId: null, enabled: false }];
-    expect(isProviderEnabled(resolveFeatureFlags(off, 't1', [azure]), 'azure')).toBe(false);
-    expect(isProviderEnabled(resolveFeatureFlags([...off, { key: azure, tenantId: 't1', enabled: true }], 't1', [azure]), 'azure')).toBe(true);
-    // Unknown keys in a plan are ignored.
-    expect(Object.keys(resolveFeatureFlags([], 't1', ['NOT_A_FLAG']))).not.toContain('NOT_A_FLAG');
+  it('turns the tenant features on by default, and off through overrides (ADR 0007)', () => {
+    expect(tenantFeatures(resolveFeatureFlags([], 't1'))).toEqual({ multiCloud: true, multiRegion: true, autoscaling: true, customDomains: true });
+    const off = [
+      { key: 'MULTI_CLOUD', tenantId: null, enabled: false },
+      { key: 'AUTOSCALING', tenantId: 't1', enabled: false },
+    ];
+    expect(tenantFeatures(resolveFeatureFlags(off, 't1'))).toEqual({ multiCloud: false, multiRegion: true, autoscaling: false, customDomains: true });
+    expect(tenantFeatures(resolveFeatureFlags(off, 't2')).autoscaling).toBe(true);
   });
 
-  it('merges stored plan entitlements over the defaults of the plan code', () => {
-    expect(entitlementsFor('GROWTH', { featureFlags: ['TEMPLATE_MARKETPLACE'] }).featureFlags).toEqual(['TEMPLATE_MARKETPLACE']);
-    expect(entitlementsFor('GROWTH', null).maxInstances).toBe(DEFAULT_ENTITLEMENTS.GROWTH.maxInstances);
-    expect(entitlementsFor('UNKNOWN', {}).maxInstances).toBe(DEFAULT_ENTITLEMENTS.FREE.maxInstances);
+  it('reads stored tenant limits, keeping only known non negative numbers', () => {
+    expect(readTenantLimits({ maxInstances: 3, maxVcpuPerInstance: 2.5, maxReplicasPerService: -1, other: 9, maxDomainsPerInstance: '2' })).toEqual({ maxInstances: 3, maxVcpuPerInstance: 2.5 });
+    expect(readTenantLimits(null)).toEqual({});
   });
 
   it('lets a tenant override win over the platform value', () => {

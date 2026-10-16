@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudCapability, CloudTarget } from '@orkstage/cloud-core';
-import type { Entitlements } from '@orkstage/domain';
+import type { TenantFeatures } from '@orkstage/domain';
 import type { EnvironmentTemplate, TemplateResource } from '@orkstage/templates';
 import { effectiveProvider } from './connectivity.js';
 import type {
@@ -15,7 +15,8 @@ import type {
 export interface PolicyInput {
   template: EnvironmentTemplate;
   environment: EnvironmentKind;
-  entitlements: Entitlements;
+  /** What the tenant may use (feature flags, ADR 0007). */
+  features: TenantFeatures;
   resources: ResolvedResource[];
   sources: Map<string, TemplateResource>;
   capabilities: Map<string, CloudCapability>;
@@ -129,7 +130,7 @@ export const POLICIES: Record<string, Policy> = {
       : [pass('max-monthly-cost', `Estimated $${cost.total}/month is within budget.`)];
   },
 
-  'multi-cloud-entitlement': ({ resources, entitlements }) => {
+  'multi-cloud-allowed': ({ resources, features }) => {
     const providers = new Set(resources.map(effectiveProvider));
     // Multi-region means several regions on the same provider; one region per provider is
     // just multi-cloud.
@@ -140,15 +141,15 @@ export const POLICIES: Record<string, Policy> = {
       regionsByProvider.get(p)!.add(r.region);
     }
     const results: PolicyResult[] = [];
-    if (providers.size > 1 && !entitlements.multiCloud) {
-      results.push({ policy: 'multi-cloud-entitlement', status: 'fail', message: `Placing resources on ${[...providers].join(', ')} requires a plan with multi-cloud.` });
+    if (providers.size > 1 && !features.multiCloud) {
+      results.push({ policy: 'multi-cloud-allowed', status: 'fail', message: `Placing resources on ${[...providers].join(', ')} needs multicloud, which is turned off for this tenant (feature flag MULTI_CLOUD).` });
     }
     for (const [provider, regions] of regionsByProvider) {
-      if (regions.size > 1 && !entitlements.multiRegion) {
-        results.push({ policy: 'multi-cloud-entitlement', status: 'fail', message: `Using ${provider} regions ${[...regions].join(', ')} requires a plan with multi-region.` });
+      if (regions.size > 1 && !features.multiRegion) {
+        results.push({ policy: 'multi-cloud-allowed', status: 'fail', message: `Using ${provider} regions ${[...regions].join(', ')} needs several regions, which is turned off for this tenant (feature flag MULTI_REGION).` });
       }
     }
-    return results.length ? results : [pass('multi-cloud-entitlement', 'Placement fits the plan.')];
+    return results.length ? results : [pass('multi-cloud-allowed', 'The placement uses only allowed providers and regions.')];
   },
 
   'cross-cloud-connectivity': ({ connectivity }) => {

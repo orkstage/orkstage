@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { PrismaClient } from '@orkstage/database';
-import { entitlementsFor, isProviderEnabled, PROVIDER_INFO, providerFlagKey, resolveFeatureFlags, type CloudProvider } from '@orkstage/domain';
+import { isProviderEnabled, PROVIDER_INFO, providerFlagKey, resolveFeatureFlags, type CloudProvider } from '@orkstage/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { PRISMA } from '../infra/infra.module.js';
 import { unprocessable } from './errors.js';
@@ -14,12 +14,8 @@ export class FeatureFlagsService {
   constructor(@Inject(PRISMA) private readonly prisma: PrismaClient) {}
 
   async forTenant(tenantId?: string | null): Promise<Record<string, boolean>> {
-    const [rows, tenant] = await Promise.all([
-      this.prisma.featureFlag.findMany({ where: tenantId ? { OR: [{ tenantId: null }, { tenantId }] } : { tenantId: null } }),
-      tenantId ? this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { plan: { select: { code: true, entitlements: true } } } }) : null,
-    ]);
-    const planFlags = tenant ? entitlementsFor(tenant.plan.code, tenant.plan.entitlements).featureFlags : [];
-    return resolveFeatureFlags(rows, tenantId ?? null, planFlags);
+    const rows = await this.prisma.featureFlag.findMany({ where: tenantId ? { OR: [{ tenantId: null }, { tenantId }] } : { tenantId: null } });
+    return resolveFeatureFlags(rows, tenantId ?? null);
   }
 
   async providerCheck(tenantId?: string | null): Promise<(provider: CloudProvider) => boolean> {

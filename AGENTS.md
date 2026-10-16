@@ -17,7 +17,7 @@ incidents, triggers). The web console, CLI, OpenTofu modules and site are separa
 |---|---|
 | `apps/api` | NestJS 12 on Fastify. Controllers per area (`catalog/`, `instances/`, `deployments/`, `integrations/`, `ops/`; `ee/` is the private Enterprise submodule, absent in public clones), guards and helpers in `common/`, process wiring in `infra/` |
 | `apps/worker` | BullMQ consumers: deployments (`runner.ts`), health and incidents (`health.ts`), drift (`drift.ts`), triggers (`triggers.ts`), notifications and webhooks |
-| `packages/domain` | Pure domain: providers and `PROVIDER_INFO`, feature flags, plans and entitlements, lifecycle state machine, naming, tags, errors. No I/O |
+| `packages/domain` | Pure domain: providers and `PROVIDER_INFO`, feature flags, tenant limits, lifecycle state machine, naming, tags, errors. No I/O |
 | `packages/contracts` | HTTP contract shared with the console and CLI: zod request schemas, response DTOs, queue names, `PROVIDER_FORMS`. Dependency free on purpose |
 | `packages/templates` | Template schema (`schema.ts`), validation stages, dependency graph, variables, built in templates in `builtin/*.yaml` |
 | `packages/provisioning` | Compiler (template to resolved infrastructure), policies, cost, plan diff, provider plans, DAG executor, triggers logic |
