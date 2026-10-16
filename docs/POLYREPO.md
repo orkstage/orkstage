@@ -11,7 +11,7 @@ workspace.
 | Repository | Contents (from this monorepo) | Publishes | License |
 |---|---|---|---|
 | `orkstage` | `apps/api`, `apps/worker`, `packages/*`, `infra/docker/platform.Dockerfile`, `docs/` | `@orkstage/contracts`, `@orkstage/authorization`, `@orkstage/templates`, `@orkstage/domain` (npm, GitHub Packages); the `ghcr.io/orkstage/platform` image | AGPL-3.0 + `ee/` |
-| `orkstage-console` | `apps/web` | the `ghcr.io/orkstage/console` image | AGPL-3.0 + `ee/` |
+| `orkstage-console` | `apps/web` | the `ghcr.io/orkstage/console` image | AGPL-3.0 |
 | `orkstage-cli` | `cli/` | signed `ork` binaries, `@orkstage/scan` (WebAssembly, npm), Homebrew, Scoop and winget manifests | AGPL-3.0 |
 | `orkstage-modules` | `infra/tofu/modules`, `infra/docker/tofu-runner.Dockerfile` | git tags `vX.Y.Z`; `ghcr.io/orkstage/tofu-runner:<tag>` | Apache-2.0 |
 | `orkstage-site` | `site/` | static site on S3 and CloudFront (orkstage.io) | MIT (code), CC BY 4.0 (content) |

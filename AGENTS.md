@@ -15,7 +15,7 @@ incidents, triggers). The web console, CLI, OpenTofu modules and site are separa
 
 | Path | What lives there |
 |---|---|
-| `apps/api` | NestJS 12 on Fastify. Controllers per area (`catalog/`, `instances/`, `deployments/`, `integrations/`, `ops/`, `ee/`), guards and helpers in `common/`, process wiring in `infra/` |
+| `apps/api` | NestJS 12 on Fastify. Controllers per area (`catalog/`, `instances/`, `deployments/`, `integrations/`, `ops/`; `ee/` is the private Enterprise submodule, absent in public clones), guards and helpers in `common/`, process wiring in `infra/` |
 | `apps/worker` | BullMQ consumers: deployments (`runner.ts`), health and incidents (`health.ts`), drift (`drift.ts`), triggers (`triggers.ts`), notifications and webhooks |
 | `packages/domain` | Pure domain: providers and `PROVIDER_INFO`, feature flags, plans and entitlements, lifecycle state machine, naming, tags, errors. No I/O |
 | `packages/contracts` | HTTP contract shared with the console and CLI: zod request schemas, response DTOs, queue names, `PROVIDER_FORMS`. Dependency free on purpose |
@@ -122,8 +122,12 @@ build` before typechecking its dependents.
 ## License headers
 
 Every source file starts with an SPDX header: `AGPL-3.0-only`, or
-`LicenseRef-OrkStage-Enterprise` inside `ee/`. Code outside `ee/` never imports from it, except
-`apps/api/src/app.module.ts`. CI runs the check; to add missing headers:
+`LicenseRef-OrkStage-Enterprise` in the Enterprise submodule (`apps/api/src/ee`, the private
+`orkstage-ee` repository). Code outside `ee/` never imports from it: `apps/api/src/enterprise.ts`
+loads its entry point by path when it exists, so the API builds and runs without it. The
+submodule is marked `update = none`, so clones skip it; with access, fetch it with
+`git submodule update --init --checkout apps/api/src/ee`. CI runs the check; to add missing
+headers:
 
 ```bash
 bash scripts/spdx.sh --fix

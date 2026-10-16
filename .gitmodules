@@ -1,0 +1,4 @@
+[submodule "apps/api/src/ee"]
+	path = apps/api/src/ee
+	url = https://github.com/orkstage/orkstage-ee.git
+	update = none

@@ -163,7 +163,7 @@ organization. This one is the core.
 
 | Repository | What it contains | License |
 |---|---|---|
-| [`orkstage`](https://github.com/orkstage/orkstage) | Control API, worker, shared packages, Enterprise modules in `ee/` | AGPL-3.0, `ee/` commercial |
+| [`orkstage`](https://github.com/orkstage/orkstage) | Control API, worker, shared packages | AGPL-3.0 |
 | [`orkstage-console`](https://github.com/orkstage/orkstage-console) | Web console (Next.js) | AGPL-3.0 |
 | [`orkstage-cli`](https://github.com/orkstage/orkstage-cli) | `ork` CLI and the scan engine (Rust, WebAssembly) | AGPL-3.0 |
 | [`orkstage-modules`](https://github.com/orkstage/orkstage-modules) | OpenTofu modules and the runner image | Apache-2.0 |
@@ -208,9 +208,10 @@ security@orkstage.io. See the [security policy](https://github.com/orkstage/.git
 ## License
 
 OrkStage is open core. Everything in this repository is licensed under the
-[GNU AGPL-3.0](LICENSE), except directories named `ee/`, which are under the OrkStage Enterprise
-License ([apps/api/src/ee/LICENSE](apps/api/src/ee/LICENSE)) and are activated with a
-license key (`ORKSTAGE_LICENSE_KEY`). Without a key you run the full Community edition. The
+[GNU AGPL-3.0](LICENSE). Enterprise features live in a private repository mounted at
+`apps/api/src/ee` (a git submodule that clones skip: the build without it is the Community edition),
+under the [OrkStage Enterprise License](LICENSE-ENTERPRISE), and the official images activate them
+with a license key (`ORKSTAGE_LICENSE_KEY`). Without a key you run the full Community edition. The
 licensing model and the feature split are in [docs/OPEN_CORE.md](docs/OPEN_CORE.md).
 
 "OrkStage" and the OrkStage logo are trademarks; see the [trademark policy](https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
