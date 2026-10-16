@@ -195,6 +195,8 @@ async function main() {
           provider: 'mock',
           name: t.name,
           environment: 'any',
+          // The local default: instances whose slots are left unbound use it.
+          isDefault: t.name === 'Simulated AWS — us-east-1',
           config: { simulate: t.simulate, seed: t.simulate, latencyMs: { min: 600, max: 2200 } },
           allowedRegions: t.regions,
           defaultRegion: t.regions[0]!,

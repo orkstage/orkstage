@@ -280,6 +280,8 @@ model CloudTarget {
   name           String
   /// The instance environment this target serves (production, staging, development, sandbox) or any.
   environment    String        @default("any")
+  /// Used for instance slots left unbound; one per tenant scope, provider and environment.
+  isDefault      Boolean       @default(false)
   /// Non-secret configuration (account id, role ARN, subscription id, simulation settings).
   config         Json
   /// Reference into the secret store. Raw credentials are never stored here (spec §11).
