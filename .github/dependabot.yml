@@ -4,7 +4,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     open-pull-requests-limit: 10
     groups:
       nestjs:
@@ -27,7 +27,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       actions:
         patterns:
@@ -37,7 +37,7 @@ updates:
   - package-ecosystem: docker
     directory: /infra/docker
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       minor-and-patch:
         patterns:
@@ -54,7 +54,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /infra/local
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       minor-and-patch:
         patterns:
