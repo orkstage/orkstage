@@ -53,7 +53,7 @@ jobs:
       - name: License headers and the ee/ boundary
         run: bash scripts/spdx.sh
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
