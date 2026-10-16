@@ -1,0 +1,24 @@
+name: Release
+
+# CHANGELOG.md and the release notes, shared by every versioned OrkStage repository:
+# https://github.com/orkstage/.github/blob/main/.github/workflows/release.yml
+# Run this workflow from the Actions tab with the version to prepare (0.2.0): it pushes a branch
+# release/v0.2.0 with the changelog for a pull request. After it is merged,
+# pushing the tag v0.2.0 creates the GitHub release with the notes of that version.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to prepare, for example 0.2.0
+        required: true
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: orkstage/.github/.github/workflows/release.yml@main
+    with:
+      version: ${{ inputs.version }}
