@@ -130,7 +130,21 @@ export function validateSemantics(template: EnvironmentTemplate): ValidationIssu
       else throw e;
     }
   }
+
+  // ADR 0007: plans and size profiles give way to tenant limits and tags.
+  const warn = (code: string, message: string, path: string) => issues.push({ stage: 'semantic', severity: 'warning', code, message, path });
+  if (template.spec.plans !== undefined) {
+    warn('PLANS_DEPRECATED', '`spec.plans` is ignored and will be rejected in the next release: tenant limits decide what fits. Remove it, or move the values to `metadata.tags`.', 'spec.plans');
+  }
+  if (template.metadata.profile !== undefined) {
+    warn('PROFILE_DEPRECATED', '`metadata.profile` is ignored and will be rejected in the next release. Remove it, or move the value to `metadata.tags`.', 'metadata.profile');
+  }
   return issues;
+}
+
+/** True when the issues include an error (warnings do not stop the next stage). */
+export function hasErrors(issues: readonly ValidationIssue[]): boolean {
+  return issues.some((i) => i.severity === 'error');
 }
 
 export interface ResourceTotals {
@@ -172,12 +186,6 @@ export function validatePlanCompatibility(
   const err = (code: string, message: string, path?: string, suggestions?: string[]) =>
     issues.push({ stage: 'plan', severity: 'error', code, message, path, suggestions });
 
-  if (!template.spec.plans.includes(plan)) {
-    err('PLAN_NOT_ALLOWED', `Template ${template.metadata.name} is not available on the ${plan} plan.`, 'spec.plans', [
-      `Use a plan in: ${template.spec.plans.join(', ')}`,
-    ]);
-  }
-
   const t = resourceTotals(template);
   const limit = (code: string, label: string, value: number, max: number) => {
     if (value > max) err(code, `${label} ${round(value)} exceeds the ${plan} limit of ${max}.`);
@@ -215,6 +223,6 @@ export function validateTemplate(
   const parsed = parseTemplate(input);
   if (!parsed.ok) return report(parsed.issues);
   const issues = validateSemantics(parsed.template);
-  if (issues.length === 0 && plan) issues.push(...validatePlanCompatibility(parsed.template, plan.code, plan.entitlements));
+  if (!hasErrors(issues) && plan) issues.push(...validatePlanCompatibility(parsed.template, plan.code, plan.entitlements));
   return { ...report(issues), template: parsed.template };
 }

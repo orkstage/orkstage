@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-﻿import { DEFAULT_ENTITLEMENTS, type PlanCode } from '@orkstage/domain';
+﻿import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';
 import {
   applyVariables,
@@ -33,13 +33,17 @@ describe('built-in templates', () => {
     ]);
   });
 
+  // The size tag of a built in template names the smallest plan it fits.
+  const SIZE_TAGS = { sandbox: 'SANDBOX', starter: 'STARTER', growth: 'GROWTH', scale: 'SCALE' } as const;
   it.each(builtins.map((b) => [b.template.metadata.name, b] as const))(
-    '%s is valid on every plan it declares',
+    '%s is valid with no warnings, and fits the plan its size tag names',
     (_name, { source, template }) => {
-      for (const plan of template.spec.plans) {
-        const result = validateTemplate(source, { code: plan, entitlements: DEFAULT_ENTITLEMENTS[plan] });
-        expect(result.issues, `${plan}: ${JSON.stringify(result.issues)}`).toEqual([]);
-      }
+      expect(validateTemplate(source).issues).toEqual([]);
+      const size = template.metadata.tags.find((t): t is keyof typeof SIZE_TAGS => t in SIZE_TAGS);
+      expect(size, 'a size tag').toBeDefined();
+      const plan = SIZE_TAGS[size!];
+      const result = validateTemplate(source, { code: plan, entitlements: DEFAULT_ENTITLEMENTS[plan] });
+      expect(result.issues, `${plan}: ${JSON.stringify(result.issues)}`).toEqual([]);
     },
   );
 });
@@ -81,16 +85,27 @@ describe('semantic validation', () => {
 });
 
 describe('plan compatibility', () => {
-  const check = (name: string, plan: PlanCode) =>
-    validateTemplate(byName(name), { code: plan, entitlements: DEFAULT_ENTITLEMENTS[plan] }).issues.map((i) => i.code);
 
-  it('rejects templates on plans they do not support', () => {
-    expect(check('growth-standard', 'FREE')).toContain('PLAN_NOT_ALLOWED');
+  it('accepts and ignores spec.plans and metadata.profile, with deprecation warnings (ADR 0007)', () => {
+    const t = { ...structuredClone(byName('growth-standard')) };
+    t.spec.plans = ['FREE'];
+    t.metadata.profile = 'growth';
+    const result = validateTemplate(t, { code: 'GROWTH', entitlements: DEFAULT_ENTITLEMENTS.GROWTH });
+    expect(result.valid).toBe(true);
+    expect(result.issues.map((i) => [i.code, i.severity])).toEqual([
+      ['PLANS_DEPRECATED', 'warning'],
+      ['PROFILE_DEPRECATED', 'warning'],
+    ]);
   });
 
-  it('enforces resource limits even when the plan list is bypassed', () => {
+  it('rejects malformed tags', () => {
     const t = structuredClone(byName('growth-standard'));
-    t.spec.plans = ['STARTER'];
+    t.metadata.tags = ['Not-Valid'];
+    expect(validateTemplate(t).issues.map((i) => i.code)).toContain('SCHEMA_INVALID');
+  });
+
+  it('enforces the resource limits of the plan it is checked against', () => {
+    const t = structuredClone(byName('growth-standard'));
     const codes = validateTemplate(t, { code: 'STARTER', entitlements: DEFAULT_ENTITLEMENTS.STARTER }).issues.map((i) => i.code);
     expect(codes).toEqual(expect.arrayContaining(['PLAN_MAX_CPU', 'PLAN_NO_AUTOSCALING', 'PLAN_BACKUP_RETENTION']));
   });

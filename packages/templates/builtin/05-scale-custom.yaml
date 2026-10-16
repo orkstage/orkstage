@@ -5,9 +5,8 @@ metadata:
   version: 1.0.0
   displayName: Scale (custom)
   description: Fully configurable enterprise baseline. Clone it to tailor topology, sizing and placement.
-  profile: scale
+  tags: [scale]
 spec:
-  plans: [SCALE]
   placements:
     - name: primary
       description: Application runtime, ingress and DNS.

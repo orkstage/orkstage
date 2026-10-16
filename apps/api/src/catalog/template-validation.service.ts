@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ValidationIssueDto } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
-import type { Entitlements, PlanCode } from '@orkstage/domain';
+import { DEFAULT_ENTITLEMENTS, type Entitlements, type PlanCode } from '@orkstage/domain';
 import { compileInfrastructure } from '@orkstage/provisioning';
 import { toCloudTarget } from '@orkstage/runtime';
 import { validateTemplate } from '@orkstage/templates';
@@ -11,7 +11,7 @@ import { chooseBindings } from './target-choice.js';
 
 /**
  * The full template validation pipeline (spec §19), shared by publishing, stateless validation
- * (CLI/CI) and IaC import: schema → semantic → plan compatibility per declared plan →
+ * (CLI/CI) and IaC import: schema → semantic → plan compatibility when a plan is asked for →
  * capability + security policy, compiled against shared cloud targets compatible with each slot
  * (the target per slot that leaves the fewest errors, see chooseBindings).
  */
@@ -28,22 +28,28 @@ export class TemplateValidationService {
     const template = base.template;
     const issues: ValidationIssueDto[] = [...base.issues];
 
-    const plans = await this.prisma.plan.findMany({ where: { code: { in: plansFilter ?? template.spec.plans } } });
+    // A plan asked for explicitly is checked by name; otherwise only capabilities and policies are,
+    // under the most generous plan (templates no longer declare plans, ADR 0007).
+    const plans = plansFilter
+      ? (await this.prisma.plan.findMany({ where: { code: { in: plansFilter } } })).map((p) => ({ code: p.code as PlanCode, entitlements: p.entitlements as unknown as Entitlements, label: `[${p.code}] ` }))
+      : [{ code: 'SCALE' as PlanCode, entitlements: DEFAULT_ENTITLEMENTS.SCALE, label: '' }];
     // Real providers before simulation, oldest first, so the choice below is stable.
     const targets = (await this.prisma.cloudTarget.findMany({ where: { status: 'ACTIVE', tenantId: null }, orderBy: { createdAt: 'asc' } })).sort(
       (a, b) => Number(a.provider === 'mock') - Number(b.provider === 'mock'),
     );
 
     for (const plan of plans) {
-      const entitlements = plan.entitlements as unknown as Entitlements;
-      const planReport = validateTemplate(template, { code: plan.code as PlanCode, entitlements });
-      issues.push(...planReport.issues.filter((i) => i.stage === 'plan').map((i) => ({ ...i, message: `[${plan.code}] ${i.message}` })));
+      const { entitlements } = plan;
+      if (plansFilter) {
+        const planReport = validateTemplate(template, { code: plan.code, entitlements });
+        issues.push(...planReport.issues.filter((i) => i.stage === 'plan').map((i) => ({ ...i, message: `${plan.label}${i.message}` })));
+      }
 
       const compile = (choice: Readonly<Record<string, (typeof targets)[number]>>) =>
         compileInfrastructure(
           {
             template,
-            plan: { code: plan.code as PlanCode, entitlements },
+            plan: { code: plan.code, entitlements },
             organizationId: 'validation',
             tenant: { id: 'validation', slug: 'validation' },
             instance: { id: 'validation', slug: 'validation', environment: template.metadata.nonProduction ? 'sandbox' : 'production' },
@@ -68,7 +74,7 @@ export class TemplateValidationService {
       issues.push(
         ...resolved.issues
           .filter((i) => i.stage === 'capability' || i.stage === 'policy')
-          .map((i) => ({ ...i, message: `[${plan.code}] ${i.message}` })),
+          .map((i) => ({ ...i, message: `${plan.label}${i.message}` })),
       );
     }
     const unique = [...new Map(issues.map((i) => [`${i.code}:${i.message}`, i])).values()];

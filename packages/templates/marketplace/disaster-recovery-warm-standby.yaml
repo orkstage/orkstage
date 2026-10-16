@@ -9,9 +9,8 @@ metadata:
     can take over. The standby database starts from the primary's backups, so the recovery point is
     the backup interval. Switching traffic is a deliberate operator action (DNS change), not an
     automatic failover.
-  profile: scale
+  tags: [scale, disaster recovery]
 spec:
-  plans: [SCALE]
   placements:
     - name: primary
       description: Region that serves traffic.

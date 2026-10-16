@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { CLOUD_PROVIDERS, PLAN_CODES } from '@orkstage/domain/core';
+import { CLOUD_PROVIDERS } from '@orkstage/domain/core';
 import { z } from 'zod';
 
 /**
@@ -246,10 +246,17 @@ export const environmentTemplate = z.object({
     description: z.string().default(''),
     /** Non-production templates carry an explicit warning in the UI (spec §5, Profile A). */
     nonProduction: z.boolean().default(false),
-    profile: z.enum(['shared-sandbox', 'dedicated-sandbox', 'starter', 'growth', 'scale']),
+    /** Free form labels for search and the marketplace (ADR 0007), for example `starter` or `postgres`. */
+    tags: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9 ]{0,31}$/, 'Tags are lowercase letters, digits and spaces, up to 32 characters.'))
+      .max(20)
+      .default([]),
+    /** Deprecated (ADR 0007): accepted and ignored with a warning for one release, then rejected. Use tags. */
+    profile: z.string().optional(),
   }),
   spec: z.object({
-    plans: z.array(z.enum(PLAN_CODES)).min(1),
+    /** Deprecated (ADR 0007): accepted and ignored with a warning for one release, then rejected. */
+    plans: z.array(z.string()).optional(),
     placements: z.array(placementSlot).min(1),
     variables: z.array(templateVariable).default([]),
     resources: z.array(templateResource).min(1),

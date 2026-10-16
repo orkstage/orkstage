@@ -9,9 +9,8 @@ metadata:
     dispatch API and a routing worker on containers, a queue for courier location events, Redis
     for live positions, PostgreSQL for orders and a bucket for delivery photos. Low cost by default;
     raise replicas and sizes through the variables.
-  profile: growth
+  tags: [growth]
 spec:
-  plans: [GROWTH, SCALE]
   placements:
     - name: web
       description: Customer tracking site.

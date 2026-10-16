@@ -8,9 +8,8 @@ metadata:
     Reference topology from spec §42.17 — API on AWS ECS Fargate behind an ALB with ECR and
     Route 53, Postgres on Azure Flexible Server, object storage on OCI. Bind every slot to the
     same AWS target for the AWS-only variant of the same template.
-  profile: growth
+  tags: [growth, multicloud]
 spec:
-  plans: [GROWTH, SCALE]
   placements:
     - name: primary
       description: Application runtime, registry, ingress and DNS.

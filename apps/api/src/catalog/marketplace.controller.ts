@@ -264,7 +264,8 @@ export class MarketplaceController {
       title: row.title,
       summary: row.summary,
       categories: row.categories,
-      tags: row.tags,
+      // The listing's own tags first, then the template's (ADR 0007).
+      tags: [...new Set([...row.tags, ...(template?.metadata.tags ?? [])])],
       badges: row.badges,
       status: row.status,
       publisherName: row.publisherName,
@@ -272,7 +273,6 @@ export class MarketplaceController {
       templateName: row.template.name,
       version: version?.version ?? null,
       providers: preview?.providers ?? [],
-      plans: template?.spec.plans ?? [],
       resourceCount: (template?.spec.resources ?? []).filter((r) => r.enabled).length,
       estimatedMonthlyCost: preview && preview.cost.confidence !== 'unavailable' ? Math.round(preview.cost.total * 100) / 100 : null,
       stars: row.stars.length,

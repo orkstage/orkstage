@@ -9,9 +9,8 @@ metadata:
     PostgreSQL for catalog and orders, Redis for sessions and carts, a queue between checkout and
     fulfillment, and a bucket for product images that the storefront can read. Triggers rebuild the
     storefront after a catalog publish.
-  profile: growth
+  tags: [growth]
 spec:
-  plans: [GROWTH, SCALE]
   placements:
     - name: storefront
       description: Website built from your repository.

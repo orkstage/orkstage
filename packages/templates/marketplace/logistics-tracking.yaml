@@ -8,9 +8,8 @@ metadata:
     Shipment tracking for carriers and warehouses: a tracking API, an ingest worker that consumes
     scan events from a FIFO queue in order, PostgreSQL for shipments and events, Redis for the
     latest status of each shipment, and a bucket for labels and proof of delivery documents.
-  profile: starter
+  tags: [starter]
 spec:
-  plans: [STARTER, GROWTH, SCALE]
   placements:
     - name: primary
       providers: [aws, azure, gcp, oci, digitalocean, magalu, mock]
