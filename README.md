@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset=".github/assets/banner-light.svg">
-    <img alt="OrkStage. Command every stage of your cloud." src=".github/assets/banner-light.svg" width="100%">
+    <img alt="OrkStage. Orchestrate every cloud from one stage." src=".github/assets/banner-light.svg" width="100%">
   </picture>
 </h1>
 
@@ -21,7 +21,8 @@
   <a href="https://orkstage.io/docs">Documentation</a> |
   <a href="docs/ARCHITECTURE.md">Architecture</a> |
   <a href="docs/ROADMAP.md">Roadmap</a> |
-  <a href="https://github.com/orgs/orkstage/discussions">Discussions</a>
+  <a href="https://github.com/orgs/orkstage/discussions">Discussions</a> |
+  <a href="https://orkstage.slack.com">Slack</a>
 </p>
 
 ## What it is
@@ -195,7 +196,8 @@ docs/              Architecture, API map, ADRs, roadmap
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the
 development setup and checks, and the [code of conduct](https://github.com/orkstage/.github/blob/main/CODE_OF_CONDUCT.md).
-Questions go to [Discussions](https://github.com/orgs/orkstage/discussions).
+Questions go to [Discussions](https://github.com/orgs/orkstage/discussions); conversation happens on
+[Slack](https://orkstage.slack.com).
 
 ## Security
 
