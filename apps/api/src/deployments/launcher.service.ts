@@ -192,7 +192,6 @@ export class LauncherService {
 function emptyResolved(instance: Instance): ResolvedInfrastructure {
   return {
     template: { name: '', version: '' },
-    plan: 'FREE',
     environment: instance.environment as ResolvedInfrastructure['environment'],
     resources: [],
     levels: [],

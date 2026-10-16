@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { PreviewDto } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
-import type { Entitlements, PlanCode } from '@orkstage/domain';
+import { isProviderEnabled, readTenantLimits, tenantFeatures } from '@orkstage/domain';
 import {
   compileInfrastructure,
   diffPlan,
@@ -31,7 +31,7 @@ export interface CompileRequest {
 }
 
 /**
- * Loads everything the compiler needs from the database (template version, plan, targets,
+ * Loads everything the compiler needs from the database (template version, tenant limits, targets,
  * image catalog, platform policy) and runs it. Pure orchestration: all rules live in
  * @orkstage/templates and @orkstage/provisioning.
  */
@@ -46,7 +46,7 @@ export class CompileService {
   async compile(req: CompileRequest): Promise<ResolvedInfrastructure> {
     const [version, tenant, policySetting] = await Promise.all([
       this.prisma.templateVersion.findUniqueOrThrow({ where: { id: req.templateVersionId } }),
-      this.prisma.tenant.findUniqueOrThrow({ where: { id: req.tenantId }, include: { plan: true } }),
+      this.prisma.tenant.findUniqueOrThrow({ where: { id: req.tenantId } }),
       this.prisma.platformSetting.findUnique({ where: { key: 'policy' } }),
     ]);
 
@@ -76,17 +76,19 @@ export class CompileService {
       apps.filter((a) => a.versions[0]).map((a) => [`catalog://${a.name}`, { uri: a.versions[0]!.imageUri, digest: a.versions[0]!.digest }]),
     );
 
+    const flags = await this.flags.forTenant(req.tenantId);
     return compileInfrastructure(
       {
         template: applied.template,
-        plan: { code: tenant.plan.code as PlanCode, entitlements: tenant.plan.entitlements as unknown as Entitlements },
+        limits: readTenantLimits(tenant.limits),
+        features: tenantFeatures(flags),
         organizationId: tenant.organizationId,
         tenant: { id: tenant.id, slug: tenant.slug },
         instance: { id: req.instanceId, slug: req.instanceSlug, environment: req.environment as EnvironmentKind },
         bindings,
         images,
         policy: (policySetting?.value ?? {}) as PolicyConfig,
-        providerEnabled: await this.flags.providerCheck(req.tenantId),
+        providerEnabled: (provider) => isProviderEnabled(flags, provider),
       },
       this.adapters.registry,
     );

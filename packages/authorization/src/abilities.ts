@@ -14,7 +14,7 @@ export const SUBJECTS = [
   'Organization',
   'Tenant',
   'Member',
-  'Plan',
+  'TenantLimits',
   'Instance',
   'Deployment',
   'Service',
@@ -116,7 +116,7 @@ export function defineAbilityFor(principal: Principal): AppAbility {
 
   if (principal.memberships.length > 0) {
     can('read', ['Tenant', 'Instance', 'Deployment', 'Service', 'Incident', 'StatusPage', 'Notification'], all);
-    can('read', ['Template', 'Plan', 'Application', 'Marketplace']);
+    can('read', ['Template', 'TenantLimits', 'Application', 'Marketplace']);
     can(['deploy', 'restart'], 'Instance', ops);
     can('deploy', 'Service', ops);
     can(['create', 'update', 'scale', 'destroy', 'approve'], 'Instance', admins);

@@ -7,7 +7,6 @@ import {
   type TemplateVersionDto,
 } from '@orkstage/contracts';
 import type { PrismaClient, TemplateVersion } from '@orkstage/database';
-import type { PlanCode } from '@orkstage/domain';
 import { parseTemplate, type EnvironmentTemplate } from '@orkstage/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -151,7 +150,8 @@ export class TemplatesController {
       if (!latest) throw notFound('Template version');
       source = latest.source;
     }
-    return this.fullValidation(source, body.planCode ? [body.planCode] : undefined);
+    if (body.tenantId) authorize(p, 'read', 'Tenant', { tenantId: body.tenantId });
+    return this.fullValidation(source, body.tenantId);
   }
 
   @Scope('templates:write')
@@ -215,8 +215,8 @@ export class TemplatesController {
     return parsed.template;
   }
 
-  private fullValidation(source: string, plansFilter?: PlanCode[]) {
-    return this.validation.validate(source, plansFilter);
+  private fullValidation(source: string, tenantId?: string) {
+    return this.validation.validate(source, tenantId);
   }
 
   private versionDto(v: TemplateVersion): TemplateVersionDto {

@@ -10,7 +10,7 @@ the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [tradema
 ## 1. Principles
 
 1. **The core is complete.** A team can run Community on its own infrastructure and operate
-   production workloads on AWS: templates, multicloud placement, plans, policies and cost,
+   production workloads on AWS: templates, multicloud placement, tenant limits, policies and cost,
    deployments, health, incidents, status pages, notifications, audit log, API keys, webhooks,
    the CLI and IaC import. Enterprise adds *organizational scale and compliance*, not basic
    usefulness.

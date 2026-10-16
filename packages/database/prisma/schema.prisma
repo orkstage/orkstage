@@ -57,14 +57,14 @@ model Tenant {
   organizationId String   @db.Uuid
   name           String
   slug           String   @unique
-  planId         String   @db.Uuid
+  /// Optional limits (see @orkstage/domain TenantLimits, ADR 0007); a missing field is no limit.
+  limits         Json     @default("{}")
   /// Email domains allowed to join via enterprise SSO, e.g. ["acme.com"].
   allowedEmailDomains String[] @default([])
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  plan         Plan         @relation(fields: [planId], references: [id])
   memberships  Membership[]
   invitations  Invitation[]
   instances    Instance[]
@@ -156,19 +156,7 @@ model Session {
   @@index([userId])
 }
 
-// ───────────────────────────── Plans & templates ─────────────────────────────
-
-model Plan {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  code         String   @unique
-  name         String
-  /// Entitlements document (see @orkstage/domain Entitlements).
-  entitlements Json
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
-
-  tenants Tenant[]
-}
+// ───────────────────────────── Templates ─────────────────────────────
 
 enum TemplateVisibility {
   SYSTEM

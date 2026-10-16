@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { DEFAULT_ENTITLEMENTS, PLAN_CODES } from '@orkstage/domain';
 import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import { createPrismaClient } from './index.js';
 
 /**
  * Idempotent seed (spec §45).
  *
- * Always: plans, built in and marketplace templates, one organization, and the platform owner
+ * Always: built in and marketplace templates, one organization, and the platform owner
  * named by PLATFORM_OWNER_EMAIL (their first SSO sign in with that verified email links to it).
  * Demo data (simulated cloud targets, sample images with placeholder digests, demo tenants and users
  * that can only sign in through the dev login) is added outside production, or with
@@ -34,16 +33,6 @@ async function seedPlatformOwner() {
 }
 
 async function main() {
-  const plans = new Map<string, string>();
-  for (const code of PLAN_CODES) {
-    const plan = await prisma.plan.upsert({
-      where: { code },
-      update: {},
-      create: { code, name: code.charAt(0) + code.slice(1).toLowerCase(), entitlements: DEFAULT_ENTITLEMENTS[code] as object },
-    });
-    plans.set(code, plan.id);
-  }
-
   for (const { source, template } of loadBuiltinTemplates()) {
     const t = await prisma.template.upsert({
       where: { name: template.metadata.name },
@@ -103,7 +92,7 @@ async function main() {
     if (!(await prisma.organization.findFirst())) {
       await prisma.organization.create({ data: { name: process.env.ORGANIZATION_NAME?.trim() || 'Organization', slug: 'default' } });
     }
-    console.log('Seed complete: plans, templates and the organization (no demo data; SEED_DEMO_DATA=true adds it).');
+    console.log('Seed complete: templates and the organization (no demo data; SEED_DEMO_DATA=true adds it).');
     return;
   }
 
@@ -151,12 +140,19 @@ async function main() {
   const acme = await prisma.tenant.upsert({
     where: { slug: 'acme' },
     update: {},
-    create: { organizationId: org.id, name: 'Acme Corp', slug: 'acme', planId: plans.get('GROWTH')! },
+    // No limits: Acme may use anything the platform offers.
+    create: { organizationId: org.id, name: 'Acme Corp', slug: 'acme' },
   });
   await prisma.tenant.upsert({
     where: { slug: 'globex' },
     update: {},
-    create: { organizationId: org.id, name: 'Globex', slug: 'globex', planId: plans.get('STARTER')! },
+    // Limits like a small customer's (ADR 0007), to show them in the console.
+    create: {
+      organizationId: org.id,
+      name: 'Globex',
+      slug: 'globex',
+      limits: { maxInstances: 3, maxServicesPerInstance: 8, maxVcpuPerInstance: 4, maxMemoryGiBPerInstance: 8, maxReplicasPerService: 2, maxDatabaseGiBPerInstance: 50, maxDomainsPerInstance: 3, maxBackupRetentionDays: 7 },
+    },
   });
 
   const admin = await prisma.user.upsert({
@@ -286,7 +282,7 @@ async function main() {
     },
   });
 
-  console.log('Seed complete: plans, templates, catalog, simulated + local AWS targets, demo tenants and users.');
+  console.log('Seed complete: templates, catalog, simulated + local AWS targets, demo tenants and users.');
 }
 
 main()

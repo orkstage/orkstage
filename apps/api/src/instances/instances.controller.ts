@@ -12,7 +12,7 @@ import {
 } from '@orkstage/contracts';
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
-import { entitlementsFor, isInstanceBusy } from '@orkstage/domain';
+import { isInstanceBusy, readTenantLimits } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -99,15 +99,15 @@ export class InstancesController {
     @CorrelationId() correlationId: string,
   ) {
     authorize(p, 'create', 'Instance', { tenantId: body.tenantId });
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: body.tenantId }, include: { plan: true } });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: body.tenantId } });
     if (!tenant) throw notFound('Tenant');
     const version = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
     if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
 
-    const entitlements = entitlementsFor(tenant.plan.code, tenant.plan.entitlements);
-    const active = await this.prisma.instance.count({ where: { tenantId: tenant.id, status: { not: 'DESTROYED' } } });
-    if (active >= entitlements.maxInstances) {
-      throw unprocessable('QUOTA_EXCEEDED', `The ${tenant.plan.code} plan allows ${entitlements.maxInstances} instance(s).`);
+    const { maxInstances } = readTenantLimits(tenant.limits);
+    if (maxInstances !== undefined) {
+      const active = await this.prisma.instance.count({ where: { tenantId: tenant.id, status: { not: 'DESTROYED' } } });
+      if (active >= maxInstances) throw unprocessable('QUOTA_EXCEEDED', `${tenant.name} is limited to ${maxInstances} instance(s).`);
     }
 
     // Compile before saving so an undeployable configuration is rejected up front.

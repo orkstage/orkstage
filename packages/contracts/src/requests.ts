@@ -15,7 +15,6 @@ const uuid = z.uuid();
 export const SECRET_REF_PATTERN = /^(env|aws-sm):\/\/\S+$/;
 
 export const PROVIDERS = ['aws', 'azure', 'gcp', 'oci', 'digitalocean', 'vultr', 'coreweave', 'magalu', 'vercel', 'render', 'supabase', 'mock'] as const;
-export const PLAN_CODES = ['FREE', 'SANDBOX', 'STARTER', 'GROWTH', 'SCALE'] as const;
 export const ENVIRONMENTS = ['production', 'staging', 'development', 'sandbox'] as const;
 /** Environments a cloud target serves: one of the instance environments, or `any` (no guard). */
 export const TARGET_ENVIRONMENTS = [...ENVIRONMENTS, 'any'] as const;
@@ -34,16 +33,37 @@ export const listQuerySchema = z.object({
 });
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
+const count = z.number().int().min(0).max(1_000_000);
+const amount = z.number().min(0).max(1_000_000);
+
+/**
+ * Optional limits of one tenant (ADR 0007, `TenantLimits` in @orkstage/domain). A missing field is
+ * no limit. Only platform owners and admins set them; an update replaces all of them.
+ */
+export const tenantLimitsSchema = z
+  .object({
+    maxInstances: count.optional(),
+    maxServicesPerInstance: count.optional(),
+    maxVcpuPerInstance: amount.optional(),
+    maxMemoryGiBPerInstance: amount.optional(),
+    maxReplicasPerService: count.optional(),
+    maxDatabaseGiBPerInstance: amount.optional(),
+    maxDomainsPerInstance: count.optional(),
+    maxBackupRetentionDays: count.optional(),
+  })
+  .strict();
+export type TenantLimitsInput = z.infer<typeof tenantLimitsSchema>;
+
 export const createTenantSchema = z.object({
   name: z.string().min(2).max(80),
   slug,
-  planCode: z.enum(PLAN_CODES),
+  limits: tenantLimitsSchema.default({}),
   allowedEmailDomains: z.array(z.string()).default([]),
 });
 
 export const updateTenantSchema = z.object({
   name: z.string().min(2).max(80).optional(),
-  planCode: z.enum(PLAN_CODES).optional(),
+  limits: tenantLimitsSchema.optional(),
 });
 
 export const createCloudTargetSchema = z.object({
@@ -97,7 +117,8 @@ export const destroyInstanceSchema = z.object({
 export const createTemplateSchema = z.object({ source: z.string().min(1).max(200_000) });
 export const validateTemplateSchema = z.object({
   source: z.string().min(1).max(200_000).optional(),
-  planCode: z.enum(PLAN_CODES).optional(),
+  /** Also check this tenant's limits and features (ADR 0007). */
+  tenantId: uuid.optional(),
 });
 export const cloneTemplateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]{1,62}$/),

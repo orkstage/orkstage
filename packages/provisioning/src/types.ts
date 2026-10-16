@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget } from '@orkstage/cloud-core';
-import type { CloudProvider, Entitlements, PlanCode } from '@orkstage/domain';
+import type { CloudProvider, TenantFeatures, TenantLimits } from '@orkstage/domain';
 import type { ConnectivityRequirement, EnvironmentTemplate, ValidationIssue } from '@orkstage/templates';
 
 export type EnvironmentKind = 'production' | 'staging' | 'development' | 'sandbox';
@@ -13,7 +13,9 @@ export interface SlotBinding {
 
 export interface CompileInput {
   template: EnvironmentTemplate;
-  plan: { code: PlanCode; entitlements: Entitlements };
+  /** The tenant's limits and allowed features (ADR 0007); preview and template checks pass none and all. */
+  limits: TenantLimits;
+  features: TenantFeatures;
   organizationId: string;
   tenant: { id: string; slug: string };
   instance: { id: string; slug: string; environment: EnvironmentKind };
@@ -98,7 +100,6 @@ export interface CostEstimate {
 
 export interface ResolvedInfrastructure {
   template: { name: string; version: string };
-  plan: PlanCode;
   environment: EnvironmentKind;
   resources: ResolvedResource[];
   /** Execution levels; resources within a level can run in parallel. */

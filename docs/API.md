@@ -38,14 +38,13 @@ package is the source of truth, and this page is the map.
 | GET | `/me` | `MeResponse`, including the CASL rules |
 | GET | `/overview` | `OverviewDto` (platform staff) |
 | GET | `/overview/trends` | deployment and health series for the dashboard charts |
-| GET | `/plans` | `PlanDto[]` |
 | GET/POST | `/tenants` | list (scoped) or create (platform admin) |
-| GET/PATCH | `/tenants/:id` | |
+| GET/PATCH | `/tenants/:id` | `limits` (ADR 0007) only by platform owners and admins |
 | GET | `/templates` | `TemplateDto[]` with the latest published version |
 | POST | `/templates` `{source}` | new template, first version as DRAFT |
 | GET | `/templates/:id` | includes `versions` |
 | POST | `/templates/:id/versions` `{source}` | new DRAFT version (published versions are immutable) |
-| POST | `/templates/:id/validate` `{source?, planCode?}` | validation report |
+| POST | `/templates/:id/validate` `{source?, tenantId?}` | validation report (with `tenantId`, also that tenant's limits and features) |
 | POST | `/templates/:id/versions/:versionId/publish` | runs the full validation; refuses unsafe templates |
 | POST | `/templates/:id/clone` `{name, displayName}` | |
 | GET | `/applications` | `ApplicationDto[]` (image catalog) |
@@ -92,7 +91,7 @@ route requires an explicit key scope. Full contract: [`specs/integration-api.md`
 | POST | `/webhooks/:id/test` | sends a `ping` delivery |
 | GET | `/webhooks/:id/deliveries` | delivery log |
 | POST | `/webhooks/:id/deliveries/:deliveryId/redeliver` | |
-| POST | `/templates/validate` `{source, planCode?}` | stateless validation (CI) |
+| POST | `/templates/validate` `{source, tenantId?}` | stateless validation (CI) |
 | PUT | `/applications/:name` | create or update a catalog application (CI) |
 | POST | `/applications/:name/versions` | publish an immutable image digest (CI) |
 | POST | `/imports` `{report}` or `{files}` | a ScanReport v1 from `ork import`, or files scanned on the server |

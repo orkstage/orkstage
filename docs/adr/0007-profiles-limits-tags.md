@@ -29,14 +29,17 @@ allow (`spec.plans`) and name a size profile (`metadata.profile`). In practice:
 
 - `Tenant.limits` (JSON, every field optional, absent means unlimited): `maxInstances`,
   `maxServicesPerInstance`, `maxVcpuPerInstance`, `maxMemoryGiBPerInstance`,
-  `maxStorageGiBPerInstance`, `maxReplicasPerService`, `maxDatabaseSize`, `maxDomainsPerInstance`,
-  `maxBackupRetentionDays`.
-  Platform owners and admins edit them (`manage Tenant`); tenant roles only read them.
+  `maxReplicasPerService`, `maxDatabaseGiBPerInstance`, `maxDomainsPerInstance`,
+  `maxBackupRetentionDays`. Platform owners and admins edit them (the `TenantLimits` subject that
+  replaces `Plan`); tenant roles only read them.
 - Enforcement: `maxInstances` at instance creation, as today (`QUOTA_EXCEEDED`). The others in
   the compiler, in a `limits` stage that replaces the `plan` stage, with codes `LIMIT_MAX_SERVICES`,
-  `LIMIT_MAX_VCPU`, `LIMIT_MAX_MEMORY`, `LIMIT_MAX_STORAGE`, `LIMIT_MAX_REPLICAS`,
-  `LIMIT_MAX_DATABASE`, `LIMIT_MAX_DOMAINS` and `LIMIT_BACKUP_RETENTION`. Storage is now enforced. Template validation
-  without a tenant (the template pages, CI validation, the marketplace preview) skips the stage.
+  `LIMIT_MAX_VCPU`, `LIMIT_MAX_MEMORY`, `LIMIT_MAX_REPLICAS`, `LIMIT_MAX_DATABASE`,
+  `LIMIT_MAX_DOMAINS` and `LIMIT_BACKUP_RETENTION`, plus `AUTOSCALING_DISABLED` and
+  `CUSTOM_DOMAINS_DISABLED` for the switches below. The plans' `maxStorageGiB` is dropped: no
+  template resource besides databases has a size to count. Template validation without a tenant
+  (the template pages, the marketplace preview) skips the stage; `tenantId` on the validation
+  endpoints checks one tenant.
 - Switches become **feature flags** with tenant overrides, which already exist (`FeatureFlag` with
   an optional `tenantId`): `MULTI_CLOUD`, `MULTI_REGION`, `AUTOSCALING`, `CUSTOM_DOMAINS`, all on
   by default. The `multi-cloud-entitlement` policy becomes `multi-cloud-allowed` and reads the two

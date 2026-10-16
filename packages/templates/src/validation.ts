@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Entitlements, PlanCode } from '@orkstage/domain/core';
+import type { TenantFeatures, TenantLimits } from '@orkstage/domain/core';
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';
 import { activeResources, buildDependencyGraph, DependencyCycleError, topologicalLevels } from './graph.js';
 import { environmentTemplate, type EnvironmentTemplate } from './schema.js';
 
-export type ValidationStage = 'schema' | 'semantic' | 'plan' | 'capability' | 'policy' | 'quota';
+export type ValidationStage = 'schema' | 'semantic' | 'limits' | 'capability' | 'policy' | 'quota';
 
 export interface ValidationIssue {
   stage: ValidationStage;
@@ -169,43 +169,45 @@ export function resourceTotals(template: EnvironmentTemplate): ResourceTotals {
     } else if (r.type === 'database.postgresql') {
       totals.databaseGiB += r.storageGiB;
     } else if (r.type === 'dns') {
-      // The platform subdomain is always included; only custom domains count against the plan.
+      // The platform subdomain is always included; only custom domains count against the limit.
       if (r.customDomain !== 'disabled') totals.domains += 1;
     }
   }
   return totals;
 }
 
-/** Stage 3 — plan compatibility against a plan's entitlements. */
-export function validatePlanCompatibility(
-  template: EnvironmentTemplate,
-  plan: PlanCode,
-  entitlements: Entitlements,
-): ValidationIssue[] {
+/** What one tenant may use: its limits and the features its feature flags allow (ADR 0007). */
+export interface TenantAllowance {
+  limits: TenantLimits;
+  features: TenantFeatures;
+}
+
+/** Stage 3: the tenant's limits and features. Without a tenant (template pages, CI) it is skipped. */
+export function validateLimits(template: EnvironmentTemplate, { limits, features }: TenantAllowance): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const err = (code: string, message: string, path?: string, suggestions?: string[]) =>
-    issues.push({ stage: 'plan', severity: 'error', code, message, path, suggestions });
+  const err = (code: string, message: string, path?: string) => issues.push({ stage: 'limits', severity: 'error', code, message, path });
 
   const t = resourceTotals(template);
-  const limit = (code: string, label: string, value: number, max: number) => {
-    if (value > max) err(code, `${label} ${round(value)} exceeds the ${plan} limit of ${max}.`);
+  const limit = (code: string, label: string, value: number, max: number | undefined) => {
+    if (max !== undefined && value > max) err(code, `${label} ${round(value)} exceeds the tenant limit of ${max}.`);
   };
-  limit('PLAN_MAX_SERVICES', 'Service count', t.services, entitlements.maxServices);
-  limit('PLAN_MAX_CPU', 'Total vCPU', t.cpu, entitlements.maxCpu);
-  limit('PLAN_MAX_MEMORY', 'Total memory (MiB)', t.memoryMiB, entitlements.maxMemoryMiB);
-  limit('PLAN_MAX_REPLICAS', 'Replica count', t.maxReplicas, entitlements.maxReplicas);
-  limit('PLAN_MAX_DATABASE', 'Database storage (GiB)', t.databaseGiB, entitlements.maxDatabaseGiB);
-  limit('PLAN_MAX_DOMAINS', 'Custom domain count', t.domains, entitlements.maxDomains);
+  limit('LIMIT_MAX_SERVICES', 'Service count', t.services, limits.maxServicesPerInstance);
+  limit('LIMIT_MAX_VCPU', 'Total vCPU', t.cpu, limits.maxVcpuPerInstance);
+  limit('LIMIT_MAX_MEMORY', 'Total memory (GiB)', t.memoryMiB / 1024, limits.maxMemoryGiBPerInstance);
+  limit('LIMIT_MAX_REPLICAS', 'Replica count', t.maxReplicas, limits.maxReplicasPerService);
+  limit('LIMIT_MAX_DATABASE', 'Database storage (GiB)', t.databaseGiB, limits.maxDatabaseGiBPerInstance);
+  limit('LIMIT_MAX_DOMAINS', 'Custom domain count', t.domains, limits.maxDomainsPerInstance);
 
   for (const r of activeResources(template)) {
-    if (r.type === 'compute.container-service' && r.autoscaling && !entitlements.autoscaling) {
-      err('PLAN_NO_AUTOSCALING', `Autoscaling on "${r.id}" is not included in the ${plan} plan.`, `spec.resources.${r.id}.autoscaling`);
+    if (r.type === 'compute.container-service' && r.autoscaling && !features.autoscaling) {
+      err('AUTOSCALING_DISABLED', `Autoscaling on "${r.id}" is turned off for this tenant (feature flag AUTOSCALING).`, `spec.resources.${r.id}.autoscaling`);
     }
-    if (r.type === 'dns' && r.customDomain !== 'disabled' && !entitlements.customDomains) {
-      err('PLAN_NO_CUSTOM_DOMAINS', `Custom domains are not included in the ${plan} plan.`, `spec.resources.${r.id}.customDomain`);
+    if (r.type === 'dns' && r.customDomain !== 'disabled' && !features.customDomains) {
+      err('CUSTOM_DOMAINS_DISABLED', `Custom domains are turned off for this tenant (feature flag CUSTOM_DOMAINS).`, `spec.resources.${r.id}.customDomain`);
     }
-    if (r.type === 'database.postgresql' && r.backup.retentionDays > entitlements.backupRetentionDays && r.backup.enabled) {
-      err('PLAN_BACKUP_RETENTION', `Backup retention of ${r.backup.retentionDays} days on "${r.id}" exceeds the ${plan} limit of ${entitlements.backupRetentionDays}.`, `spec.resources.${r.id}.backup`);
+    const maxRetention = limits.maxBackupRetentionDays;
+    if (r.type === 'database.postgresql' && r.backup.enabled && maxRetention !== undefined && r.backup.retentionDays > maxRetention) {
+      err('LIMIT_BACKUP_RETENTION', `Backup retention of ${r.backup.retentionDays} days on "${r.id}" exceeds the tenant limit of ${maxRetention}.`, `spec.resources.${r.id}.backup`);
     }
   }
   return issues;
@@ -215,14 +217,11 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Runs schema → semantic → plan stages. Capability/policy stages live in @orkstage/provisioning. */
-export function validateTemplate(
-  input: string | unknown,
-  plan?: { code: PlanCode; entitlements: Entitlements },
-): ValidationReport & { template?: EnvironmentTemplate } {
+/** Runs schema → semantic → limits stages. Capability/policy stages live in @orkstage/provisioning. */
+export function validateTemplate(input: string | unknown, tenant?: TenantAllowance): ValidationReport & { template?: EnvironmentTemplate } {
   const parsed = parseTemplate(input);
   if (!parsed.ok) return report(parsed.issues);
   const issues = validateSemantics(parsed.template);
-  if (!hasErrors(issues) && plan) issues.push(...validatePlanCompatibility(parsed.template, plan.code, plan.entitlements));
+  if (!hasErrors(issues) && tenant) issues.push(...validateLimits(parsed.template, tenant));
   return { ...report(issues), template: parsed.template };
 }

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 describe('contract enums match the domain', () => {
   it.each([
     ['providers', contracts.PROVIDERS, domain.CLOUD_PROVIDERS],
-    ['plans', contracts.PLAN_CODES, domain.PLAN_CODES],
+    ['tenant limits', Object.keys(contracts.tenantLimitsSchema.shape), domain.TENANT_LIMIT_KEYS],
     ['health', contracts.HEALTH_STATES, domain.HEALTH_STATES],
     ['status', contracts.STATUS_STATES, domain.STATUS_STATES],
   ])('%s', (_name, a, b) => {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs, ResourceResult } from '@orkstage/cloud-core';
 import type { Deployment, InstanceStatus, StepStatus } from '@orkstage/database';
-import { assertInstanceTransition, entitlementsFor, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass } from '@orkstage/domain';
+import { assertInstanceTransition, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass } from '@orkstage/domain';
 import {
   describeProviderPlan,
   diffPlan,
@@ -130,12 +130,7 @@ export class DeploymentRunner {
         regions.get(r.targetId)!.add(r.region);
       }
       // Feature flags can change between plan and run: check again here (apply only, never destroy).
-      const plan = (await prisma.tenant.findUniqueOrThrow({ where: { id: d.tenantId }, select: { plan: { select: { code: true, entitlements: true } } } })).plan;
-      const flags = resolveFeatureFlags(
-        await prisma.featureFlag.findMany({ where: { OR: [{ tenantId: null }, { tenantId: d.tenantId }] } }),
-        d.tenantId,
-        entitlementsFor(plan.code, plan.entitlements).featureFlags,
-      );
+      const flags = resolveFeatureFlags(await prisma.featureFlag.findMany({ where: { OR: [{ tenantId: null }, { tenantId: d.tenantId }] } }), d.tenantId);
       for (const [targetId, rs] of regions) {
         const row = await prisma.cloudTarget.findUniqueOrThrow({ where: { id: targetId } });
         if (row.status !== 'ACTIVE') throw new PhaseFailure('VALIDATION_ERROR', `Cloud target ${row.name} is disabled.`);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-﻿import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';
+﻿import type { TenantFeatures, TenantLimits } from '@orkstage/domain';
 import { describe, expect, it } from 'vitest';
 import {
   applyVariables,
@@ -20,6 +20,28 @@ const byName = (name: string): EnvironmentTemplate => {
   return found.template;
 };
 
+
+const ALL_ON: TenantFeatures = { multiCloud: true, multiRegion: true, autoscaling: true, customDomains: true };
+/** What the size tags of the built in templates stand for: the limits the old plans of that name had. */
+const SIZES: Record<'sandbox' | 'starter' | 'growth' | 'scale', { limits: TenantLimits; features: TenantFeatures }> = {
+  sandbox: {
+    limits: { maxServicesPerInstance: 4, maxVcpuPerInstance: 1, maxMemoryGiBPerInstance: 2, maxDatabaseGiBPerInstance: 10, maxReplicasPerService: 1, maxDomainsPerInstance: 1, maxBackupRetentionDays: 1 },
+    features: { multiCloud: false, multiRegion: false, autoscaling: false, customDomains: false },
+  },
+  starter: {
+    limits: { maxServicesPerInstance: 8, maxVcpuPerInstance: 4, maxMemoryGiBPerInstance: 8, maxDatabaseGiBPerInstance: 50, maxReplicasPerService: 2, maxDomainsPerInstance: 3, maxBackupRetentionDays: 7 },
+    features: { multiCloud: false, multiRegion: false, autoscaling: false, customDomains: true },
+  },
+  growth: {
+    limits: { maxServicesPerInstance: 20, maxVcpuPerInstance: 16, maxMemoryGiBPerInstance: 32, maxDatabaseGiBPerInstance: 250, maxReplicasPerService: 6, maxDomainsPerInstance: 10, maxBackupRetentionDays: 14 },
+    features: { multiCloud: true, multiRegion: false, autoscaling: true, customDomains: true },
+  },
+  scale: {
+    limits: { maxServicesPerInstance: 100, maxVcpuPerInstance: 256, maxMemoryGiBPerInstance: 512, maxDatabaseGiBPerInstance: 4000, maxReplicasPerService: 50, maxDomainsPerInstance: 100, maxBackupRetentionDays: 35 },
+    features: ALL_ON,
+  },
+};
+
 describe('built-in templates', () => {
   it('ships the required defaults', () => {
     expect(builtins.map((b) => b.template.metadata.name)).toEqual([
@@ -33,17 +55,14 @@ describe('built-in templates', () => {
     ]);
   });
 
-  // The size tag of a built in template names the smallest plan it fits.
-  const SIZE_TAGS = { sandbox: 'SANDBOX', starter: 'STARTER', growth: 'GROWTH', scale: 'SCALE' } as const;
   it.each(builtins.map((b) => [b.template.metadata.name, b] as const))(
-    '%s is valid with no warnings, and fits the plan its size tag names',
+    '%s is valid with no warnings, and fits the limits its size tag stands for',
     (_name, { source, template }) => {
       expect(validateTemplate(source).issues).toEqual([]);
-      const size = template.metadata.tags.find((t): t is keyof typeof SIZE_TAGS => t in SIZE_TAGS);
+      const size = template.metadata.tags.find((t): t is keyof typeof SIZES => t in SIZES);
       expect(size, 'a size tag').toBeDefined();
-      const plan = SIZE_TAGS[size!];
-      const result = validateTemplate(source, { code: plan, entitlements: DEFAULT_ENTITLEMENTS[plan] });
-      expect(result.issues, `${plan}: ${JSON.stringify(result.issues)}`).toEqual([]);
+      const result = validateTemplate(source, SIZES[size!]);
+      expect(result.issues, `${size}: ${JSON.stringify(result.issues)}`).toEqual([]);
     },
   );
 });
@@ -84,13 +103,13 @@ describe('semantic validation', () => {
   });
 });
 
-describe('plan compatibility', () => {
+describe('tenant limits and deprecated fields', () => {
 
   it('accepts and ignores spec.plans and metadata.profile, with deprecation warnings (ADR 0007)', () => {
     const t = { ...structuredClone(byName('growth-standard')) };
     t.spec.plans = ['FREE'];
     t.metadata.profile = 'growth';
-    const result = validateTemplate(t, { code: 'GROWTH', entitlements: DEFAULT_ENTITLEMENTS.GROWTH });
+    const result = validateTemplate(t, SIZES.growth);
     expect(result.valid).toBe(true);
     expect(result.issues.map((i) => [i.code, i.severity])).toEqual([
       ['PLANS_DEPRECATED', 'warning'],
@@ -104,10 +123,11 @@ describe('plan compatibility', () => {
     expect(validateTemplate(t).issues.map((i) => i.code)).toContain('SCHEMA_INVALID');
   });
 
-  it('enforces the resource limits of the plan it is checked against', () => {
+  it('enforces the limits and features of the tenant it is checked for', () => {
     const t = structuredClone(byName('growth-standard'));
-    const codes = validateTemplate(t, { code: 'STARTER', entitlements: DEFAULT_ENTITLEMENTS.STARTER }).issues.map((i) => i.code);
-    expect(codes).toEqual(expect.arrayContaining(['PLAN_MAX_CPU', 'PLAN_NO_AUTOSCALING', 'PLAN_BACKUP_RETENTION']));
+    const codes = validateTemplate(t, SIZES.starter).issues.map((i) => i.code);
+    expect(codes).toEqual(expect.arrayContaining(['LIMIT_MAX_VCPU', 'AUTOSCALING_DISABLED', 'LIMIT_BACKUP_RETENTION']));
+    expect(validateTemplate(t, { limits: {}, features: ALL_ON }).issues).toEqual([]);
   });
 });
 

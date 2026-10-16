@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
 import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@orkstage/cloud-mock';
-import { DEFAULT_ENTITLEMENTS } from '@orkstage/domain';
+import { ALL_FEATURES, type TenantFeatures } from '@orkstage/domain';
 import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import type { EnvironmentTemplate } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
@@ -38,10 +38,11 @@ const aws = mockTarget('aws-a', 'aws', 'us-east-1');
 const azure = mockTarget('azure-b', 'azure', 'eastus');
 const oci = mockTarget('oci-c', 'oci', 'us-ashburn-1');
 
-function input(template: EnvironmentTemplate, bindings: CompileInput['bindings'], plan: 'GROWTH' | 'STARTER' = 'GROWTH'): CompileInput {
+function input(template: EnvironmentTemplate, bindings: CompileInput['bindings'], features: TenantFeatures = ALL_FEATURES): CompileInput {
   return {
     template,
-    plan: { code: plan, entitlements: DEFAULT_ENTITLEMENTS[plan] },
+    limits: {},
+    features,
     organizationId: 'org-1',
     tenant: { id: 'tenant-1', slug: 'acme' },
     instance: { id: 'inst-1', slug: 'prod', environment: 'production' },
@@ -195,20 +196,19 @@ describe('compiler — failing before cloud mutation', () => {
     expect(resolved.issues.map((i) => i.code)).toContain('POLICY_CROSS_CLOUD_CONNECTIVITY');
   });
 
-  it('rejects multi-cloud placement on plans without it', () => {
+  it('rejects multi-cloud placement when MULTI_CLOUD is off for the tenant', () => {
     const t = structuredClone(templates['multicloud-reference']!);
-    t.spec.plans = ['STARTER'];
     const db = t.spec.resources.find((r) => r.id === 'database')!;
     if (db.type === 'database.postgresql') db.highAvailability = 'none';
-    const resolved = compileInfrastructure(input(t, multiCloudBindings, 'STARTER'), registry());
-    expect(resolved.issues.map((i) => i.code)).toContain('POLICY_MULTI_CLOUD_ENTITLEMENT');
+    const resolved = compileInfrastructure(input(t, multiCloudBindings, { ...ALL_FEATURES, multiCloud: false }), registry());
+    expect(resolved.issues.map((i) => i.code)).toContain('POLICY_MULTI_CLOUD_ALLOWED');
   });
 
   it('rejects public databases and non-production templates in production', () => {
     const t = structuredClone(templates['free-validation']!);
     const db = t.spec.resources.find((r) => r.id === 'database')!;
     if (db.type === 'database.postgresql') db.publicAccess = true;
-    const resolved = compileInfrastructure({ ...input(t, { primary: multiCloudBindings.primary }), plan: { code: 'FREE', entitlements: DEFAULT_ENTITLEMENTS.FREE } }, registry());
+    const resolved = compileInfrastructure(input(t, { primary: multiCloudBindings.primary }), registry());
     const codes = resolved.issues.map((i) => i.code);
     expect(codes).toEqual(expect.arrayContaining(['POLICY_NO_PUBLIC_DATABASE', 'POLICY_NON_PRODUCTION_TEMPLATE']));
   });
@@ -419,15 +419,10 @@ describe('compiler: provider feature flags', () => {
 });
 
 describe('compiler: marketplace templates', () => {
-  // The size tag of a marketplace template names the smallest plan it fits.
-  const SIZE_TAGS = { sandbox: 'SANDBOX', starter: 'STARTER', growth: 'GROWTH', scale: 'SCALE' } as const;
-  it.each(loadMarketplaceTemplates().map((s) => [s.slug, s.template] as const))('%s compiles in preview, also on the plan its size tag names', (_slug, template) => {
-    const size = template.metadata.tags.find((t): t is keyof typeof SIZE_TAGS => t in SIZE_TAGS);
-    for (const plan of [undefined, SIZE_TAGS[size!]]) {
-      const preview = previewTemplate(template, registry(), plan);
-      expect(preview.resolved.issues.filter((i) => i.severity === 'error'), plan).toEqual([]);
-      expect(preview.cost.total).toBeGreaterThan(0);
-    }
+  it.each(loadMarketplaceTemplates().map((s) => [s.slug, s.template] as const))('%s compiles in preview', (_slug, template) => {
+    const preview = previewTemplate(template, registry());
+    expect(preview.resolved.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(preview.cost.total).toBeGreaterThan(0);
   });
 
   it('previews on the first allowed provider of each slot', () => {
