@@ -33,7 +33,9 @@ jobs:
           path-to-signatures: signatures/version1/cla.json
           path-to-document: https://github.com/orkstage/.github/blob/main/CLA.md
           branch: cla-signatures
-          allowlist: paulowdev,dependabot[bot],github-actions[bot]
+          # The maintainer, the bots, and the AI assistant credited as co-author on the maintainer's
+          # commits (Co-Authored-By trailers count as committers). Anyone else signs.
+          allowlist: paulowdev,claude,dependabot[bot],github-actions[bot]
           custom-notsigned-prcomment: >-
             Thank you for your contribution. Before it can be merged, please read the
             [OrkStage Contributor License Agreement](https://github.com/orkstage/.github/blob/main/CLA.md)
