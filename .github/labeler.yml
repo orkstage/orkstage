@@ -1,0 +1,13 @@
+# Labels added from the changed paths (actions/labeler, run by the community workflow).
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**']
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**']
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['**/package.json', 'pnpm-lock.yaml']
+provider:
+  - changed-files:
+      - any-glob-to-any-file: ['packages/cloud-*/**']
