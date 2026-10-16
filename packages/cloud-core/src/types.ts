@@ -16,6 +16,8 @@ export interface CloudTarget {
   credentialRef?: string;
   allowedRegions: string[];
   defaultRegion: string;
+  /** The instance environment this target serves (`production`, `staging`, ...), or `any`. */
+  environment?: string;
 }
 
 export interface ProviderContext {

@@ -17,6 +17,8 @@ export const SECRET_REF_PATTERN = /^(env|aws-sm):\/\/\S+$/;
 export const PROVIDERS = ['aws', 'azure', 'gcp', 'oci', 'digitalocean', 'vultr', 'coreweave', 'magalu', 'vercel', 'render', 'supabase', 'mock'] as const;
 export const PLAN_CODES = ['FREE', 'SANDBOX', 'STARTER', 'GROWTH', 'SCALE'] as const;
 export const ENVIRONMENTS = ['production', 'staging', 'development', 'sandbox'] as const;
+/** Environments a cloud target serves: one of the instance environments, or `any` (no guard). */
+export const TARGET_ENVIRONMENTS = [...ENVIRONMENTS, 'any'] as const;
 export const HEALTH_STATES = ['HEALTHY', 'DEGRADED', 'UNHEALTHY', 'UNKNOWN', 'MAINTENANCE'] as const;
 export const STATUS_STATES = ['OPERATIONAL', 'DEGRADED', 'PARTIAL_OUTAGE', 'MAJOR_OUTAGE', 'MAINTENANCE', 'UNKNOWN'] as const;
 export const INCIDENT_STATUSES = ['INVESTIGATING', 'IDENTIFIED', 'MONITORING', 'RESOLVED'] as const;
@@ -47,7 +49,8 @@ export const updateTenantSchema = z.object({
 export const createCloudTargetSchema = z.object({
   provider: z.enum(PROVIDERS),
   name: z.string().min(2).max(80),
-  environment: z.string().default('production'),
+  /** Instances of another environment cannot deploy here (policy `target-environment`); `any` allows all. */
+  environment: z.enum(TARGET_ENVIRONMENTS).default('any'),
   /** Non-secret configuration only. The API rejects keys that look like secrets. */
   config: z.record(z.string(), z.unknown()),
   credentialRef: z.string().max(300).regex(SECRET_REF_PATTERN, 'Use a secret reference (env://NAME or aws-sm://name-or-arn), never the secret value.').optional(),

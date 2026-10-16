@@ -97,6 +97,30 @@ describe('compiler: web app on managed platforms', () => {
   });
 });
 
+describe('policy: target environment', () => {
+  const template = (): EnvironmentTemplate => {
+    const t = structuredClone(templates['web-platforms']!);
+    return t;
+  };
+  const bindingsFor = (environment?: string) => ({
+    web: { target: { ...mockTarget('vercel-v', 'vercel', 'gru1'), environment }, region: 'gru1' },
+    data: { target: { ...mockTarget('supa-s', 'supabase', 'sa-east-1'), environment }, region: 'sa-east-1' },
+    files: { target: { ...mockTarget('aws-f', 'aws', 'us-east-1'), environment }, region: 'us-east-1' },
+  });
+  const result = (environment?: string) =>
+    compileInfrastructure(input(template(), bindingsFor(environment)), registry()).policyResults.filter((p) => p.policy === 'target-environment');
+
+  it('passes for targets of the same environment, or marked any, or without an environment', () => {
+    for (const env of ['production', 'any', undefined]) expect(result(env)).toEqual([expect.objectContaining({ status: 'pass' })]);
+  });
+
+  it('fails a production instance on a development target, naming the target', () => {
+    const fails = result('development');
+    expect(fails.length).toBe(3);
+    expect(fails[0]).toMatchObject({ status: 'fail', message: expect.stringContaining('is for development, but this instance is production') });
+  });
+});
+
 describe('compiler — spec §42.17 multi-cloud reference', () => {
   const resolved = compileInfrastructure(input(templates['multicloud-reference']!, multiCloudBindings), registry());
 
