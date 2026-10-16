@@ -1,8 +1,14 @@
 name: CI
 
 on:
-  # Merges to main are not built again: the pull request was.
+  # Pull requests are built; merges to main are not built again. Pull requests that only change
+  # Markdown or docs/ skip CI. A weekly run on main scans for secrets and refreshes the caches that
+  # pull requests restore (a pull request can only reuse caches saved on main).
   pull_request:
+    paths-ignore: ['**/*.md', 'docs/**']
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
 
 # A new push to a pull request cancels its previous run.
 concurrency:
@@ -13,22 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  # Secret scan of the whole history with gitleaks. Reviewed false positives go in .gitleaksignore.
-  secrets:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: gitleaks
-        run: >-
-          docker run --rm -v "$PWD:/repo" -w /repo
-          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
-          ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --no-banner --verbose
-      # Every source file has an SPDX license header; core code does not import ee/ (scripts/spdx.sh).
-      - name: License headers and the ee/ boundary
-        run: bash scripts/spdx.sh
-
   build-test:
     runs-on: ubuntu-latest
     # Images come from mirror.gcr.io (Google's Docker Hub cache): anonymous pulls from Docker Hub
@@ -52,6 +42,16 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
+          ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --no-banner --verbose
+      # Every source file has an SPDX license header; core code does not import ee/ (scripts/spdx.sh).
+      - name: License headers and the ee/ boundary
+        run: bash scripts/spdx.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
