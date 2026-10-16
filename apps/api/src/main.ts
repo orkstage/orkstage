@@ -9,6 +9,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
+import { loadEnterpriseModule } from './enterprise.js';
 
 const CORRELATION_ID = /^[A-Za-z0-9._:-]{8,128}$/;
 
@@ -23,7 +24,7 @@ async function bootstrap() {
     trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
     bodyLimit: 1024 * 1024,
   });
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, { bufferLogs: true });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule.register(await loadEnterpriseModule()), adapter, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');

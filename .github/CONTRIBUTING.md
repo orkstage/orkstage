@@ -42,7 +42,7 @@ test against the emulator: `MINISTACK_E2E=1 pnpm --filter @orkstage/cloud-aws te
 | A new cloud provider | a new `packages/cloud-<provider>` implementing the adapter contract in `packages/cloud-core` |
 | Request and response shapes | `packages/contracts` (shared with the console and the CLI) |
 | Database schema | `packages/database/prisma/schema.prisma`, then `pnpm db:migrate` |
-| Enterprise features | `ee/` directories only; core code never imports from `ee/` |
+| Enterprise features | the private `orkstage-ee` submodule at `apps/api/src/ee` (maintainers); core code never imports from it, and every change here must work without it |
 
 Significant design changes start with an ADR in [`docs/adr`](../docs/adr).
 

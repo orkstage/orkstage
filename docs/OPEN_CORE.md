@@ -1,8 +1,10 @@
 # OrkStage open core: Community and Enterprise
 
-**Model:** an AGPL-3.0 core plus commercial Enterprise features in `ee/` directories, the model
-used by Formbricks, Cal.com and other projects. Decided on October 5, 2026. This document is the plan;
-the legal texts are adopted as version 1.0: the [Enterprise License](../apps/api/src/ee/LICENSE),
+**Model:** an AGPL-3.0 core plus commercial Enterprise features in a private repository
+(`orkstage-ee`) mounted as a git submodule at `apps/api/src/ee`. Open core was decided on October 5,
+2026; on October 16, 2026 the Enterprise source moved from public `ee/` directories to that private
+repository. This document is the plan; the legal texts are adopted as version 1.0: the
+[Enterprise License](../LICENSE-ENTERPRISE),
 the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [trademark policy](https://github.com/orkstage/.github/blob/main/TRADEMARKS.md).
 
 ## 1. Principles
@@ -12,18 +14,22 @@ the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [tradema
    deployments, health, incidents, status pages, notifications, audit log, API keys, webhooks,
    the CLI and IaC import. Enterprise adds *organizational scale and compliance*, not basic
    usefulness.
-2. **One codebase, one build.** Enterprise code ships in the same images under `ee/` and is
-   activated by a signed license key. No separate fork, no feature drift.
-3. **Clear boundary.** Everything outside `ee/` is AGPL-3.0. Code inside `ee/` is under the
-   OrkStage Enterprise License (the source is available; commercial use requires a
-   subscription). Core code never imports from `ee/`; `ee/` plugs into the core through
-   extension points.
+2. **One codebase, one build.** The official images are built from this repository with the
+   `orkstage-ee` submodule and activate Enterprise features with a signed license key. No separate
+   fork, no feature drift. A clone without access to the submodule builds the Community edition:
+   `apps/api/src/enterprise.ts` loads the Enterprise module only when `src/ee/ee.module.js`
+   exists.
+3. **Clear boundary.** Everything in the public repositories is AGPL-3.0 (the modules are
+   Apache-2.0). The Enterprise source is under the OrkStage Enterprise License
+   ([LICENSE-ENTERPRISE](../LICENSE-ENTERPRISE)); it is private, and customers and evaluators get
+   read access on request (hello@orkstage.io). Core code never imports from `ee/`; the Enterprise
+   module plugs into the core through extension points.
 4. **No dark patterns.** Community never needs to contact our servers; license checks are
    offline (signature verification). Usage telemetry, if it is ever added, will be opt in.
 
 ## 2. Feature split
 
-| Area | Community (AGPL) | Enterprise (`ee/`) |
+| Area | Community (AGPL) | Enterprise (`orkstage-ee`) |
 |---|---|---|
 | Provisioning | Templates, visual builder, AWS through OpenTofu, mock provider, DAG, retries, drift detection | Policy packs (rule sets in the style of CIS and SOC 2), custom policy authoring, cost budgets per team |
 | Multicloud | Placement per resource, cross cloud strategy | The other provider adapters (now in preview): **to be decided**. The recommendation is Community, to drive adoption |
@@ -34,8 +40,8 @@ the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [tradema
 | Observability | Health, incidents, status pages, logs and metrics through adapters | Long term metrics retention, SLO management, advanced incident analytics |
 | Support | Community support in GitHub Discussions | Support backed by an SLA, security advisories before public disclosure |
 
-The first Enterprise module is **audit export** (`ee/`). It proves the boundary, the license
-gating and the packaging end to end.
+The first Enterprise module is **audit export** (`orkstage-ee`). It proves the boundary, the
+license gating and the packaging end to end.
 
 ## 3. Licensing mechanics
 
@@ -54,20 +60,22 @@ gating and the packaging end to end.
 ## 4. Repository layout (polyrepo)
 
 ```text
-orkstage            AGPL core (api, worker, packages) + ee/            public
-orkstage-console    AGPL console + ee/ (console screens for EE)        public
+orkstage            AGPL core (api, worker, packages)                  public
+orkstage-ee         Enterprise source, submodule at apps/api/src/ee    private
+orkstage-console    AGPL console                                       public
 orkstage-cli        AGPL (ork CLI + scan engine)                       public
 orkstage-modules    Apache-2.0 (reusable OpenTofu modules)             public
 orkstage-site       site + docs (code MIT, content CC BY 4.0)          public
-orkstage-dev        meta repository: submodules + compose (MIT)        public
+orkstage-dev        meta repository: submodules + compose (MIT)        private for now
 orkstage-licensing  license signing service and keys                  private
 ```
 
 The OpenTofu modules use Apache-2.0 so that users can copy them into their own infrastructure
 code without friction. The AGPL protection matters for the control plane, not for the modules.
 
-All repositories start private and become public at launch, except `orkstage-licensing`, which
-stays private.
+`orkstage-ee` and `orkstage-licensing` stay private. Console screens for Enterprise features
+live in the console and are shown only when the license includes the feature; if they ever need
+private code, they get their own private submodule the same way.
 
 ## 5. Contributions
 
@@ -75,7 +83,7 @@ stays private.
   AGPL and a commercial license, it needs the right to relicense contributions, and a DCO alone
   does not grant that. The [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) follows the Apache ICLA model, with an organization
   section, and CLA Assistant Lite (`.github/workflows/cla.yml` in every repository) records it.
-- Contributions to `ee/` are accepted under the same CLA.
+- Contributions to `orkstage-ee` are accepted under the same CLA.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) and `SECURITY.md` (private
   disclosure to security@orkstage.io) live in the organization's `.github` repository; each
   repository adds only what differs.
@@ -96,10 +104,11 @@ policy: [TRADEMARKS.md](https://github.com/orkstage/.github/blob/main/TRADEMARKS
 ## 8. Implementation checklist
 
 - [x] Root `LICENSE` (AGPL-3.0, official text)
-- [x] `ee/LICENSE` (OrkStage Enterprise License 1.0)
+- [x] `LICENSE-ENTERPRISE` (OrkStage Enterprise License 1.0)
 - [x] `packages/licensing`: offline Ed25519 license verification, feature checks, tests
 - [x] `GET /api/v1/license` and `402 ENTERPRISE_REQUIRED`
-- [x] First EE module: audit export (`ee/api`)
+- [x] First EE module: audit export (`orkstage-ee`)
+- [x] Enterprise source in the private `orkstage-ee` submodule, loaded only when present
 - [ ] License headers and SPDX identifiers in source files (`SPDX-License-Identifier: AGPL-3.0-only`)
 - [x] CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and SUPPORT in the organization [`.github`](https://github.com/orkstage/.github) repository
 - [x] CLA bot, CLA text and trademark policy (version 1.0)

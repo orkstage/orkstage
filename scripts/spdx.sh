@@ -3,13 +3,14 @@
 # License headers and the open core boundary (orkstage-dev docs/open-source-launch.md, L8):
 # - every source file starts with an SPDX identifier: AGPL-3.0-only, or LicenseRef-OrkStage-Enterprise
 #   inside an ee/ directory;
-# - code outside ee/ never imports from ee/, except the composition root that registers it.
+# - code outside ee/ never imports from ee/. The Enterprise source is the private orkstage-ee
+#   submodule at apps/api/src/ee; apps/api/src/enterprise.ts loads its entry point by path.
 # `bash scripts/spdx.sh --fix` adds missing headers (after a shebang line when there is one).
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# Files allowed to import from ee/ (space separated).
-EE_IMPORTERS="apps/api/src/app.module.ts"
+# Files allowed to import from ee/ (space separated): none.
+EE_IMPORTERS=""
 
 fix=false
 [ "${1:-}" = "--fix" ] && fix=true
