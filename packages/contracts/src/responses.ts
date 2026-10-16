@@ -81,6 +81,8 @@ export interface CloudTargetDto {
   simulates: string | null;
   name: string;
   environment: string;
+  /** The default target of its tenant scope, provider and environment. */
+  isDefault: boolean;
   config: Record<string, unknown>;
   hasCredentialRef: boolean;
   allowedRegions: string[];

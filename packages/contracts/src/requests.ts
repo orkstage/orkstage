@@ -58,7 +58,12 @@ export const createCloudTargetSchema = z.object({
   defaultRegion: z.string().min(2),
   tenantId: uuid.optional(),
   maxConcurrentDeployments: z.number().int().min(1).max(20).default(3),
+  /** The default target of its tenant scope, provider and environment (see setDefaultTargetSchema). */
+  isDefault: z.boolean().default(false),
 });
+
+/** Instances whose slot is left unbound get the default target of their environment. */
+export const setDefaultTargetSchema = z.object({ isDefault: z.boolean() });
 
 export const validateTargetSchema = z.object({ region: z.string().optional() });
 
@@ -71,7 +76,8 @@ export const createInstanceSchema = z.object({
   environment: z.enum(ENVIRONMENTS).default('production'),
   templateVersionId: uuid,
   variables: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
-  bindings: z.record(z.string(), bindingSchema),
+  /** Slots left out are bound to the default target of the instance's environment, if there is one. */
+  bindings: z.record(z.string(), bindingSchema).default({}),
 });
 
 export const updateInstanceSchema = z.object({

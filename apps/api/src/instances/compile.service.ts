@@ -18,6 +18,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { unprocessable } from '../common/errors.js';
 import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
+import { pickDefaultBindings } from './default-targets.js';
 
 export interface CompileRequest {
   tenantId: string;
@@ -89,6 +90,20 @@ export class CompileService {
       },
       this.adapters.registry,
     );
+  }
+
+  /**
+   * The request's bindings plus the default target for every slot it left unbound. Called when an
+   * instance is created, and the result is stored with it: a later change of default never moves
+   * an existing instance to another account.
+   */
+  async withDefaultBindings(req: { tenantId: string; environment: string; templateVersionId: string; bindings: Record<string, { targetId: string; region: string }> }) {
+    const version = await this.prisma.templateVersion.findUniqueOrThrow({ where: { id: req.templateVersionId } });
+    const template = environmentTemplate.parse(version.document);
+    const unbound = template.spec.placements.filter((s) => !req.bindings[s.name]);
+    if (unbound.length === 0) return req.bindings;
+    const candidates = await this.prisma.cloudTarget.findMany({ where: { isDefault: true, status: 'ACTIVE', OR: [{ tenantId: null }, { tenantId: req.tenantId }] } });
+    return { ...req.bindings, ...pickDefaultBindings(unbound, req.bindings, req.environment, req.tenantId, candidates) };
   }
 
   async knownResources(instanceId: string): Promise<KnownResource[]> {
