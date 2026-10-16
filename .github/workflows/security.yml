@@ -1,14 +1,13 @@
 name: Security
 
 on:
-  # While the repositories are private, Actions minutes are paid: scan only when what is scanned
-  # changes, or on demand. At launch (free minutes for public repositories) remove the paths
-  # filter and add back a push trigger and a weekly schedule (cron '17 6 * * 1').
+  # Public repository: free minutes, so scan on every change and weekly (new advisories against
+  # dependencies that did not change); CodeQL (and the Scorecard in orkstage) run too.
+  push:
+    branches: [main]
   pull_request:
-    paths:
-      - pnpm-lock.yaml
-      - '**/package.json'
-      - .github/workflows/security.yml
+  schedule:
+    - cron: '17 6 * * 1'
   workflow_dispatch:
 
 permissions:

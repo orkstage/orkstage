@@ -1,11 +1,11 @@
 name: CI
 
 on:
-  # Pull requests are built; merges to main are not built again. Pull requests that only change
-  # Markdown or docs/ skip CI. A weekly run on main scans for secrets and refreshes the caches that
-  # pull requests restore (a pull request can only reuse caches saved on main).
+  # Public repository: Actions minutes are free, so every push to main and every pull request is
+  # built, plus a weekly run that keeps caches warm.
+  push:
+    branches: [main]
   pull_request:
-    paths-ignore: ['**/*.md', 'docs/**']
   schedule:
     - cron: '23 5 * * 1'
   workflow_dispatch:
