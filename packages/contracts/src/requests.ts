@@ -250,7 +250,9 @@ export const updateStatusPageSchema = z
     description: z.string().trim().max(300).nullable().default(null),
   })
   .strict()
-  .refine((v) => v.visibility !== 'PUBLIC' || !!v.slug, { message: 'A public page needs an address.', path: ['slug'] });
+  .refine((v) => v.visibility !== 'PUBLIC' || !!v.slug, { message: 'A public page needs an address.', path: ['slug'] })
+  // `/s/unsubscribe/<token>` is the unsubscribe link of every status email.
+  .refine((v) => v.slug !== 'unsubscribe', { message: 'This address is reserved.', path: ['slug'] });
 
 /** How a component shows on the status page; the worker keeps its status and resources. */
 export const updateStatusComponentSchema = z

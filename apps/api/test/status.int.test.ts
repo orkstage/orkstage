@@ -43,6 +43,7 @@ describe('status page visibility (open item 8)', () => {
     const t = await freshTenant();
     const slug = `st-${unique()}`;
     expect((await put(t.owner, `/status-pages/${t.id}`, { visibility: 'PUBLIC' })).status).toBe(400);
+    expect((await put(t.owner, `/status-pages/${t.id}`, { visibility: 'PUBLIC', slug: 'unsubscribe' })).status).toBe(400);
     const saved = await put(t.owner, `/status-pages/${t.id}`, { visibility: 'PUBLIC', slug, title: 'Example status' });
     expect(saved.status, JSON.stringify(saved.body)).toBe(200);
 
