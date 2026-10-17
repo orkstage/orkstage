@@ -243,6 +243,22 @@ export interface DeploymentEventDto {
   message: string;
 }
 
+export interface AlertRuleDto {
+  id: string;
+  /** Null: a platform rule, applied to every tenant. */
+  tenantId: string | null;
+  name: string;
+  condition:
+    | { signal: 'health'; critical?: boolean; consecutiveFailures: number }
+    | { signal: 'metric'; metric: string; resourceTypes?: string[]; operator: '>' | '>=' | '<' | '<='; threshold: number; windowMinutes: number; statistic: 'avg' | 'max' | 'min' };
+  severity: string;
+  actions: string[];
+  cooldownSeconds: number;
+  autoResolve: boolean;
+  enabled: boolean;
+  createdAt: string;
+}
+
 export interface IncidentDto {
   id: string;
   tenantId: string;

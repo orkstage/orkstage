@@ -238,11 +238,23 @@ export class MockAdapter implements CloudProviderAdapter {
 
   async getMetric(ctx: ProviderContext, res: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]> {
     const now = Math.floor(Date.now() / 60000) * 60000;
+    const pinned = await this.store.get(this.metricKey(ctx, res.name, metric));
     return Array.from({ length: minutes }, (_, i) => {
       const t = now - (minutes - 1 - i) * 60000;
+      if (pinned !== null && pinned !== undefined) return { timestamp: new Date(t).toISOString(), value: Number(pinned) };
       const n = parseInt(hash(`${ctx.target.id}:${res.resourceId}:${metric}:${t}`).slice(0, 4), 16) / 0xffff;
       return { timestamp: new Date(t).toISOString(), value: Math.round((20 + n * 40) * 10) / 10 };
     });
+  }
+
+  /** Simulation control: pin a metric of a resource to a value (null: back to the series), for metric alerts. */
+  async setMetricOverride(ctx: ProviderContext, name: string, metric: string, value: number | null): Promise<void> {
+    if (value === null) await this.store.delete(this.metricKey(ctx, name, metric));
+    else await this.store.set(this.metricKey(ctx, name, metric), String(value));
+  }
+
+  private metricKey(ctx: ProviderContext, name: string, metric: string) {
+    return `${this.key(ctx, name)}:metric:${metric}`;
   }
 
   /** Simulation control: force a health state for a resource (used to exercise incidents). */
