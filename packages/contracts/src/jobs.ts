@@ -9,8 +9,13 @@ export const QUEUES = {
   emails: 'emails',
 } as const;
 
+/** W3C trace context of whoever queued the job, so the worker's span continues that trace. */
+export interface Traced {
+  _trace?: Record<string, string>;
+}
+
 /** Payloads carry ids only; the worker reloads authoritative state from the database. */
-export interface DeploymentJob {
+export interface DeploymentJob extends Traced {
   deploymentId: string;
 }
 
@@ -18,13 +23,13 @@ export interface DeploymentJob {
  * Run a template trigger. `runId` for runs created by the API; scheduled runs carry the instance
  * and trigger name and the worker records the run itself.
  */
-export type TriggerJob = { runId: string } | { instanceId: string; trigger: string };
+export type TriggerJob = ({ runId: string } | { instanceId: string; trigger: string }) & Traced;
 
 /**
  * A one off email to someone who is not (yet) a member, such as an invitation. The job carries
  * the invitation link, so it is removed from the queue as soon as it is sent or gives up.
  */
-export interface InvitationEmailJob {
+export interface InvitationEmailJob extends Traced {
   kind: 'invitation';
   to: string;
   tenantName: string;
@@ -39,7 +44,7 @@ export interface InvitationEmailJob {
  * preferences, writes in-app notifications and sends email. Keep bodies free of sensitive
  * infrastructure detail (spec §28).
  */
-export interface NotificationJob {
+export interface NotificationJob extends Traced {
   tenantId: string;
   event: NotificationEvent;
   title: string;

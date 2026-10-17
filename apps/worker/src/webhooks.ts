@@ -4,6 +4,7 @@ import {
   SecretBox,
   sendWebhook,
   WEBHOOK_DISABLE_AFTER_FAILURES,
+  platformMetrics,
   WEBHOOK_RETRY_DELAYS_S,
 } from '@orkstage/runtime';
 import { createHash } from 'node:crypto';
@@ -97,6 +98,7 @@ export class WebhookDispatcher {
       }
       const delay = WEBHOOK_RETRY_DELAYS_S[attempt - 1];
       const failures = d.endpoint.consecutiveFailures + 1;
+      platformMetrics.notificationFailed('webhook');
       const disable = failures >= WEBHOOK_DISABLE_AFTER_FAILURES;
       await prisma.$transaction([
         prisma.webhookDelivery.update({

@@ -17,7 +17,7 @@ import {
   type ResolvedInfrastructure,
   type StepFailure,
 } from '@orkstage/provisioning';
-import { toCloudTarget } from '@orkstage/runtime';
+import { annotateSpan, platformMetrics, toCloudTarget } from '@orkstage/runtime';
 import type { Logger } from 'pino';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 import { TargetSlots } from './slots.js';
@@ -69,6 +69,7 @@ export class DeploymentRunner {
     const deployment = await prisma.deployment.findUnique({ where: { id: deploymentId } });
     if (!deployment || ['SUCCEEDED', 'FAILED', 'PARTIALLY_FAILED', 'CANCELLED'].includes(deployment.status)) return;
 
+    annotateSpan({ 'tenant.id': deployment.tenantId, 'instance.id': deployment.instanceId, 'deployment.id': deploymentId, 'deployment.kind': deployment.kind });
     const log = this.ctx.logger.child({
       tenantId: deployment.tenantId,
       instanceId: deployment.instanceId,
@@ -278,6 +279,8 @@ export class DeploymentRunner {
       existing.filter((r) => r.idempotencyKey && r.drift !== 'DRIFT_DETECTED').map((r) => [r.resourceId, { idempotencyKey: r.idempotencyKey!, outputs: r.outputs as Record<string, string>, providerResourceId: r.providerResourceId ?? '' }]),
     );
     const byId = new Map(resolved.resources.map((r) => [r.id, r]));
+    // Start of each resource's current attempt, for the provider duration metric.
+    const started = new Map<string, number>();
     const abort = new AbortController();
     const poll = setInterval(async () => {
       const row = await prisma.deployment.findUnique({ where: { id: d.id }, select: { cancelRequestedAt: true } }).catch(() => null);
@@ -299,6 +302,7 @@ export class DeploymentRunner {
         log: (id, level, message) => void this.event(d.id, level, id, message).catch(() => {}),
         hooks: {
           onStart: async (id, attempt) => {
+            started.set(id, Date.now());
             await this.step(d.id, id, 'RUNNING', { attempt });
             const r = byId.get(id)!;
             await prisma.instanceResource.upsert({
@@ -324,6 +328,7 @@ export class DeploymentRunner {
           },
           onSuccess: async (id, result: ResourceResult) => {
             const r = byId.get(id)!;
+            platformMetrics.provider(r.provider, 'apply', Date.now() - (started.get(id) ?? Date.now()), 'ok');
             await prisma.instanceResource.update({
               where: { instanceId_resourceId: { instanceId: d.instanceId, resourceId: id } },
               data: {
@@ -342,6 +347,7 @@ export class DeploymentRunner {
             await this.event(d.id, 'info', id, result.unchanged ? `${id}: already up to date.` : `${id}: ready (${result.providerResourceId}).`);
           },
           onFailure: async (id, f: StepFailure, attempt) => {
+            platformMetrics.provider(byId.get(id)?.provider ?? 'unknown', 'apply', Date.now() - (started.get(id) ?? Date.now()), 'error', f.failureClass);
             await prisma.instanceResource.updateMany({ where: { instanceId: d.instanceId, resourceId: id }, data: { status: 'FAILED', knowledge: 'UNKNOWN' } });
             await this.step(d.id, id, f.code === 'CANCELLED' ? 'CANCELLED' : 'FAILED', { attempt, errorClass: f.failureClass, errorMessage: f.message });
             await this.event(d.id, 'error', id, `${id} failed (${f.failureClass}) after ${attempt} attempt(s): ${f.message}`);
@@ -351,6 +357,7 @@ export class DeploymentRunner {
             await this.event(d.id, 'warn', id, `${id} skipped: ${reason}`);
           },
           onRetry: async (id, attempt, delayMs, f) => {
+            platformMetrics.provider(byId.get(id)?.provider ?? 'unknown', 'apply', Date.now() - (started.get(id) ?? Date.now()), 'error', f.failureClass);
             await this.event(d.id, 'warn', id, `${id}: ${f.failureClass} on attempt ${attempt}; retrying in ${Math.round(delayMs / 1000)}s.`);
           },
         },

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createIncidentSchema, incidentUpdateSchema, listQuerySchema, type IncidentDto, type ListQuery } from '@orkstage/contracts';
 import type { Incident, IncidentUpdate, PrismaClient } from '@orkstage/database';
+import { platformMetrics } from '@orkstage/runtime';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
@@ -79,6 +80,7 @@ export class IncidentsController {
       },
       include: { updates: true },
     });
+    platformMetrics.incidentOpened('manual');
     await this.queues.notify({ tenantId: body.tenantId, event: 'incident.opened', title: `Incident: ${body.title}`, body: body.message, link: `/incidents/${incident.id}` });
     await this.audit.record({ principal: p, tenantId: body.tenantId, resourceType: 'Incident', resourceId: incident.id, action: 'CREATE', correlationId, changes: { title: body.title, impact: body.impact } });
     return toIncidentDto(incident);
@@ -106,6 +108,7 @@ export class IncidentsController {
     if (!incident) throw notFound('Incident');
     authorize(p, 'update', 'Incident', { tenantId: incident.tenantId });
     const resolved = body.status === 'RESOLVED';
+    if (resolved && incident.status !== 'RESOLVED') platformMetrics.incidentResolved(incident.openedAt);
     const updated = await this.prisma.incident.update({
       where: { id },
       data: {
