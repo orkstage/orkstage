@@ -60,3 +60,20 @@ export function constantTimeEqual(a: string, b: string): boolean {
 export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
+
+/**
+ * The unsubscribe link token of a status page subscription: `<id>.<hmac>`. Derived from the
+ * session secret, so every email carries a working link and nothing is stored.
+ */
+export function unsubscribeToken(sessionSecret: string, subscriptionId: string): string {
+  const mac = createHmac('sha256', sessionSecret).update(`status-unsubscribe:${subscriptionId}`).digest('base64url').slice(0, 32);
+  return `${subscriptionId}.${mac}`;
+}
+
+/** The subscription id in a valid unsubscribe token, or null. */
+export function verifyUnsubscribeToken(sessionSecret: string, token: string): string | null {
+  const id = token.split('.')[0] ?? '';
+  const expected = Buffer.from(unsubscribeToken(sessionSecret, id));
+  const given = Buffer.from(token);
+  return id && expected.length === given.length && timingSafeEqual(expected, given) ? id : null;
+}

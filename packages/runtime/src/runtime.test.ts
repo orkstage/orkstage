@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, verifyWebhook } from './index.js';
+import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, unsubscribeToken, verifyUnsubscribeToken, verifyWebhook } from './index.js';
 
 const base = {
   DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
@@ -131,5 +131,16 @@ describe('webhooks', () => {
     await expect(assertSafeWebhookUrl('https://198.18.0.1/hook', false)).rejects.toThrow(/public/);
     await expect(assertSafeWebhookUrl('https://[2606:4700::1111]/hook', false)).resolves.toBeInstanceOf(URL);
     await expect(assertSafeWebhookUrl('http://localhost:9999/hook', true)).resolves.toBeInstanceOf(URL);
+  });
+});
+
+describe('status unsubscribe tokens', () => {
+  it('verifies its own tokens and nothing else', () => {
+    const secret = 's'.repeat(40);
+    const token = unsubscribeToken(secret, 'sub-1');
+    expect(verifyUnsubscribeToken(secret, token)).toBe('sub-1');
+    expect(verifyUnsubscribeToken('t'.repeat(40), token)).toBeNull();
+    expect(verifyUnsubscribeToken(secret, 'sub-2' + token.slice(5))).toBeNull();
+    expect(verifyUnsubscribeToken(secret, 'garbage')).toBeNull();
   });
 });

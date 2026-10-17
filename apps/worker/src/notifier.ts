@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { InvitationEmailJob, NotificationJob } from '@orkstage/contracts';
-import { platformMetrics } from '@orkstage/runtime';
+import type { InvitationEmailJob, NotificationJob, StatusEmailJob } from '@orkstage/contracts';
+import { publicIncidentTitle, publicIncidentUpdate } from '@orkstage/domain';
+import { platformMetrics, unsubscribeToken } from '@orkstage/runtime';
+import type { Queue } from 'bullmq';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';
 
 const MAX_EMAIL_ATTEMPTS = 5;
+
+/** Events that status page subscribers hear about. */
+const SUBSCRIBER_EVENTS = new Set(['incident.opened', 'incident.updated', 'incident.resolved', 'maintenance.scheduled', 'maintenance.started', 'maintenance.completed']);
 
 /**
  * Turns a notification request into in-app notifications plus email deliveries. Deliveries are
@@ -13,7 +18,10 @@ const MAX_EMAIL_ATTEMPTS = 5;
 export class Notifier {
   private readonly mail: Transporter;
 
-  constructor(private readonly ctx: WorkerContext) {
+  constructor(
+    private readonly ctx: WorkerContext,
+    private readonly emails?: Pick<Queue<StatusEmailJob>, 'add'>,
+  ) {
     this.mail = nodemailer.createTransport({
       host: ctx.config.SMTP_HOST,
       port: ctx.config.SMTP_PORT,
@@ -48,6 +56,52 @@ export class Notifier {
       });
     }
     await this.deliverPending();
+    await this.notifySubscribers(job);
+  }
+
+  /**
+   * One email per confirmed subscriber of the tenant's status page, through the email queue so a
+   * failed send retries alone. Incidents read as on the public page: automated ones carry no
+   * internal detail. Subscribers from the public page hear only while the page is public.
+   */
+  async notifySubscribers(job: NotificationJob): Promise<void> {
+    if (!this.emails || !SUBSCRIBER_EVENTS.has(job.event)) return;
+    const { prisma, config } = this.ctx;
+    const page = await prisma.statusPage.findUnique({ where: { tenantId: job.tenantId }, include: { tenant: { select: { name: true } } } });
+    if (!page) return;
+    const subscribers = await prisma.statusSubscription.findMany({
+      where: { statusPageId: page.id, confirmedAt: { not: null }, ...(page.visibility === 'PUBLIC' ? {} : { userId: { not: null } }) },
+    });
+    if (subscribers.length === 0) return;
+
+    const name = page.title ?? page.tenant.name;
+    let subject = `[${name}] ${job.title}`;
+    let body = job.body;
+    const incidentId = typeof job.data?.incidentId === 'string' ? job.data.incidentId : null;
+    if (incidentId) {
+      const incident = await prisma.incident.findUnique({ where: { id: incidentId }, include: { updates: { orderBy: { at: 'desc' }, take: 1 } } });
+      if (!incident) return;
+      const instance = incident.instanceId ? await prisma.instance.findUnique({ where: { id: incident.instanceId }, select: { name: true } }) : null;
+      const title = publicIncidentTitle(incident, instance?.name);
+      const status = incident.status === 'RESOLVED' ? 'Resolved' : incident.status.charAt(0) + incident.status.slice(1).toLowerCase();
+      subject = `[${name}] ${status}: ${title}`;
+      body = incident.updates[0] ? publicIncidentUpdate(incident.updates[0]) : body;
+    }
+    const base = config.WEB_PUBLIC_URL.replace(/\/+$/, '');
+    const pageLink = page.visibility === 'PUBLIC' && page.slug ? `${base}/s/${page.slug}` : `${base}/status/${job.tenantId}`;
+    for (const s of subscribers) {
+      const unsubscribe = `${base}/s/unsubscribe/${unsubscribeToken(config.SESSION_SECRET, s.id)}`;
+      const text = `${body}\n\nStatus page: ${pageLink}\n\nYou receive this because you subscribed to updates from ${name}. Unsubscribe: ${unsubscribe}`;
+      await this.emails.add(
+        'status',
+        { kind: 'status', to: s.email, subject, text },
+        { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true },
+      );
+    }
+  }
+
+  async sendStatusEmail(job: StatusEmailJob): Promise<void> {
+    await this.mail.sendMail({ from: this.ctx.config.EMAIL_FROM, to: job.to, subject: job.subject, text: job.text });
   }
 
   /** An invitation to someone who may not have an account yet. Throws so the queue retries. */

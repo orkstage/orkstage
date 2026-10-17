@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type StatusEmailJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient } from '@orkstage/database';
 import {
   createAdapterRegistry,
@@ -51,7 +51,8 @@ async function main() {
   const triggerQueue = new Queue<TriggerJob>(QUEUES.triggers, { connection: redis.duplicate() });
   const triggerRunner = new TriggerRunner(ctx, triggerQueue);
   const monitor = new HealthMonitor(ctx);
-  const notifier = new Notifier(ctx);
+  const emailQueue = new Queue<StatusEmailJob>(QUEUES.emails, { connection: redis.duplicate() });
+  const notifier = new Notifier(ctx, emailQueue);
 
   const deployments = new Worker<DeploymentJob>(
     QUEUES.deployments,
@@ -126,7 +127,11 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 1, lockDuration: 120_000 },
   );
 
-  const emails = new Worker<InvitationEmailJob>(QUEUES.emails, async (job) => traceJob(QUEUES.emails, job, {}, () => notifier.sendInvitation(job.data)), { connection: redis.duplicate(), concurrency: 2 });
+  const emails = new Worker<InvitationEmailJob | StatusEmailJob>(
+    QUEUES.emails,
+    async (job) => traceJob(QUEUES.emails, job, {}, () => (job.data.kind === 'status' ? notifier.sendStatusEmail(job.data) : notifier.sendInvitation(job.data))),
+    { connection: redis.duplicate(), concurrency: 2 },
+  );
 
   // Trigger runs: provider actions are short API calls (they start work, they do not wait for it).
   const triggers = new Worker<TriggerJob>(
@@ -155,7 +160,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down: finishing in-flight jobs');
     await Promise.all([deployments.close(), notify.close(), health.close(), drift.close(), triggers.close(), emails.close()]);
-    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close(), deploymentQueue.close()]);
+    await Promise.all([healthQueue.close(), driftQueue.close(), notifications.close(), triggerQueue.close(), deploymentQueue.close(), emailQueue.close()]);
     await prisma.$disconnect();
     redis.disconnect();
     await stopTelemetry();

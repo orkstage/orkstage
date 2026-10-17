@@ -76,3 +76,27 @@ export function worstStatus(states: readonly StatusState[]): StatusState {
     'OPERATIONAL',
   );
 }
+
+/**
+ * What the public status page and status emails say about an incident (open item 8). Automated
+ * incidents carry internal details in their titles and updates (resource ids, rule names,
+ * metric values), so outside the console they read as a plain impact on the instance; people
+ * write the title and updates of manual incidents for their readers.
+ */
+export function publicIncidentTitle(i: { source: string; title: string; impact: string }, instanceName?: string | null): string {
+  if (i.source !== 'AUTOMATED') return i.title;
+  const what = i.impact === 'MAJOR_OUTAGE' ? 'Service disruption' : i.impact === 'PARTIAL_OUTAGE' ? 'Partial outage' : 'Degraded performance';
+  return instanceName ? `${what} on ${instanceName}` : what;
+}
+
+/** A system update (no author) in plain words; updates written by people pass through. */
+export function publicIncidentUpdate(u: { status: string; message: string; createdById: string | null }): string {
+  if (u.createdById) return u.message;
+  return u.status === 'RESOLVED' ? 'This incident is resolved. The service is working normally.' : 'We detected a problem and are looking into it.';
+}
+
+/** Where a maintenance window is in time. */
+export function maintenanceState(w: { startsAt: Date; endsAt: Date }, now = new Date()): 'scheduled' | 'in_progress' | 'completed' {
+  if (now < w.startsAt) return 'scheduled';
+  return now < w.endsAt ? 'in_progress' : 'completed';
+}

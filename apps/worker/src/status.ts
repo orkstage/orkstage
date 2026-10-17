@@ -30,8 +30,16 @@ function componentFor(r: InstanceResource): { name: string; position: number } |
   }
 }
 
-export async function syncStatusComponents(ctx: WorkerContext, instanceId: string, tenantId: string): Promise<void> {
-  const resources = await ctx.prisma.instanceResource.findMany({ where: { instanceId, status: 'ACTIVE' } });
+/**
+ * Updates the status components of an instance from the health of its resources. While a
+ * maintenance window covers a component (by name, or all of them when the window names none), it
+ * shows MAINTENANCE. Returns the resource ids under maintenance, which open no incidents.
+ */
+export async function syncStatusComponents(ctx: WorkerContext, instanceId: string, tenantId: string, now = new Date()): Promise<Set<string>> {
+  const [resources, windows] = await Promise.all([
+    ctx.prisma.instanceResource.findMany({ where: { instanceId, status: 'ACTIVE' } }),
+    ctx.prisma.maintenanceWindow.findMany({ where: { tenantId, startsAt: { lte: now }, endsAt: { gt: now }, OR: [{ instanceId }, { instanceId: null }] } }),
+  ]);
   const groups = new Map<string, { position: number; resources: InstanceResource[] }>();
   for (const r of resources) {
     const c = componentFor(r);
@@ -40,17 +48,23 @@ export async function syncStatusComponents(ctx: WorkerContext, instanceId: strin
     groups.get(c.name)!.resources.push(r);
   }
 
+  const inMaintenance = new Set<string>();
+  const covered = (name: string) => windows.some((w) => w.componentNames.length === 0 || w.componentNames.includes(name));
   for (const [name, g] of groups) {
     const critical = g.resources.some((r) => r.critical);
-    const statuses = g.resources.map((r) => healthToStatus(r.health as HealthState, r.critical));
-    const status: StatusState = worstStatus(statuses);
+    const maintenance = covered(name);
+    if (maintenance) for (const r of g.resources) inMaintenance.add(r.resourceId);
+    const status: StatusState = maintenance ? 'MAINTENANCE' : worstStatus(g.resources.map((r) => healthToStatus(r.health as HealthState, r.critical)));
     await ctx.prisma.statusComponent.upsert({
       where: { instanceId_name: { instanceId, name } },
       update: { resourceIds: g.resources.map((r) => r.resourceId), status, critical, position: g.position },
       create: { tenantId, instanceId, name, resourceIds: g.resources.map((r) => r.resourceId), status, critical, position: g.position },
     });
   }
+  // A window without component names covers resources that have no component too.
+  if (windows.some((w) => w.componentNames.length === 0)) for (const r of resources) inMaintenance.add(r.resourceId);
   await ctx.prisma.statusComponent.deleteMany({ where: { instanceId, name: { notIn: [...groups.keys()] } } });
+  return inMaintenance;
 }
 
 export function instanceHealth(resources: InstanceResource[]): HealthState {

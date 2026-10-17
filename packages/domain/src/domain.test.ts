@@ -19,6 +19,9 @@ import {
   summarizeSteps,
   worstStatus,
   isRetryable,
+  maintenanceState,
+  publicIncidentTitle,
+  publicIncidentUpdate,
 } from './index.js';
 
 describe('instance lifecycle', () => {
@@ -89,6 +92,22 @@ describe('health derivation', () => {
   it('picks the worst status for the headline', () => {
     expect(worstStatus(['OPERATIONAL', 'PARTIAL_OUTAGE', 'DEGRADED'])).toBe('PARTIAL_OUTAGE');
     expect(worstStatus([])).toBe('OPERATIONAL');
+  });
+});
+
+describe('public status page', () => {
+  it('hides the internals of automated incidents', () => {
+    expect(publicIncidentTitle({ source: 'AUTOMATED', title: 'web cpu > 90 on Acme', impact: 'DEGRADED' }, 'Acme production')).toBe('Degraded performance on Acme production');
+    expect(publicIncidentTitle({ source: 'AUTOMATED', title: 'API unavailable', impact: 'MAJOR_OUTAGE' })).toBe('Service disruption');
+    expect(publicIncidentTitle({ source: 'MANUAL', title: 'Slow logins', impact: 'DEGRADED' }, 'Acme')).toBe('Slow logins');
+    expect(publicIncidentUpdate({ status: 'INVESTIGATING', message: 'Automated: 3 failed checks (rule)', createdById: null })).toBe('We detected a problem and are looking into it.');
+    expect(publicIncidentUpdate({ status: 'MONITORING', message: 'A fix is out.', createdById: 'u1' })).toBe('A fix is out.');
+  });
+  it('places a maintenance window in time', () => {
+    const w = { startsAt: new Date('2026-10-20T10:00:00Z'), endsAt: new Date('2026-10-20T11:00:00Z') };
+    expect(maintenanceState(w, new Date('2026-10-20T09:59:00Z'))).toBe('scheduled');
+    expect(maintenanceState(w, new Date('2026-10-20T10:00:00Z'))).toBe('in_progress');
+    expect(maintenanceState(w, new Date('2026-10-20T11:00:00Z'))).toBe('completed');
   });
 });
 

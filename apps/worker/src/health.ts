@@ -51,10 +51,29 @@ export class HealthMonitor {
           await notify(this.ctx, { tenantId: instance.tenantId, event: 'instance.degraded', title: `${instance.name} is degraded`, body: 'One or more components are not healthy. We are tracking it on your status page.', link: `/instances/${instance.id}`, data: { instanceId: instance.id, health } });
         }
       }
-      await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
+      const inMaintenance = await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
       const scoped = rules.filter((rule) => !rule.tenantId || rule.tenantId === instance.tenantId);
-      await this.evaluateAlerts(instance, fresh, scoped);
-      await this.metricAlerts.evaluate(instance, fresh, scoped, targets);
+      await this.evaluateAlerts(instance, fresh, scoped, inMaintenance);
+      await this.metricAlerts.evaluate(instance, fresh.filter((r) => !inMaintenance.has(r.resourceId)), scoped, targets);
+    }
+    await this.announceMaintenance();
+  }
+
+  /** Tells the tenant and the status page subscribers when a maintenance window starts and ends. */
+  private async announceMaintenance(now = new Date()) {
+    const { prisma } = this.ctx;
+    const starting = await prisma.maintenanceWindow.findMany({ where: { startedAt: null, startsAt: { lte: now }, endsAt: { gt: now } }, take: 50 });
+    for (const w of starting) {
+      // Claimed with a conditional update, so a second worker does not announce it again.
+      const { count } = await prisma.maintenanceWindow.updateMany({ where: { id: w.id, startedAt: null }, data: { startedAt: now } });
+      if (count === 0) continue;
+      await notify(this.ctx, { tenantId: w.tenantId, event: 'maintenance.started', title: `Maintenance started: ${w.title}`, body: `Planned until ${w.endsAt.toUTCString()}.${w.message ? ` ${w.message}` : ''}`, link: `/status/${w.tenantId}`, data: { maintenanceId: w.id } });
+    }
+    const ending = await prisma.maintenanceWindow.findMany({ where: { completedAt: null, startedAt: { not: null }, endsAt: { lte: now } }, take: 50 });
+    for (const w of ending) {
+      const { count } = await prisma.maintenanceWindow.updateMany({ where: { id: w.id, completedAt: null }, data: { completedAt: now } });
+      if (count === 0) continue;
+      await notify(this.ctx, { tenantId: w.tenantId, event: 'maintenance.completed', title: `Maintenance completed: ${w.title}`, body: 'The planned work is over.', link: `/status/${w.tenantId}`, data: { maintenanceId: w.id } });
     }
   }
 
@@ -116,7 +135,7 @@ export class HealthMonitor {
     await prisma.healthCheckResult.create({ data: { tenantId: r.tenantId, instanceId: r.instanceId, resourceId: r.resourceId, state, latencyMs, message } });
   }
 
-  private async evaluateAlerts(instance: { id: string; tenantId: string; name: string }, resources: InstanceResource[], rules: AlertRule[]) {
+  private async evaluateAlerts(instance: { id: string; tenantId: string; name: string }, resources: InstanceResource[], rules: AlertRule[], inMaintenance: Set<string>) {
     const { prisma } = this.ctx;
     for (const r of resources) {
       const dedupKey = `health:${instance.id}:${r.resourceId}`;
@@ -135,6 +154,7 @@ export class HealthMonitor {
         continue;
       }
       if (r.health !== 'UNHEALTHY' || open) continue; // dedup: one open incident per resource
+      if (inMaintenance.has(r.resourceId)) continue; // planned work opens no incidents
 
       const rule = rules.find((rule) => {
         const c = rule.condition as unknown as HealthCondition;
