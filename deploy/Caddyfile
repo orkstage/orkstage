@@ -1,0 +1,7 @@
+# HTTPS for the console and the Control API (under /api), with certificates from Let's Encrypt
+# for ORKSTAGE_DOMAIN. For a test on your machine, ORKSTAGE_DOMAIN=localhost uses Caddy's local
+# certificate authority instead.
+{$ORKSTAGE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
