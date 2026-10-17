@@ -71,6 +71,7 @@ model Tenant {
   incidents    Incident[]
   cloudTargets CloudTarget[]
   profiles     Profile[]
+  statusPage   StatusPage?
 
   @@index([organizationId])
 }
@@ -646,6 +647,10 @@ model StatusComponent {
   critical    Boolean     @default(true)
   status      StatusState @default(UNKNOWN)
   position    Int         @default(0)
+  /// Set by the tenant on its status page settings; the worker never changes these three.
+  label       String?
+  hidden      Boolean     @default(false)
+  sortOrder   Int?
   updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
 
   instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
@@ -705,16 +710,67 @@ model IncidentUpdate {
   @@index([incidentId, at])
 }
 
+/// Planned work (spec §27, §52). While it runs, the components it names (all of the instance, or
+/// of every instance of the tenant, when none are named) show MAINTENANCE and open no incidents.
 model MaintenanceWindow {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  tenantId   String   @db.Uuid
-  instanceId String?  @db.Uuid
-  title      String
-  startsAt   DateTime @db.Timestamptz(3)
-  endsAt     DateTime @db.Timestamptz(3)
-  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  id             String    @id @default(uuid(7)) @db.Uuid
+  tenantId       String    @db.Uuid
+  instanceId     String?   @db.Uuid
+  title          String
+  message        String?
+  componentNames String[]  @default([])
+  startsAt       DateTime  @db.Timestamptz(3)
+  endsAt         DateTime  @db.Timestamptz(3)
+  /// When subscribers were told it started and ended.
+  startedAt      DateTime? @db.Timestamptz(3)
+  completedAt    DateTime? @db.Timestamptz(3)
+  createdById    String?   @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([tenantId, startsAt])
+  @@index([endsAt])
+}
+
+enum StatusVisibility {
+  /// Platform staff and the tenant's owners and admins.
+  PRIVATE
+  /// Every member of the tenant (the default).
+  CUSTOMER_ONLY
+  /// Also anyone with the address `/s/<slug>`, without signing in.
+  PUBLIC
+}
+
+/// Status page settings of a tenant (spec §26, §52). No row means the defaults.
+model StatusPage {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  tenantId    String           @unique @db.Uuid
+  visibility  StatusVisibility @default(CUSTOMER_ONLY)
+  /// Public address; required while the page is public.
+  slug        String?          @unique
+  title       String?
+  description String?
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions StatusSubscription[]
+}
+
+/// Email updates about incidents and maintenance. Confirmed by a link, except for a signed in
+/// member subscribing their own address.
+model StatusSubscription {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  statusPageId String    @db.Uuid
+  email        String
+  /// The member who subscribed; null for a subscription from the public page.
+  userId       String?   @db.Uuid
+  /// sha256 of the token in the confirm and unsubscribe links.
+  tokenHash    String    @unique
+  confirmedAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  statusPage StatusPage @relation(fields: [statusPageId], references: [id], onDelete: Cascade)
+
+  @@unique([statusPageId, email])
 }
 
 /// Alert rules are data, not code (spec §29). Null tenantId = platform default rule.

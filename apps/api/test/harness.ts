@@ -34,11 +34,16 @@ export interface Api {
 }
 
 let lastAddress = 0;
+/** Test files run in their own processes and share Redis: each starts in its own address range. */
+const addressBase = Math.floor(Math.random() * 250) * 250;
 /**
  * Each caller gets its own client address (the API trusts one proxy hop), so the per address
  * limits of sign in and the rate limit tests do not spill over between callers.
  */
-export const nextAddress = () => `10.77.${Math.floor(++lastAddress / 250)}.${(lastAddress % 250) + 1}`;
+export const nextAddress = () => {
+  const n = addressBase + ++lastAddress;
+  return `10.${Math.floor(n / 62_500) % 250}.${Math.floor(n / 250) % 250}.${(n % 250) + 1}`;
+};
 
 /** A unique suffix for names and slugs, so the suite can run again on the same database. */
 export const unique = () => randomUUID().slice(0, 8);

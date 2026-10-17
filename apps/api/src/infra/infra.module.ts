@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type TriggerJob } from '@orkstage/contracts';
+import { QUEUES, type DeploymentJob, type InvitationEmailJob, type NotificationJob, type StatusEmailJob, type TriggerJob } from '@orkstage/contracts';
 import { createPrismaClient, type PrismaClient } from '@orkstage/database';
 import {
   createAdapterRegistry,
@@ -45,18 +45,23 @@ export class Queues implements OnApplicationShutdown {
   readonly deployments: Queue<DeploymentJob>;
   readonly notifications: Queue<NotificationJob>;
   readonly triggers: Queue<TriggerJob>;
-  readonly emails: Queue<InvitationEmailJob>;
+  readonly emails: Queue<InvitationEmailJob | StatusEmailJob>;
 
   constructor(@Inject(REDIS) redis: Redis) {
     const connection = redis.duplicate();
     this.deployments = new Queue<DeploymentJob>(QUEUES.deployments, { connection });
     this.notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection });
     this.triggers = new Queue<TriggerJob>(QUEUES.triggers, { connection });
-    this.emails = new Queue<InvitationEmailJob>(QUEUES.emails, { connection });
+    this.emails = new Queue<InvitationEmailJob | StatusEmailJob>(QUEUES.emails, { connection });
   }
 
   /** The job carries an invitation link: it leaves the queue as soon as it is sent or gives up. */
   async enqueueInvitationEmail(job: InvitationEmailJob) {
+    await this.emails.add(job.kind, { ...job, _trace: traceCarrier() }, { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true });
+  }
+
+  /** A status page email (a confirmation link): it leaves the queue once sent, like an invitation. */
+  async enqueueStatusEmail(job: StatusEmailJob) {
     await this.emails.add(job.kind, { ...job, _trace: traceCarrier() }, { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true });
   }
 

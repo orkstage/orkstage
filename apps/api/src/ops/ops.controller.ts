@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto, type StatusPageDto } from '@orkstage/contracts';
+import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto } from '@orkstage/contracts';
 import type { AuditEvent, PrismaClient } from '@orkstage/database';
 import { worstStatus, type StatusState } from '@orkstage/domain';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
@@ -146,54 +146,6 @@ export class OpsController {
       incidentsByDay: dayKeys.map((day) => ({ day, opened: count(opened, day), resolved: count(resolved, day) })),
       costByProvider: [...costByProvider].map(([provider, monthly]) => ({ provider, monthly: Math.round(monthly * 100) / 100 })).sort((a, b) => b.monthly - a.monthly),
       resourcesByHealth,
-    };
-  }
-
-  /** Private, tenant-scoped status page (spec §26, §52). Never includes other tenants' data. */
-  @Scope('instances:read')
-  @Get('status/:tenantId')
-  async status(@CurrentPrincipal() p: RequestPrincipal, @Param('tenantId', ParseUUIDPipe) tenantId: string): Promise<StatusPageDto> {
-    authorize(p, 'read', 'StatusPage', { tenantId });
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) throw notFound('Tenant');
-    const [instances, open, recent, deployments] = await Promise.all([
-      this.prisma.instance.findMany({
-        where: { tenantId, status: { not: 'DESTROYED' } },
-        include: { components: { orderBy: { position: 'asc' } } },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.incident.findMany({ where: { tenantId, status: { not: 'RESOLVED' } }, include: { updates: { orderBy: { at: 'desc' }, take: 1 } }, orderBy: { openedAt: 'desc' } }),
-      this.prisma.incident.findMany({ where: { tenantId, status: 'RESOLVED' }, orderBy: { resolvedAt: 'desc' }, take: 5 }),
-      this.prisma.deployment.findMany({ where: { tenantId, finishedAt: { not: null } }, orderBy: { finishedAt: 'desc' }, take: 8, include: { instance: { select: { name: true } } } }),
-    ]);
-    const targetIds = new Set(instances.flatMap((i) => Object.values(i.bindings as Record<string, { targetId: string }>).map((b) => b.targetId)));
-    const mockTargets = new Set((await this.prisma.cloudTarget.findMany({ where: { id: { in: [...targetIds] }, provider: 'mock' }, select: { id: true } })).map((t) => t.id));
-
-    const instanceStatus = (components: { status: StatusState }[], status: string): StatusState =>
-      components.length > 0 ? worstStatus(components.map((c) => c.status)) : status === 'READY' ? 'OPERATIONAL' : 'UNKNOWN';
-    const view = instances.map((i) => ({
-      id: i.id,
-      name: i.name,
-      status: instanceStatus(i.components, i.status),
-      simulated: Object.values(i.bindings as Record<string, { targetId: string }>).every((b) => mockTargets.has(b.targetId)),
-      components: i.components.map((c) => ({ id: c.id, name: c.name, status: c.status })),
-    }));
-    const activity = [
-      ...deployments.map((d) => ({
-        at: d.finishedAt!.toISOString(),
-        kind: 'deployment',
-        message: `${d.kind === 'APPLY' ? 'Deployment' : 'Destroy'} of ${d.instance.name} ${d.status === 'SUCCEEDED' ? 'completed' : d.status.toLowerCase().replace('_', ' ')}`,
-      })),
-      ...recent.map((i) => ({ at: (i.resolvedAt ?? i.openedAt).toISOString(), kind: 'incident', message: `Resolved: ${i.title}` })),
-    ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 10);
-
-    return {
-      tenant: { id: tenant.id, name: tenant.name },
-      overall: worstStatus(view.map((v) => v.status as StatusState)),
-      instances: view,
-      openIncidents: open.map((i) => toIncidentDto(i)),
-      recentIncidents: recent.map((i) => toIncidentDto(i)),
-      recentActivity: activity,
     };
   }
 

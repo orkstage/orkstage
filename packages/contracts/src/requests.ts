@@ -239,6 +239,52 @@ export const createAlertRuleSchema = z.object({
 /** Unknown keys are refused: a threshold belongs in `condition`, not beside it. */
 export const updateAlertRuleSchema = createAlertRuleSchema.omit({ tenantId: true }).partial().strict();
 
+export const STATUS_VISIBILITIES = ['PRIVATE', 'CUSTOMER_ONLY', 'PUBLIC'] as const;
+
+/** Status page settings of a tenant (open item 8). A public page needs a slug. */
+export const updateStatusPageSchema = z
+  .object({
+    visibility: z.enum(STATUS_VISIBILITIES),
+    slug: z.string().regex(/^[a-z0-9][a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes').nullable().default(null),
+    title: z.string().trim().min(2).max(80).nullable().default(null),
+    description: z.string().trim().max(300).nullable().default(null),
+  })
+  .strict()
+  .refine((v) => v.visibility !== 'PUBLIC' || !!v.slug, { message: 'A public page needs an address.', path: ['slug'] });
+
+/** How a component shows on the status page; the worker keeps its status and resources. */
+export const updateStatusComponentSchema = z
+  .object({
+    label: z.string().trim().min(1).max(40).nullable(),
+    hidden: z.boolean(),
+    sortOrder: z.number().int().min(0).max(999).nullable(),
+  })
+  .partial()
+  .strict();
+
+const maintenanceFields = {
+  title: z.string().trim().min(3).max(120),
+  message: z.string().trim().max(2000).nullable().optional(),
+  /** Status components it covers (by name); all components when empty. */
+  componentNames: z.array(z.string().min(1).max(40)).max(20).default([]),
+  startsAt: z.iso.datetime({ offset: true }),
+  endsAt: z.iso.datetime({ offset: true }),
+};
+const maintenanceOrder = { message: 'The end must be after the start.', path: ['endsAt'] };
+
+export const createMaintenanceSchema = z
+  .object({ tenantId: uuid, instanceId: uuid.nullable().optional(), ...maintenanceFields })
+  .strict()
+  .refine((v) => Date.parse(v.endsAt) > Date.parse(v.startsAt), maintenanceOrder);
+
+export const updateMaintenanceSchema = z
+  .object(maintenanceFields)
+  .partial()
+  .strict()
+  .refine((v) => !v.startsAt || !v.endsAt || Date.parse(v.endsAt) > Date.parse(v.startsAt), maintenanceOrder);
+
+export const subscribeStatusSchema = z.object({ email: z.email().max(254) }).strict();
+
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
 export type CreateCloudTargetInput = z.infer<typeof createCloudTargetSchema>;
 export type CreateInstanceInput = z.infer<typeof createInstanceSchema>;

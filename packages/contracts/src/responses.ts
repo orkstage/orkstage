@@ -286,6 +286,58 @@ export interface StatusPageDto {
   openIncidents: IncidentDto[];
   recentIncidents: IncidentDto[];
   recentActivity: { at: string; message: string; kind: string }[];
+  /** Running and upcoming maintenance. */
+  maintenance: MaintenanceDto[];
+  page: { visibility: StatusVisibility; slug: string | null; title: string | null; description: string | null };
+  /** Whether the signed in user gets email updates from this page. */
+  subscribed: boolean;
+}
+
+export type StatusVisibility = 'PRIVATE' | 'CUSTOMER_ONLY' | 'PUBLIC';
+
+export interface MaintenanceDto {
+  id: string;
+  tenantId: string;
+  instanceId: string | null;
+  instanceName: string | null;
+  title: string;
+  message: string | null;
+  componentNames: string[];
+  startsAt: string;
+  endsAt: string;
+  state: 'scheduled' | 'in_progress' | 'completed';
+}
+
+/** Status page settings for its owners and admins. */
+export interface StatusPageSettingsDto {
+  tenantId: string;
+  visibility: StatusVisibility;
+  slug: string | null;
+  title: string | null;
+  description: string | null;
+  confirmedSubscribers: number;
+  components: { id: string; instanceId: string; instanceName: string; name: string; label: string | null; hidden: boolean; sortOrder: number | null; status: string }[];
+}
+
+/** The public view of a status page: names and states only, nothing internal. */
+export interface PublicStatusDto {
+  title: string;
+  description: string | null;
+  overall: string;
+  groups: { name: string; status: string; components: { name: string; status: string }[] }[];
+  openIncidents: PublicIncidentDto[];
+  recentIncidents: PublicIncidentDto[];
+  maintenance: { title: string; message: string | null; componentNames: string[]; startsAt: string; endsAt: string; state: MaintenanceDto['state'] }[];
+}
+
+export interface PublicIncidentDto {
+  id: string;
+  title: string;
+  status: IncidentDto['status'];
+  impact: string;
+  openedAt: string;
+  resolvedAt: string | null;
+  updates: { status: string; message: string; at: string }[];
 }
 
 export interface NotificationDto {

@@ -39,6 +39,14 @@ export interface InvitationEmailJob extends Traced {
   expiresAt: string;
 }
 
+/** An update to the confirmed subscribers of a status page, or a confirmation link to a new one. */
+export interface StatusEmailJob extends Traced {
+  kind: 'status';
+  to: string;
+  subject: string;
+  text: string;
+}
+
 /**
  * Ask the worker to notify a tenant's responsible users. The worker resolves recipients and
  * preferences, writes in-app notifications and sends email. Keep bodies free of sensitive
@@ -70,6 +78,9 @@ export const NOTIFICATION_EVENTS = [
   'incident.opened',
   'incident.updated',
   'incident.resolved',
+  'maintenance.scheduled',
+  'maintenance.started',
+  'maintenance.completed',
   'cloud_target.unhealthy',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];

@@ -134,6 +134,8 @@ export function defineAbilityFor(principal: Principal): AppAbility {
     can('read', 'AlertRule', all);
     can('read', 'AlertRule', { tenantId: null });
     can(['create', 'update', 'delete'], 'AlertRule', admins);
+    // Status page settings, components and maintenance windows: owners and admins.
+    can('update', 'StatusPage', admins);
     // Integrations: tenant admins manage their tenant's keys and webhooks; developers can import IaC.
     can('manage', ['ApiKey', 'Webhook'], admins);
     // Profiles (ADR 0007): every member reads the tenant's and the shared ones, and creates
