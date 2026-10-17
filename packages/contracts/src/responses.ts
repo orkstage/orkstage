@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ProviderForm } from './providers.js';
 import type { TenantLimitsInput } from './requests.js';
 /** Response shapes returned by the API (dates are ISO strings). */
 
@@ -382,6 +383,8 @@ export interface ProviderDto {
   simulated: boolean;
   /** False when the provider's feature flag is off for the caller's scope. */
   enabled: boolean;
+  /** What registering a target asks for (PROVIDER_FORMS), so clients such as the CLI need no copy. */
+  form: ProviderForm;
 }
 
 /**
