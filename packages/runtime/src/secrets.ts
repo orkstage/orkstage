@@ -19,7 +19,7 @@ const scheme = (ref: string) => /^([a-z][a-z0-9-]*):\/\//.exec(ref)?.[1];
  * and credentials. A target's credentialRef is chosen by an operator, so without this a reference
  * like `env://ENCRYPTION_KEY` would hand a platform secret to a provider adapter.
  */
-const RESERVED_ENV = /^(DATABASE_URL|REDIS_URL|SESSION_SECRET|ENCRYPTION_KEY|ORKSTAGE_LICENSE_KEY|(OIDC|SMTP|AWS|TOFU|API|WEB|APP|NODE)_.*)$/;
+const RESERVED_ENV = /^(DATABASE_URL|REDIS_URL|SESSION_SECRET|ENCRYPTION_KEY|ORKSTAGE_LICENSE_KEY|(OIDC|OAUTH|OTEL|SMTP|AWS|TOFU|API|WEB|APP|NODE)_.*)$/;
 
 export class EnvSecretResolver implements SecretResolver {
   constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}

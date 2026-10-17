@@ -376,6 +376,20 @@ export interface FeatureFlagDto {
   enabled: boolean;
 }
 
+/** One of the signed in person's sessions (`GET /me/sessions`). */
+export interface SessionDto {
+  id: string;
+  /** How it signed in: `dev`, or the identity provider key (`entra`, `google`, `github`...). */
+  method: string;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  /** The session making this request. */
+  current: boolean;
+}
+
 export interface ProviderDto {
   provider: string;
   displayName: string;
