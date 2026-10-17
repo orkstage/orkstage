@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DeploymentJob } from '@orkstage/contracts';
+import { platformMetrics } from '@orkstage/runtime';
 import type { Queue } from 'bullmq';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 
@@ -41,6 +42,7 @@ export class Housekeeping {
         where: { id: incident.id },
         data: { status: 'RESOLVED', resolvedAt: new Date(), updates: { create: { status: 'RESOLVED', message: `Resolved automatically: ${reason}` } } },
       });
+      platformMetrics.incidentResolved(incident.openedAt);
       await notify(this.ctx, { tenantId: incident.tenantId, event: 'incident.resolved', title: `Resolved: ${incident.title}`, body: reason, link: `/incidents/${incident.id}`, data: { incidentId: incident.id, instanceId } });
       await systemAudit(this.ctx, { tenantId: incident.tenantId, resourceType: 'Incident', resourceId: incident.id, action: 'AUTO_RESOLVE', changes: { reason } });
       resolved++;

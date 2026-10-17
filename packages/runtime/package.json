@@ -9,16 +9,31 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "default": "./dist/telemetry.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run && node scripts/telemetry-smoke.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "3.1146.0",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.223.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.223.0",
+    "@opentelemetry/instrumentation": "0.223.0",
+    "@opentelemetry/instrumentation-http": "0.223.0",
+    "@opentelemetry/instrumentation-ioredis": "0.71.0",
+    "@opentelemetry/instrumentation-undici": "0.33.0",
+    "@opentelemetry/resources": "2.12.0",
+    "@opentelemetry/sdk-metrics": "2.12.0",
+    "@opentelemetry/sdk-trace-node": "2.12.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
     "@orkstage/cloud-aws": "workspace:*",
     "@orkstage/cloud-azure": "workspace:*",
     "@orkstage/cloud-core": "workspace:*",
@@ -26,14 +41,15 @@
     "@orkstage/cloud-digitalocean": "workspace:*",
     "@orkstage/cloud-gcp": "workspace:*",
     "@orkstage/cloud-magalu": "workspace:*",
+    "@orkstage/cloud-mock": "workspace:*",
     "@orkstage/cloud-oci": "workspace:*",
     "@orkstage/cloud-render": "workspace:*",
     "@orkstage/cloud-supabase": "workspace:*",
     "@orkstage/cloud-vercel": "workspace:*",
     "@orkstage/cloud-vultr": "workspace:*",
-    "@orkstage/cloud-mock": "workspace:*",
     "@orkstage/domain": "workspace:*",
     "@orkstage/iac": "workspace:*",
+    "@prisma/instrumentation": "7.10.0",
     "ioredis": "6.0.0",
     "pino": "10.4.0",
     "zod": "4.6.5"

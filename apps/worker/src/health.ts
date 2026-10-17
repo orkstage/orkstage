@@ -2,7 +2,7 @@
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { AlertRule, InstanceResource } from '@orkstage/database';
 import { healthToStatus, type HealthState } from '@orkstage/domain';
-import { toCloudTarget } from '@orkstage/runtime';
+import { platformMetrics, toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
 import { instanceHealth, syncStatusComponents } from './status.js';
@@ -75,6 +75,7 @@ export class HealthMonitor {
     } catch (err) {
       message = `Health check error: ${(err as Error).message.slice(0, 200)}`;
     }
+    platformMetrics.healthCheck(r.provider, state);
 
     let drift = r.drift;
     let driftChecked = true;
@@ -119,6 +120,7 @@ export class HealthMonitor {
           where: { id: open.id },
           data: { status: 'RESOLVED', resolvedAt: new Date(), updates: { create: { status: 'RESOLVED', message: `Health restored for ${r.resourceId}.` } } },
         });
+        platformMetrics.incidentResolved(open.openedAt);
         await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.resolved', title: `Resolved: ${open.title}`, body: 'The affected component is healthy again.', link: `/incidents/${open.id}`, data: { incidentId: open.id, instanceId: instance.id } });
         await systemAudit(this.ctx, { tenantId: instance.tenantId, resourceType: 'Incident', resourceId: open.id, action: 'AUTO_RESOLVE' });
         continue;
@@ -156,6 +158,7 @@ export class HealthMonitor {
           throw err;
         });
       if (!incident) continue;
+      platformMetrics.incidentOpened('automated');
       if (rule.actions.includes('notify_owners')) {
         await notify(this.ctx, { tenantId: instance.tenantId, event: 'incident.opened', title: incident.title, body: 'We detected a problem and opened an incident. Follow updates on your status page.', link: `/incidents/${incident.id}`, data: { incidentId: incident.id, instanceId: instance.id, severity: incident.severity } });
       }

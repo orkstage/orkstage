@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { InvitationEmailJob, NotificationJob } from '@orkstage/contracts';
+import { platformMetrics } from '@orkstage/runtime';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';
 
@@ -85,6 +86,7 @@ Sign in with this email address (${job.to}). The link works once and expires on 
       } catch (err) {
         const message = (err as Error).message.slice(0, 300);
         logger.warn({ deliveryId: d.id, err: message }, 'email delivery failed');
+        platformMetrics.notificationFailed('email');
         await prisma.notificationDelivery.update({ where: { id: d.id }, data: { status: 'FAILED', attempts: d.attempts + 1, lastError: message } });
       }
     }

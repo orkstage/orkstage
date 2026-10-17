@@ -7,6 +7,7 @@ import {
   createSecretResolver,
   loadConfig,
   SecretBox,
+  traceCarrier,
   type PlatformConfig,
 } from '@orkstage/runtime';
 import type { AdapterRegistry } from '@orkstage/cloud-core';
@@ -56,17 +57,17 @@ export class Queues implements OnApplicationShutdown {
 
   /** The job carries an invitation link: it leaves the queue as soon as it is sent or gives up. */
   async enqueueInvitationEmail(job: InvitationEmailJob) {
-    await this.emails.add(job.kind, job, { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true });
+    await this.emails.add(job.kind, { ...job, _trace: traceCarrier() }, { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true, removeOnFail: true });
   }
 
   /** jobId = run id: a repeated enqueue of the same run collapses into one job. */
   async enqueueTrigger(runId: string) {
-    await this.triggers.add('run', { runId }, { jobId: runId, attempts: 1, removeOnComplete: 1000, removeOnFail: 5000 });
+    await this.triggers.add('run', { runId, _trace: traceCarrier() }, { jobId: runId, attempts: 1, removeOnComplete: 1000, removeOnFail: 5000 });
   }
 
   /** jobId = deployment id (+ phase) so duplicate enqueues collapse into one job. */
   async enqueueDeployment(deploymentId: string, phase = 'run') {
-    await this.deployments.add('deployment', { deploymentId }, {
+    await this.deployments.add('deployment', { deploymentId, _trace: traceCarrier() }, {
       jobId: `${deploymentId}--${phase}`,
       attempts: 1,
       removeOnComplete: 1000,
@@ -75,7 +76,7 @@ export class Queues implements OnApplicationShutdown {
   }
 
   async notify(job: NotificationJob) {
-    await this.notifications.add('notify', job, {
+    await this.notifications.add('notify', { ...job, _trace: traceCarrier() }, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 5000 },
       removeOnComplete: 1000,
