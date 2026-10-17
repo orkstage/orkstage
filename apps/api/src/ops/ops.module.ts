@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
 import { AlertRulesController } from './alert-rules.controller.js';
+import { CustomerOverviewController } from './customer-overview.controller.js';
 import { IncidentsController } from './incidents.controller.js';
 import { OpsController } from './ops.controller.js';
 import { StatusPagesController } from './status-pages.controller.js';
 
-@Module({ controllers: [OpsController, IncidentsController, AlertRulesController, StatusPagesController] })
+@Module({ controllers: [OpsController, IncidentsController, AlertRulesController, StatusPagesController, CustomerOverviewController] })
 export class OpsModule {}

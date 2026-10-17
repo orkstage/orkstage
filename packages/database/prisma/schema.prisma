@@ -624,6 +624,7 @@ model HealthCheckResult {
   checkedAt  DateTime    @default(now()) @db.Timestamptz(3)
 
   @@index([instanceId, checkedAt])
+  @@index([tenantId, checkedAt])
   @@index([checkedAt])
 }
 
