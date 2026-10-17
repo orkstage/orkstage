@@ -44,6 +44,9 @@ pnpm typecheck
 pnpm test           # vitest in every package
 pnpm -C packages/<name> test        # one package
 pnpm db:deploy && pnpm db:seed      # needs DATABASE_URL (local stack: see orkstage-dev)
+# API integration tests (tenant isolation, keys, team, audit): after build, on a migrated and
+# seeded database with Redis; AUTH_DEV_LOGIN_ENABLED=true. CI runs them on every pull request.
+pnpm --filter @orkstage/api test:integration
 pnpm audit --audit-level high       # CI runs this
 ```
 
