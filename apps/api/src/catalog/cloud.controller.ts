@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { type ApplicationDto, type CapabilityDto, type CloudTargetDto, createCloudTargetSchema, type ProviderDto, setDefaultTargetSchema, validateTargetSchema } from '@orkstage/contracts';
+import { type ApplicationDto, type CapabilityDto, type CloudTargetDto, createCloudTargetSchema, type ProviderDto, validateTargetSchema } from '@orkstage/contracts';
 import { PROVIDER_INFO } from '@orkstage/domain';
 import type { CloudTarget as CloudTargetRow, PrismaClient } from '@orkstage/database';
 import { findSecretLikeKeys, toCloudTarget } from '@orkstage/runtime';
@@ -85,34 +85,8 @@ export class CloudController {
     await this.flags.assertProvider(body.provider, body.tenantId);
     const clash = await this.prisma.cloudTarget.findFirst({ where: { tenantId: body.tenantId ?? null, name: { equals: body.name, mode: 'insensitive' } }, select: { id: true } });
     if (clash) throw conflict('TARGET_NAME_TAKEN', `A cloud target named "${body.name}" already exists here.`);
-    const row = await this.prisma.$transaction(async (tx) => {
-      if (body.isDefault) await tx.cloudTarget.updateMany({ where: { tenantId: body.tenantId ?? null, provider: body.provider, environment: body.environment, isDefault: true }, data: { isDefault: false } });
-      return tx.cloudTarget.create({ data: { ...body, config: body.config as object } });
-    });
+    const row = await this.prisma.cloudTarget.create({ data: { ...body, config: body.config as object } });
     await this.audit.record({ principal: p, tenantId: row.tenantId, resourceType: 'CloudTarget', resourceId: row.id, action: 'CREATE', correlationId, changes: { provider: row.provider, name: row.name, regions: row.allowedRegions } });
-    return this.toDto(row);
-  }
-
-  /** Makes a target the default of its tenant scope, provider and environment (or stops it being one). */
-  @Post('cloud/targets/:id/default')
-  @HttpCode(200)
-  @ApiZodBody(setDefaultTargetSchema)
-  async setDefault(
-    @CurrentPrincipal() p: RequestPrincipal,
-    @Param('id', ParseUUIDPipe) id: string,
-    @ZodBody(setDefaultTargetSchema) body: z.infer<typeof setDefaultTargetSchema>,
-    @CorrelationId() correlationId: string,
-  ): Promise<CloudTargetDto> {
-    authorize(p, 'update', 'CloudTarget');
-    const target = await this.prisma.cloudTarget.findUnique({ where: { id } });
-    if (!target) throw notFound('Cloud target');
-    const row = await this.prisma.$transaction(async (tx) => {
-      if (body.isDefault) {
-        await tx.cloudTarget.updateMany({ where: { tenantId: target.tenantId, provider: target.provider, environment: target.environment, isDefault: true, id: { not: id } }, data: { isDefault: false } });
-      }
-      return tx.cloudTarget.update({ where: { id }, data: { isDefault: body.isDefault } });
-    });
-    await this.audit.record({ principal: p, tenantId: row.tenantId, resourceType: 'CloudTarget', resourceId: row.id, action: body.isDefault ? 'SET_DEFAULT' : 'UNSET_DEFAULT', correlationId, changes: { provider: row.provider, environment: row.environment } });
     return this.toDto(row);
   }
 
@@ -181,7 +155,6 @@ export class CloudController {
       simulates: r.provider === 'mock' ? String(config.simulate ?? 'aws') : null,
       name: r.name,
       environment: r.environment,
-      isDefault: r.isDefault,
       config,
       hasCredentialRef: Boolean(r.credentialRef),
       allowedRegions: r.allowedRegions,

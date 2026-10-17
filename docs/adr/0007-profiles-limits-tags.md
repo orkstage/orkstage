@@ -75,8 +75,10 @@ becomes a tenant override set to off. Then `Tenant.planId` and `Plan` are droppe
   instances.
 - `CloudTarget.isDefault` and `POST /cloud/targets/{id}/default` are removed.
 - API: `GET /profiles` (own and shared), `POST /profiles`, `GET`, `PATCH` and `DELETE
-  /profiles/{id}`, `POST /profiles/{id}/default`. Platform staff manage shared profiles; tenant
-  owners and admins manage their tenant's. Deleting a profile leaves instances as they are.
+  /profiles/{id}`, `POST /profiles/{id}/default`. Platform owners and admins manage profiles,
+  shared or per tenant, because they manage the cloud targets that tenant roles never see; tenant
+  members read their tenant's and the shared ones and create instances from them without seeing a
+  target. Deleting a profile leaves instances as they are.
 
 **Migration.** For every tenant scope and environment with a default target, a profile named after
 the environment (for example "production") is created with those targets and marked default.

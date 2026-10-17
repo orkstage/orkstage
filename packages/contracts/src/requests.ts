@@ -78,16 +78,33 @@ export const createCloudTargetSchema = z.object({
   defaultRegion: z.string().min(2),
   tenantId: uuid.optional(),
   maxConcurrentDeployments: z.number().int().min(1).max(20).default(3),
-  /** The default target of its tenant scope, provider and environment (see setDefaultTargetSchema). */
-  isDefault: z.boolean().default(false),
 });
-
-/** Instances whose slot is left unbound get the default target of their environment. */
-export const setDefaultTargetSchema = z.object({ isDefault: z.boolean() });
 
 export const validateTargetSchema = z.object({ region: z.string().optional() });
 
 export const bindingSchema = z.object({ targetId: uuid, region: z.string().min(2) });
+
+/** One provider of a profile: the provider comes from the target; no region means its default. */
+export const profileTargetSchema = z.object({ targetId: uuid, region: z.string().min(2).optional() });
+
+/**
+ * A named setup for an environment (ADR 0007): the target, and optionally the region, per
+ * provider. Without `tenantId` the profile is shared with every tenant (platform staff only).
+ */
+export const createProfileSchema = z.object({
+  tenantId: uuid.optional(),
+  name: z.string().min(2).max(80),
+  environment: z.enum(TARGET_ENVIRONMENTS),
+  isDefault: z.boolean().default(false),
+  targets: z.array(profileTargetSchema).min(1).max(20),
+});
+export const updateProfileSchema = z.object({
+  name: z.string().min(2).max(80).optional(),
+  environment: z.enum(TARGET_ENVIRONMENTS).optional(),
+  targets: z.array(profileTargetSchema).min(1).max(20).optional(),
+});
+/** One default profile per tenant scope and environment: setting one clears the previous. */
+export const setDefaultProfileSchema = z.object({ isDefault: z.boolean() });
 
 export const createInstanceSchema = z.object({
   tenantId: uuid,
@@ -96,8 +113,12 @@ export const createInstanceSchema = z.object({
   environment: z.enum(ENVIRONMENTS).default('production'),
   templateVersionId: uuid,
   variables: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
-  /** Slots left out are bound to the default target of the instance's environment, if there is one. */
+  /**
+   * Slots left out are bound from this profile, or from the default profile of the instance's
+   * environment (ADR 0007), when it has a target for a provider the slot accepts.
+   */
   bindings: z.record(z.string(), bindingSchema).default({}),
+  profileId: uuid.optional(),
 });
 
 export const updateInstanceSchema = z.object({

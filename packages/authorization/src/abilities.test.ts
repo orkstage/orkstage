@@ -113,3 +113,24 @@ describe('tenant members', () => {
     expect(owner.can('create', subject('Member', { tenantId: 'acme' }))).toBe(true);
   });
 });
+
+describe('profiles (ADR 0007)', () => {
+  const own = subject('Profile', { tenantId: 'acme' });
+  const shared = subject('Profile', { tenantId: null });
+  const other = subject('Profile', { tenantId: 'globex' });
+
+  it('members read their tenant and shared profiles; they do not manage them', () => {
+    const viewer = defineAbilityFor({ userId: 'v', memberships: [{ tenantId: 'acme', role: 'CustomerViewer' }] });
+    const admin = defineAbilityFor({ userId: 'a', memberships: [{ tenantId: 'acme', role: 'CustomerAdmin' }] });
+    expect([viewer.can('read', own), viewer.can('read', shared), viewer.can('read', other)]).toEqual([true, true, false]);
+    expect(viewer.can('update', own)).toBe(false);
+    expect([admin.can('create', own), admin.can('update', shared), admin.can('delete', other)]).toEqual([false, false, false]);
+  });
+
+  it('platform admins manage shared profiles; operators only read them', () => {
+    const admin = defineAbilityFor({ userId: 'p', platformRole: 'PlatformAdmin', memberships: [] });
+    const operator = defineAbilityFor({ userId: 'o', platformRole: 'PlatformOperator', memberships: [] });
+    expect(admin.can('create', shared)).toBe(true);
+    expect([operator.can('read', shared), operator.can('update', shared)]).toEqual([true, false]);
+  });
+});

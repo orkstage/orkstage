@@ -52,7 +52,10 @@ package is the source of truth, and this page is the map.
 | GET/POST | `/cloud/targets` | `CloudTargetDto[]` or register a target |
 | POST | `/cloud/targets/:id/validate` `{region?}` | runs the adapter validation and stores the result |
 | GET | `/cloud/targets/:id/capabilities` | `CapabilityDto[]` |
-| GET/POST | `/instances` | list (`?tenantId`) or create a DRAFT |
+| GET/POST | `/profiles` | `ProfileDto[]` (shared and the caller's tenants, `?tenantId`) or create a profile (ADR 0007) |
+| GET/PATCH/DELETE | `/profiles/:id` | one profile; deleting it leaves instances as they are |
+| POST | `/profiles/:id/default` `{isDefault}` | the default profile of its tenant scope and environment |
+| GET/POST | `/instances` | list (`?tenantId`) or create a DRAFT; slots left out of `bindings` come from `profileId` or the default profile |
 | GET/PATCH | `/instances/:id` | `InstanceDto` with resources and the last deployment |
 | POST | `/instances/:id/preview` | `PreviewDto`: compile, policies, cost and plan, without changes |
 | POST | `/instances/:id/deploy` | `202 DeploymentSummaryDto` |

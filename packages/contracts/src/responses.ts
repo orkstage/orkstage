@@ -76,8 +76,6 @@ export interface CloudTargetDto {
   simulates: string | null;
   name: string;
   environment: string;
-  /** The default target of its tenant scope, provider and environment. */
-  isDefault: boolean;
   config: Record<string, unknown>;
   hasCredentialRef: boolean;
   allowedRegions: string[];
@@ -123,6 +121,21 @@ export interface ResourceDto {
   driftChanges: { address: string; action: string }[];
 }
 
+/** A profile (ADR 0007): the target and region per provider for one environment. */
+export interface ProfileDto {
+  id: string;
+  /** Null when the profile is shared with every tenant. */
+  tenantId: string | null;
+  name: string;
+  environment: string;
+  isDefault: boolean;
+  targets: { provider: string; targetId: string; targetName: string; region: string | null; defaultRegion: string }[];
+  /** Instances created from it. */
+  instanceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface InstanceDto {
   id: string;
   tenantId: string;
@@ -136,6 +149,8 @@ export interface InstanceDto {
   template: { id: string; name: string; displayName: string; version: string; versionId: string };
   variables: Record<string, unknown>;
   bindings: Record<string, { targetId: string; region: string }>;
+  /** The profile the unbound slots were bound from at creation (ADR 0007). */
+  profile: { id: string; name: string } | null;
   protectedFromDestroy: boolean;
   createdAt: string;
   updatedAt: string;

@@ -191,14 +191,21 @@ async function main() {
           provider: 'mock',
           name: t.name,
           environment: 'any',
-          // The local default: instances whose slots are left unbound use it.
-          isDefault: t.name === 'Simulated AWS — us-east-1',
           config: { simulate: t.simulate, seed: t.simulate, latencyMs: { min: 600, max: 2200 } },
           allowedRegions: t.regions,
           defaultRegion: t.regions[0]!,
         },
       }));
     targetIds[t.simulate] = row.id;
+  }
+
+  // The shared default profile (ADR 0007): instances whose slots are left unbound use the
+  // simulated AWS target, in every environment, unless a tenant has its own default profile.
+  // A database migrated from default targets already has one, named after its environment.
+  if ((await prisma.profile.count({ where: { tenantId: null, environment: 'any', isDefault: true } })) === 0) {
+    await prisma.profile.create({
+      data: { name: 'Simulation', environment: 'any', isDefault: true, targets: { create: [{ provider: 'mock', targetId: targetIds.aws! }] } },
+    });
   }
 
   if ((await prisma.alertRule.count({ where: { tenantId: null } })) === 0) {
