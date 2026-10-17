@@ -5,6 +5,7 @@ import { healthToStatus, type HealthState } from '@orkstage/domain';
 import { platformMetrics, toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
+import { DomainMonitor } from './domains.js';
 import { MetricAlerts } from './metric-alerts.js';
 import { instanceHealth, syncStatusComponents } from './status.js';
 
@@ -21,9 +22,11 @@ interface HealthCondition {
  */
 export class HealthMonitor {
   private readonly metricAlerts: MetricAlerts;
+  private readonly domains: DomainMonitor;
 
   constructor(private readonly ctx: WorkerContext) {
     this.metricAlerts = new MetricAlerts(ctx);
+    this.domains = new DomainMonitor(ctx);
   }
 
   async tick(): Promise<void> {
@@ -57,6 +60,7 @@ export class HealthMonitor {
       await this.metricAlerts.evaluate(instance, fresh.filter((r) => !inMaintenance.has(r.resourceId)), scoped, targets);
     }
     await this.announceMaintenance();
+    await this.domains.tick(targets);
   }
 
   /** Tells the tenant and the status page subscribers when a maintenance window starts and ends. */

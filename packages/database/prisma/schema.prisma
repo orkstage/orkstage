@@ -388,6 +388,7 @@ model Instance {
   transitions     InstanceTransition[]
   components      StatusComponent[]
   triggerRuns     TriggerRun[]
+  domains         Domain[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -1012,4 +1013,58 @@ model MarketplaceStar {
 
   @@id([listingId, userId])
   @@index([userId])
+}
+
+enum DomainKind {
+  /// The subdomain OrkStage creates in the platform zone (the `dns` resource).
+  PLATFORM
+  /// A hostname the tenant owns, attached after its ownership is verified.
+  CUSTOM
+}
+
+enum DomainStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  FAILED
+}
+
+enum CertificateStatus {
+  NONE
+  PENDING_VALIDATION
+  ISSUED
+  EXPIRING
+  EXPIRED
+  FAILED
+}
+
+/// A hostname served by an instance (spec §23, open item 9). Hostnames are unique across the
+/// platform: a hostname attached to one tenant cannot be claimed by another.
+model Domain {
+  id                   String            @id @default(uuid(7)) @db.Uuid
+  tenantId             String            @db.Uuid
+  instanceId           String            @db.Uuid
+  /// Logical id of the resource that serves it (`dns` or `web.frontend`).
+  resourceId           String
+  hostname             String            @unique
+  kind                 DomainKind
+  status               DomainStatus      @default(PENDING_VERIFICATION)
+  /// Value of the TXT record `_orkstage-challenge.<hostname>` that proves ownership.
+  verificationToken    String
+  verifiedAt           DateTime?         @db.Timestamptz(3)
+  lastCheckedAt        DateTime?         @db.Timestamptz(3)
+  lastError            String?
+  certificateStatus    CertificateStatus @default(NONE)
+  certificateExpiresAt DateTime?         @db.Timestamptz(3)
+  /// DNS records the certificate authority needs (name, type, value), when the tenant must add them.
+  certificateRecords   Json              @default("[]")
+  /// The last expiry warning sent (days before expiry), so each one goes out once.
+  expiryNoticeDays     Int?
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([instanceId])
+  @@index([status, lastCheckedAt])
 }

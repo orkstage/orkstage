@@ -476,3 +476,19 @@ describe('compiler: marketplace templates', () => {
     expect(preview.providers).toEqual(['vercel', 'render', 'supabase', 'aws', 'gcp', 'azure', 'digitalocean']);
   });
 });
+
+describe('custom domains (open item 9)', () => {
+  it('puts verified custom domains in the dns spec, and the certificate flag once it is issued', () => {
+    const base = input(templates['multicloud-reference']!, multiCloudBindings);
+    const plain = compileInfrastructure(base, registry()).resources.find((r) => r.id === 'dns')!;
+    expect(plain.spec.customDomains).toBeUndefined();
+
+    const withDomain = compileInfrastructure({ ...base, customDomains: { dns: ['www.acme.test', 'api.acme.test'] } }, registry()).resources.find((r) => r.id === 'dns')!;
+    expect(withDomain.spec.customDomains).toEqual(['api.acme.test', 'www.acme.test']);
+    expect(withDomain.spec.customCertificateIssued).toBeUndefined();
+    expect(withDomain.specHash).not.toBe(plain.specHash);
+
+    const issued = compileInfrastructure({ ...base, customDomains: { dns: ['api.acme.test'] }, customCertificatesIssued: ['dns'] }, registry()).resources.find((r) => r.id === 'dns')!;
+    expect(issued.spec.customCertificateIssued).toBe(true);
+  });
+});

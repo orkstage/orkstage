@@ -208,6 +208,23 @@ export interface MetricPoint {
   value: number;
 }
 
+/** A DNS record someone must create, e.g. for certificate validation. */
+export interface DnsRecord {
+  name: string;
+  type: 'CNAME' | 'TXT' | 'A';
+  value: string;
+}
+
+/** TLS certificate state for one hostname served by a resource (open item 9). */
+export interface CertificateInfo {
+  hostname: string;
+  status: 'PENDING_VALIDATION' | 'ISSUED' | 'EXPIRED' | 'FAILED';
+  /** ISO time the certificate stops being valid. */
+  notAfter?: string;
+  /** Records the certificate authority still needs, when the hostname is outside the platform zone. */
+  records?: DnsRecord[];
+}
+
 /**
  * Every provider integration implements this contract (spec §8). The domain never imports a
  * cloud SDK; it only talks to adapters. Adapters must be idempotent: `ensureResource` creates
@@ -247,6 +264,15 @@ export interface CloudProviderAdapter {
 
   getLogs?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<LogLine[]>;
   getMetric?(ctx: ProviderContext, resource: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]>;
+
+  /** Certificates of the hostnames a `dns` or `web.frontend` resource serves (open item 9). */
+  getCertificates?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<CertificateInfo[]>;
+
+  /**
+   * Simulation adapters answer DNS lookups from their own records, so domain verification can be
+   * exercised without a real zone. Real adapters leave this out and the platform asks public DNS.
+   */
+  lookupDns?(ctx: ProviderContext, name: string, type: 'TXT' | 'CNAME'): Promise<string[]>;
 
   /**
    * Reads a `secret_ref` this adapter published (e.g. a generated database password), so a

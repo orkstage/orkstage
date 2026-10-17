@@ -3,6 +3,7 @@ import {
   allowlistAddresses,
   ProviderError,
   secretEnvironment,
+  type CertificateInfo,
   type CloudCapability,
   type CloudProviderAdapter,
   type CloudTarget,
@@ -247,6 +248,47 @@ export class MockAdapter implements CloudProviderAdapter {
     });
   }
 
+  /**
+   * Certificates of a simulated `dns` or `web.frontend` resource: issued, valid for 60 days from
+   * now (as if renewed on time), unless a test pinned an expiry with `setCertificateExpiry`.
+   */
+  async getCertificates(_ctx: ProviderContext, res: ResourceIdentifier): Promise<CertificateInfo[]> {
+    const out = (res.outputs ?? {}) as Record<string, unknown>;
+    const list = (v: unknown) => (typeof v === 'string' && v ? v.split(',') : []);
+    const hostnames =
+      res.serviceKind === 'dns'
+        ? [String(out.fqdn ?? ''), ...list(out.custom_domains)]
+        : res.serviceKind === 'web.frontend'
+          ? [String(out.url ?? '').replace(/^https?:\/\//, ''), ...list(out.domains)]
+          : [];
+    const certs: CertificateInfo[] = [];
+    for (const hostname of hostnames.filter(Boolean)) {
+      const pinned = await this.store.get(`cert:${hostname}`);
+      const notAfter = pinned ?? new Date(Date.now() + 60 * 86_400_000).toISOString();
+      certs.push({ hostname, status: Date.parse(notAfter) <= Date.now() ? 'EXPIRED' : 'ISSUED', notAfter });
+    }
+    return certs;
+  }
+
+  /** Simulation control: pin when the certificate of a hostname expires (null: back to renewed). */
+  async setCertificateExpiry(hostname: string, notAfter: string | null): Promise<void> {
+    if (notAfter === null) await this.store.delete(`cert:${hostname}`);
+    else await this.store.set(`cert:${hostname}`, notAfter);
+  }
+
+  /** Simulated public DNS: records set with `setDnsRecord`, shared by every simulated target. */
+  async lookupDns(_ctx: ProviderContext, name: string, type: 'TXT' | 'CNAME'): Promise<string[]> {
+    const stored = await this.store.get(`dns:${type}:${name.toLowerCase()}`);
+    return stored ? (JSON.parse(stored) as string[]) : [];
+  }
+
+  /** Simulation control: create (or with null, remove) a DNS record in the simulated public DNS. */
+  async setDnsRecord(name: string, type: 'TXT' | 'CNAME', values: string[] | null): Promise<void> {
+    const key = `dns:${type}:${name.toLowerCase()}`;
+    if (values === null || values.length === 0) await this.store.delete(key);
+    else await this.store.set(key, JSON.stringify(values));
+  }
+
   /** Simulation control: pin a metric of a resource to a value (null: back to the series), for metric alerts. */
   async setMetricOverride(ctx: ProviderContext, name: string, metric: string, value: number | null): Promise<void> {
     if (value === null) await this.store.delete(this.metricKey(ctx, name, metric));
@@ -369,10 +411,14 @@ function outputsFor(req: ResourceRequest, region: string, simulate: string, id: 
       return { bucket: req.name, endpoint: `https://${req.name}.objects.${region}.${domain}` };
     case 'ingress':
       return { dnsName: `${req.name}.lb.${region}.${domain}` };
-    case 'dns':
-      return { fqdn: `${String(req.spec.subdomainLabel ?? req.name)}.platform.example.test`, tls: 'issued' };
-    case 'web.frontend':
-      return { url: `https://${req.name}.web.${domain}`, project_id: id };
+    case 'dns': {
+      const custom = Array.isArray(req.spec.customDomains) ? (req.spec.customDomains as string[]) : [];
+      return { fqdn: `${String(req.spec.subdomainLabel ?? req.name)}.platform.example.test`, tls: 'issued', ...(custom.length ? { custom_domains: custom.join(',') } : {}) };
+    }
+    case 'web.frontend': {
+      const domains = Array.isArray(req.spec.domains) ? (req.spec.domains as string[]) : [];
+      return { url: `https://${req.name}.web.${domain}`, project_id: id, ...(domains.length ? { domains: domains.join(',') } : {}) };
+    }
     default:
       return {};
   }

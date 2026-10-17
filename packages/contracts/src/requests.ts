@@ -196,6 +196,13 @@ export const simulateSchema = z.object({
   drift: z.boolean().optional(),
   /** Pin a metric to a value (null: back to the simulated series), to exercise metric alerts. */
   metric: z.object({ name: z.enum(['cpu', 'memory', 'requests', 'errors_5xx', 'latency_ms', 'connections']), value: z.number().nullable() }).optional(),
+  /**
+   * A domain of this instance in the simulated DNS: `ownershipRecord` creates (or removes) its TXT
+   * record, `certificateExpiresAt` pins when its certificate expires (null: renewed as usual).
+   */
+  domain: z
+    .object({ hostname: z.string().min(4).max(253), ownershipRecord: z.boolean().optional(), certificateExpiresAt: z.iso.datetime({ offset: true }).nullable().optional() })
+    .optional(),
 });
 
 /** The platform's metric names, the same on every provider (open item 7). */
@@ -284,6 +291,22 @@ export const updateMaintenanceSchema = z
   .partial()
   .strict()
   .refine((v) => !v.startsAt || !v.endsAt || Date.parse(v.endsAt) > Date.parse(v.startsAt), maintenanceOrder);
+
+/** A hostname the tenant owns: lowercase, at least two labels, no wildcard (open item 9). */
+export const hostnameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(253)
+  .regex(/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'a hostname such as api.example.com');
+
+export const addDomainSchema = z
+  .object({
+    hostname: hostnameSchema,
+    /** The `dns` or `web.frontend` resource that serves it; the only one when omitted. */
+    resourceId: z.string().min(1).max(63).optional(),
+  })
+  .strict();
 
 export const subscribeStatusSchema = z.object({ email: z.email().max(254) }).strict();
 

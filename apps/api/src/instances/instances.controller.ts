@@ -12,7 +12,7 @@ import {
 } from '@orkstage/contracts';
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
-import { isInstanceBusy, readTenantLimits } from '@orkstage/domain';
+import { challengeName, isInstanceBusy, readTenantLimits } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -327,6 +327,15 @@ export class InstancesController {
     if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, resource.name, body.health);
     if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, resource.name, body.drift);
     if (body.metric) await this.adapters.mock.setMetricOverride(ctx, resource.name, body.metric.name, body.metric.value);
+    if (body.domain) {
+      // Only hostnames of this instance: the simulated DNS is shared by every simulated target.
+      const domain = await this.prisma.domain.findFirst({ where: { instanceId: id, hostname: body.domain.hostname.toLowerCase() } });
+      if (!domain) throw notFound('Domain');
+      if (body.domain.ownershipRecord !== undefined) {
+        await this.adapters.mock.setDnsRecord(challengeName(domain.hostname), 'TXT', body.domain.ownershipRecord ? [domain.verificationToken] : null);
+      }
+      if (body.domain.certificateExpiresAt !== undefined) await this.adapters.mock.setCertificateExpiry(domain.hostname, body.domain.certificateExpiresAt);
+    }
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'InstanceResource', resourceId: `${id}/${body.resourceId}`, action: 'SIMULATE', correlationId, changes: body });
   }
 

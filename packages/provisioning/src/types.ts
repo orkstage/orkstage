@@ -29,6 +29,10 @@ export interface CompileInput {
    * issue; omitted means every registered provider is allowed.
    */
   providerEnabled?: (provider: CloudProvider) => boolean;
+  /** Verified custom hostnames by logical resource id (`dns` or `web.frontend`), open item 9. */
+  customDomains?: Record<string, string[]>;
+  /** Resources whose custom domain certificate was seen issued, so the listener can use it. */
+  customCertificatesIssued?: string[];
 }
 
 /** Platform-wide policy knobs (spec §33). Policies are evaluated before any cloud mutation. */

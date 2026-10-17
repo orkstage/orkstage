@@ -201,6 +201,8 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
           lb_arn: ingress.arn,
           default_target_group_arn: tgs[0] ?? '',
           tls: true,
+          custom_domains: Array.isArray(spec.customDomains) ? spec.customDomains : [],
+          attach_custom_certificate: spec.customCertificateIssued === true,
         },
       };
     }
