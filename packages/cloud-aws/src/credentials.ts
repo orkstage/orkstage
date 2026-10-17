@@ -15,11 +15,16 @@ export type StsClientFactory = (region: string) => Pick<STSClient, 'send'>;
 
 /** Emulators accept any credentials; these are not secrets. */
 const EMULATOR_CREDENTIALS: AwsCredentials = { accessKeyId: 'test', secretAccessKey: 'test' };
-const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+/** SDK calls: reuse cached credentials while they have at least this long left. */
+export const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+/** Default session length; the role's MaxSessionDuration must allow it. */
+export const DEFAULT_SESSION_SECONDS = 3600;
 
 /**
  * Short-lived credentials per target via cross-account AssumeRole with an external id
- * (spec §11). Cached in memory until shortly before expiry; never persisted or logged.
+ * (spec §11). Cached in memory while they still cover what the caller needs; never persisted or
+ * logged. The cache key includes the role and the credential reference, so editing a target takes
+ * effect at once in every process.
  */
 export class AwsCredentialProvider {
   private readonly cache = new Map<string, AwsCredentials>();
@@ -27,14 +32,21 @@ export class AwsCredentialProvider {
   constructor(
     private readonly resolveExternalId: ExternalIdResolver,
     private readonly stsFactory: StsClientFactory = (region) => new STSClient({ region }),
+    private readonly sessionSeconds: number = DEFAULT_SESSION_SECONDS,
+    private readonly now: () => number = Date.now,
   ) {}
 
-  async get(ctx: ProviderContext): Promise<AwsCredentials> {
+  /**
+   * Credentials valid for at least `minValidityMs` from now. SDK calls take the default margin;
+   * an OpenTofu run asks for its whole timeout, so an apply never starts with credentials that
+   * expire halfway through it.
+   */
+  async get(ctx: ProviderContext, minValidityMs = REFRESH_MARGIN_MS): Promise<AwsCredentials> {
     const cfg = awsConfig(ctx.target);
     if (isEmulator(cfg)) return EMULATOR_CREDENTIALS;
-    const key = `${ctx.target.id}:${ctx.region}`;
+    const key = [ctx.target.id, cfg.roleArn ?? '', ctx.target.credentialRef ?? '', ctx.region].join('|');
     const cached = this.cache.get(key);
-    if (cached?.expiration && cached.expiration.getTime() - Date.now() > REFRESH_MARGIN_MS) return cached;
+    if (cached?.expiration && cached.expiration.getTime() - this.now() > minValidityMs) return cached;
     if (!cfg.roleArn) throw new ProviderError('AWS_ROLE_MISSING', 'The AWS target has no deployment role configured.', 'AUTHENTICATION_ERROR', 'aws');
 
     const externalId = ctx.target.credentialRef ? await this.resolveExternalId(ctx.target.credentialRef) : undefined;
@@ -43,13 +55,19 @@ export class AwsCredentialProvider {
         RoleArn: cfg.roleArn,
         RoleSessionName: `orkstage-${ctx.correlationId}`.replace(/[^\w+=,.@-]/g, '').slice(0, 64),
         ExternalId: externalId,
-        DurationSeconds: 3600,
+        DurationSeconds: this.sessionSeconds,
       }),
       { abortSignal: ctx.signal },
     );
     const c = out.Credentials;
     if (!c?.AccessKeyId || !c.SecretAccessKey) throw new ProviderError('AWS_ASSUME_ROLE_FAILED', 'STS returned no credentials.', 'AUTHENTICATION_ERROR', 'aws');
     const creds = { accessKeyId: c.AccessKeyId, secretAccessKey: c.SecretAccessKey, sessionToken: c.SessionToken, expiration: c.Expiration };
+    if (creds.expiration && creds.expiration.getTime() - this.now() < minValidityMs) {
+      ctx.log?.(
+        'warn',
+        `AWS credentials last ${Math.round(this.sessionSeconds / 60)} minutes, less than this OpenTofu run may take. Raise AWS_ROLE_SESSION_MINUTES and the role's MaxSessionDuration, or lower TOFU_TIMEOUT_MINUTES.`,
+      );
+    }
     this.cache.set(key, creds);
     return creds;
   }

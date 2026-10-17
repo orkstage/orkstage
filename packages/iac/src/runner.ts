@@ -129,7 +129,8 @@ interface JsonLine {
  */
 export class TofuRunner {
   private readonly docker: string;
-  private readonly timeoutMs: number;
+  /** Longest a single OpenTofu command may run before it is stopped. */
+  readonly timeoutMs: number;
 
   constructor(private readonly opts: TofuRunnerOptions) {
     this.docker = opts.dockerBin ?? 'docker';

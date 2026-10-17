@@ -50,6 +50,7 @@ package is the source of truth, and this page is the map.
 | GET | `/applications` | `ApplicationDto[]` (image catalog) |
 | GET | `/cloud/providers` | providers with an installed adapter |
 | GET/POST | `/cloud/targets` | `CloudTargetDto[]` or register a target |
+| PATCH | `/cloud/targets/:id` `{name?, config?, credentialRef?, allowedRegions?, defaultRegion?, maxConcurrentDeployments?}` | edits a target; `config` is merged (`null` removes a key); fixed fields (the account, the state location) and regions still in use are refused; clears the last validation |
 | POST | `/cloud/targets/:id/validate` `{region?}` | runs the adapter validation and stores the result |
 | GET | `/cloud/targets/:id/capabilities` | `CapabilityDto[]` |
 | GET/POST | `/profiles` | `ProfileDto[]` (shared and the caller's tenants, `?tenantId`) or create a profile (ADR 0007) |

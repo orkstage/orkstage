@@ -80,6 +80,22 @@ export const createCloudTargetSchema = z.object({
   maxConcurrentDeployments: z.number().int().min(1).max(20).default(3),
 });
 
+/**
+ * Editing a target (A4). Provider, tenant and environment never change; neither do the config
+ * fields a provider marks `fixed` (the account, the state location). `config` is merged into the
+ * stored one, and a `null` value removes that key. Any change clears the last validation.
+ */
+export const updateCloudTargetSchema = z
+  .object({
+    name: z.string().min(2).max(80).optional(),
+    config: z.record(z.string(), z.unknown().nullable()).optional(),
+    credentialRef: z.string().max(300).regex(SECRET_REF_PATTERN, 'Use a secret reference (env://NAME or aws-sm://name-or-arn), never the secret value.').optional(),
+    allowedRegions: z.array(z.string().min(2)).min(1).optional(),
+    defaultRegion: z.string().min(2).optional(),
+    maxConcurrentDeployments: z.number().int().min(1).max(20).optional(),
+  })
+  .strict();
+
 export const validateTargetSchema = z.object({ region: z.string().optional() });
 
 export const bindingSchema = z.object({ targetId: uuid, region: z.string().min(2) });
