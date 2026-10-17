@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Licensing, type EnterpriseFeature } from '@orkstage/licensing';
+import type { LicenseDto } from '@orkstage/contracts';
 import type { PlatformConfig } from '@orkstage/runtime';
 import { Controller, Get, Global, Inject, Injectable, Logger, Module, SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -36,7 +37,7 @@ export class LicenseController {
 
   @Scope('*')
   @Get()
-  get() {
+  get(): LicenseDto {
     const s = this.licensing.state;
     return { edition: s.edition, status: s.status, customer: s.customer ?? null, features: s.features, expiresAt: s.expiresAt ?? null, message: s.message };
   }

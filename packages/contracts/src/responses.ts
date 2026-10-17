@@ -381,3 +381,29 @@ export interface ProviderDto {
   /** False when the provider's feature flag is off for the caller's scope. */
   enabled: boolean;
 }
+
+/**
+ * The feature keys an Enterprise license can grant (ENTERPRISE_FEATURES in @orkstage/licensing,
+ * which is not browser safe; a test keeps both lists equal).
+ */
+export const ENTERPRISE_FEATURE_KEYS = [
+  'audit.export',
+  'auth.saml',
+  'auth.scim',
+  'rbac.custom-roles',
+  'approvals.multi-step',
+  'policies.packs',
+  'organizations.multiple',
+  'status.white-label',
+] as const;
+export type EnterpriseFeatureKey = (typeof ENTERPRISE_FEATURE_KEYS)[number];
+
+/** `GET /license`: the edition and what the license grants. Never the key itself. */
+export interface LicenseDto {
+  edition: 'community' | 'enterprise';
+  status: 'community' | 'active' | 'grace' | 'expired' | 'invalid';
+  customer: string | null;
+  features: EnterpriseFeatureKey[];
+  expiresAt: string | null;
+  message: string;
+}
