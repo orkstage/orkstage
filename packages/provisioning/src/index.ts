@@ -10,3 +10,4 @@ export * from './workflow.js';
 export * from './provider-plan.js';
 export * from './triggers.js';
 export * from './preview.js';
+export * from './policy-config.js';

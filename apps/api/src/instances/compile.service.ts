@@ -5,6 +5,7 @@ import { isProviderEnabled, readTenantLimits, tenantFeatures } from '@orkstage/d
 import {
   compileInfrastructure,
   diffPlan,
+  effectivePolicy,
   renderPlan,
   type EnvironmentKind,
   type KnownResource,
@@ -28,6 +29,8 @@ export interface CompileRequest {
   templateVersionId: string;
   variables: VariableValues;
   bindings: Record<string, { targetId: string; region: string }>;
+  /** The instance labels; read from the instance when omitted. */
+  labels?: Record<string, string>;
 }
 
 /**
@@ -77,6 +80,7 @@ export class CompileService {
     );
 
     const flags = await this.flags.forTenant(req.tenantId);
+    const labels = req.labels ?? ((await this.prisma.instance.findUnique({ where: { id: req.instanceId }, select: { labels: true } }))?.labels as Record<string, string> | undefined) ?? {};
     // Verified custom domains (open item 9) join the spec of the resource that serves them.
     const domains = await this.prisma.domain.findMany({ where: { instanceId: req.instanceId, kind: 'CUSTOM', status: 'VERIFIED' }, orderBy: { hostname: 'asc' } });
     const customDomains: Record<string, string[]> = {};
@@ -91,10 +95,11 @@ export class CompileService {
         features: tenantFeatures(flags),
         organizationId: tenant.organizationId,
         tenant: { id: tenant.id, slug: tenant.slug },
-        instance: { id: req.instanceId, slug: req.instanceSlug, environment: req.environment as EnvironmentKind },
+        instance: { id: req.instanceId, slug: req.instanceSlug, environment: req.environment as EnvironmentKind, labels },
         bindings,
         images,
-        policy: (policySetting?.value ?? {}) as PolicyConfig,
+        // The platform policy, tightened by the tenant's (open item 12).
+        policy: effectivePolicy((policySetting?.value ?? {}) as PolicyConfig, (tenant.policy ?? {}) as PolicyConfig),
         providerEnabled: (provider) => isProviderEnabled(flags, provider),
         customDomains,
         customCertificatesIssued,

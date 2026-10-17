@@ -155,6 +155,7 @@ export interface InstanceDto {
   /** The profile the unbound slots were bound from at creation (ADR 0007). */
   profile: { id: string; name: string } | null;
   protectedFromDestroy: boolean;
+  labels: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   resources?: ResourceDto[];
@@ -534,4 +535,25 @@ export interface CustomerOverviewDto {
   }[];
   openIncidents: IncidentDto[];
   recentActivity: { at: string; kind: 'deployment' | 'incident'; message: string; link: string }[];
+}
+
+export interface PolicyConfigDto {
+  allowedRegions?: string[];
+  maxMonthlyCostUsd?: number;
+  maxReplicas?: number;
+  machineSizes?: { cpu: number; memoryMiB: number }[];
+  approvedRegistries?: string[];
+  requiredLabels?: string[];
+  minTlsVersion?: '1.2' | '1.3';
+  minLogRetentionDays?: number;
+  disabled?: string[];
+}
+
+/** The policy of a tenant: what the platform sets, what the tenant adds, and what applies. */
+export interface TenantPolicyDto {
+  platform: PolicyConfigDto;
+  tenant: PolicyConfigDto;
+  effective: PolicyConfigDto;
+  /** Names of the built-in policies, for the platform's list of policies to turn off. */
+  builtIn: string[];
 }

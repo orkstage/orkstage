@@ -61,6 +61,8 @@ model Tenant {
   limits         Json     @default("{}")
   /// Email domains allowed to join via enterprise SSO, e.g. ["acme.com"].
   allowedEmailDomains String[] @default([])
+  /// Policy of this tenant (open item 12). It only tightens the platform policy.
+  policy         Json     @default("{}")
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
@@ -370,6 +372,8 @@ model Instance {
   templateVersionId String         @db.Uuid
   /// Variable values supplied for the template.
   variables         Json           @default("{}")
+  /// Labels (key → value), added as tags to every cloud resource (open item 12).
+  labels            Json           @default("{}")
   /// Placement slot → { targetId, region }.
   bindings          Json
   /// The profile the unbound slots were bound from at creation; editing it later moves nothing.

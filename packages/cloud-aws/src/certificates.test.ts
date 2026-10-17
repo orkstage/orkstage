@@ -27,3 +27,12 @@ describe('ACM certificates (open item 9)', () => {
     expect(await readCertificates(client as never, { certificate_arn: 'arn:a' })).toEqual([{ hostname: 'x.apps.example.com', status: 'ISSUED', notAfter: notAfter.toISOString() }]);
   });
 });
+
+describe('log retention (open item 12)', () => {
+  it('rounds a policy minimum up to a value CloudWatch accepts', async () => {
+    const { cloudWatchRetention } = await import('./stacks.js');
+    expect(cloudWatchRetention(10)).toBe(14);
+    expect(cloudWatchRetention(30)).toBe(30);
+    expect(cloudWatchRetention(5000)).toBe(3653);
+  });
+});

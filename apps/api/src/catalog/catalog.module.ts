@@ -3,11 +3,12 @@ import { Module } from '@nestjs/common';
 import { CloudController } from './cloud.controller.js';
 import { FeatureFlagsController } from './feature-flags.controller.js';
 import { MarketplaceController } from './marketplace.controller.js';
+import { PoliciesController } from './policies.controller.js';
 import { ProfilesController } from './profiles.controller.js';
 import { TeamController } from './team.controller.js';
 import { TemplateValidationService } from './template-validation.service.js';
 import { TemplatesController } from './templates.controller.js';
 import { TenantsController } from './tenants.controller.js';
 
-@Module({ controllers: [TenantsController, TemplatesController, CloudController, FeatureFlagsController, MarketplaceController, ProfilesController, TeamController], providers: [TemplateValidationService] })
+@Module({ controllers: [TenantsController, TemplatesController, CloudController, FeatureFlagsController, MarketplaceController, ProfilesController, TeamController, PoliciesController], providers: [TemplateValidationService] })
 export class CatalogModule {}

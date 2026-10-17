@@ -134,6 +134,7 @@ export class InstancesController {
         environment: body.environment,
         templateVersionId: version.id,
         variables: body.variables,
+        labels: body.labels,
         bindings,
         profileId,
         createdById: p.userId,
@@ -171,7 +172,7 @@ export class InstancesController {
   ) {
     const instance = await this.load(p, id, 'update');
     if (isInstanceBusy(instance.status)) throw conflict('INSTANCE_BUSY', 'Wait for the current operation to finish.');
-    if (body.bindings || body.variables) {
+    if (body.bindings || body.variables || body.labels) {
       const resolved = await this.compiler.compile({
         tenantId: instance.tenantId,
         instanceId: id,
@@ -180,13 +181,14 @@ export class InstancesController {
         templateVersionId: instance.templateVersionId,
         variables: (body.variables ?? instance.variables) as Record<string, string | number | boolean>,
         bindings: body.bindings ?? (instance.bindings as Record<string, { targetId: string; region: string }>),
+        labels: body.labels ?? (instance.labels as Record<string, string>),
       });
       const blocking = resolved.issues.filter((i) => i.severity === 'error' && i.stage !== 'policy');
       if (blocking.length > 0) throw unprocessable('VALIDATION_FAILED', 'The new configuration is not valid.', { issues: resolved.issues });
     }
     const updated = await this.prisma.instance.update({
       where: { id },
-      data: { name: body.name, variables: body.variables, bindings: body.bindings, protectedFromDestroy: body.protectedFromDestroy },
+      data: { name: body.name, variables: body.variables, bindings: body.bindings, protectedFromDestroy: body.protectedFromDestroy, labels: body.labels },
       include: instanceInclude,
     });
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: id, action: 'UPDATE', correlationId, changes: body });
@@ -399,6 +401,7 @@ export class InstancesController {
       bindings: i.bindings as Record<string, { targetId: string; region: string }>,
       profile: i.profile,
       protectedFromDestroy: i.protectedFromDestroy,
+      labels: (i.labels ?? {}) as Record<string, string>,
       createdAt: i.createdAt.toISOString(),
       updatedAt: i.updatedAt.toISOString(),
     };

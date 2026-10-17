@@ -122,6 +122,14 @@ export const updateProfileSchema = z.object({
 /** One default profile per tenant scope and environment: setting one clears the previous. */
 export const setDefaultProfileSchema = z.object({ isDefault: z.boolean() });
 
+/** Instance labels: they become tags on every cloud resource of the instance (open item 12). */
+export const labelsSchema = z
+  .record(
+    z.string().regex(/^[a-z][a-z0-9_.-]{0,62}$/, 'lowercase letters, digits, dots, dashes and underscores').refine((k) => !k.startsWith('platform'), 'reserved for platform tags'),
+    z.string().min(1).max(256),
+  )
+  .refine((v) => Object.keys(v).length <= 20, 'at most 20 labels');
+
 export const createInstanceSchema = z.object({
   tenantId: uuid,
   name: z.string().min(2).max(80),
@@ -135,6 +143,7 @@ export const createInstanceSchema = z.object({
    */
   bindings: z.record(z.string(), bindingSchema).default({}),
   profileId: uuid.optional(),
+  labels: labelsSchema.default({}),
 });
 
 export const updateInstanceSchema = z.object({
@@ -142,6 +151,7 @@ export const updateInstanceSchema = z.object({
   variables: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   bindings: z.record(z.string(), bindingSchema).optional(),
   protectedFromDestroy: z.boolean().optional(),
+  labels: labelsSchema.optional(),
 });
 
 export const upgradeInstanceSchema = z.object({ templateVersionId: uuid });
@@ -245,6 +255,25 @@ export const createAlertRuleSchema = z.object({
 });
 /** Unknown keys are refused: a threshold belongs in `condition`, not beside it. */
 export const updateAlertRuleSchema = createAlertRuleSchema.omit({ tenantId: true }).partial().strict();
+
+/** A policy as data (open item 12): the platform's, or a tenant's that only tightens it. */
+export const policyConfigSchema = z
+  .object({
+    allowedRegions: z.array(z.string().min(2).max(40)).max(100),
+    maxMonthlyCostUsd: z.number().positive().max(10_000_000),
+    maxReplicas: z.number().int().min(1).max(1000),
+    machineSizes: z.array(z.object({ cpu: z.number().positive().max(64), memoryMiB: z.number().int().min(128).max(524_288) }).strict()).max(50),
+    approvedRegistries: z.array(z.string().min(3).max(200)).max(50),
+    requiredLabels: z.array(z.string().regex(/^[a-z][a-z0-9_.-]{0,62}$/)).max(20),
+    minTlsVersion: z.enum(['1.2', '1.3']),
+    minLogRetentionDays: z.number().int().min(1).max(3653),
+    disabled: z.array(z.string().min(1).max(60)).max(30),
+  })
+  .partial()
+  .strict();
+
+/** A tenant cannot turn a policy off. */
+export const tenantPolicySchema = policyConfigSchema.omit({ disabled: true });
 
 export const STATUS_VISIBILITIES = ['PRIVATE', 'CUSTOMER_ONLY', 'PUBLIC'] as const;
 
