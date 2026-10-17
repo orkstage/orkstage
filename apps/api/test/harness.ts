@@ -24,7 +24,8 @@ export interface Api {
   app: NestFastifyApplication;
   prisma: PrismaClient;
   /** A cookie session, signed in through the development login (created on first use). */
-  as(email: string): Promise<Caller>;
+  /** Signs in (once per email, unless `fresh` asks for another session). */
+  as(email: string, opts?: { fresh?: boolean }): Promise<Caller>;
   /** Requests authenticated with an API key token. */
   withKey(token: string): Caller;
   /** Requests without credentials. */
@@ -84,8 +85,8 @@ export async function startApi(): Promise<Api> {
   return {
     app,
     prisma,
-    async as(email) {
-      const known = sessions.get(email);
+    async as(email, opts) {
+      const known = opts?.fresh ? undefined : sessions.get(email);
       if (known) return known;
       const address = nextAddress();
       const res = await fastify.inject({

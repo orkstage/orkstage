@@ -32,10 +32,13 @@ package is the source of truth, and this page is the map.
 | GET | `/healthz`, `/readyz` | liveness and readiness (database and Redis) |
 | POST | `/auth/dev-login` `{email}` | local development only; disabled in production |
 | GET | `/auth/providers` | enabled SSO providers `[{key,name}]` |
-| GET | `/auth/oidc/:provider/login?returnTo=/path` | redirects to the identity provider (state, nonce, PKCE) |
-| GET | `/auth/oidc/:provider/callback` | validates, creates the session, redirects to the console |
+| GET | `/auth/oidc/:provider/login?returnTo=/path` | redirects to the identity provider (state, PKCE, and a nonce for OIDC; `github` is OAuth 2) |
+| GET | `/auth/oidc/:provider/callback` | validates (ID token signature against the provider's keys; for GitHub, the verified primary email from its API), links the account, creates the session, redirects to the console |
 | POST | `/auth/logout` | revokes the session |
 | GET | `/me` | `MeResponse`, including the CASL rules |
+| GET | `/me/sessions` | `SessionDto[]`: the person's active sessions (`current` marks this one); not for API keys |
+| DELETE | `/me/sessions/:id` | signs one of the person's sessions out |
+| POST | `/me/sessions/revoke-others` | signs every other session of the person out |
 | GET | `/overview` | `OverviewDto` (platform staff) |
 | GET | `/overview/trends` | deployment and health series for the dashboard charts |
 | GET/POST | `/tenants` | list (scoped) or create (platform admin) |
