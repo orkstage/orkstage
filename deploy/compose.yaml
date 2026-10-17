@@ -1,0 +1,157 @@
+# OrkStage in production with Docker Compose, from the published images (launch item L4).
+#
+#   cp .env.example .env      # then fill it in: domain, secrets, database, sign in
+#   docker compose up -d --wait
+#
+# One HTTPS address serves the console and, under /api, the Control API (the console forwards
+# /api to the api service), so only Caddy is published. Postgres and Redis run here when .env
+# has COMPOSE_PROFILES=bundled (the example's default); for managed ones, remove that line and set
+# DATABASE_URL and REDIS_URL.
+# Upgrades: change ORKSTAGE_VERSION, then `docker compose pull && docker compose up -d --wait`;
+# the migrate service applies database migrations before the API and the worker start.
+name: orkstage
+
+x-platform: &platform
+  image: ${ORKSTAGE_REGISTRY:-ghcr.io/orkstage}/platform:${ORKSTAGE_VERSION:?set ORKSTAGE_VERSION in .env}
+  restart: unless-stopped
+  env_file: .env
+  environment: &platform-env
+    NODE_ENV: production
+    DATABASE_URL: ${DATABASE_URL:-postgresql://orkstage:${POSTGRES_PASSWORD}@postgres:5432/orkstage}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    API_PUBLIC_URL: https://${ORKSTAGE_DOMAIN}
+    WEB_PUBLIC_URL: https://${ORKSTAGE_DOMAIN}
+    # Two proxies stand in front of the API, Caddy and the console's /api forwarding, so rate limits
+    # and the audit log see the client's address.
+    TRUST_PROXY_HOPS: '2'
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    profiles: [bundled]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orkstage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env, or drop the bundled profile}
+      POSTGRES_DB: orkstage
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orkstage']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8-alpine
+    profiles: [bundled]
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Applies pending migrations, then the production seed (templates, the organization and the
+  # platform owner named by PLATFORM_OWNER_EMAIL; never demo data). Safe to run on every start.
+  migrate:
+    <<: *platform
+    restart: 'no'
+    user: orkstage
+    working_dir: /repo
+    command: ['sh', '-c', 'pnpm db:deploy && pnpm db:seed']
+    environment:
+      <<: *platform-env
+      SEED_DEMO_DATA: 'false'
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  api:
+    <<: *platform
+    user: orkstage
+    working_dir: /repo/orkstage/apps/api
+    command: ['node', '--enable-source-maps', 'dist/main.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/api/v1/readyz']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Runs deployments, health checks, drift scans and notifications. It starts one throwaway
+  # OpenTofu container per command through the Docker socket, so it runs as root and the socket
+  # gives it control of this Docker host: run OrkStage on a host dedicated to it.
+  worker:
+    <<: *platform
+    user: root
+    working_dir: /repo/orkstage/apps/worker
+    command: ['node', '--enable-source-maps', 'dist/main.js']
+    environment:
+      <<: *platform-env
+      TOFU_IMAGE: ${ORKSTAGE_REGISTRY:-ghcr.io/orkstage}/tofu-runner:${ORKSTAGE_VERSION}
+      TOFU_MODULES_IN_IMAGE: 'true'
+      TOFU_WORK_DIR: /var/lib/orkstage/tofu
+      TOFU_WORK_VOLUME: orkstage-tofu-work
+      TOFU_PLUGIN_CACHE_VOLUME: orkstage-tofu-plugins
+      TOFU_DOCKER_NETWORK: orkstage_default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - tofu-work:/var/lib/orkstage/tofu
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+        required: false
+
+  web:
+    <<: *platform
+    user: orkstage
+    working_dir: /repo/orkstage-console
+    command: ['node', 'node_modules/next/dist/bin/next', 'start', '--port', '3000']
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/login']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # HTTPS with automatic certificates for ORKSTAGE_DOMAIN (Let's Encrypt; the domain must point
+  # to this host, with ports 80 and 443 open).
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    environment:
+      ORKSTAGE_DOMAIN: ${ORKSTAGE_DOMAIN:?set ORKSTAGE_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy-data:
+  caddy-config:
+  tofu-work:
+    name: orkstage-tofu-work

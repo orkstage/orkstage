@@ -27,6 +27,9 @@ const schema = z
     SMTP_HOST: z.string().default('localhost'),
     SMTP_PORT: z.coerce.number().int().default(1025),
     SMTP_SECURE: bool.default(false),
+    /** SMTP authentication, for providers that require it (most do outside a local relay). */
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
     EMAIL_FROM: z.string().default('OrkStage <noreply@example.local>'),
     HEALTH_CHECK_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(30),
     // Days of per resource health check history kept (uptime and trends); older rows are deleted.

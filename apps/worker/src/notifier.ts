@@ -17,6 +17,7 @@ export class Notifier {
       host: ctx.config.SMTP_HOST,
       port: ctx.config.SMTP_PORT,
       secure: ctx.config.SMTP_SECURE,
+      ...(ctx.config.SMTP_USER ? { auth: { user: ctx.config.SMTP_USER, pass: ctx.config.SMTP_PASSWORD ?? '' } } : {}),
     });
   }
 
