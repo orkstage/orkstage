@@ -218,6 +218,13 @@ function specFor(r: TemplateResource, input: CompileInput): Record<string, unkno
     spec.image = `${img.uri}@${img.digest}`;
   }
   if (r.type === 'dns') spec.subdomainLabel = `${input.instance.slug}-${input.tenant.slug}`;
+  // Verified custom domains join the spec, so attaching one is a change the next deployment applies.
+  const custom = [...(input.customDomains?.[r.id] ?? [])].sort();
+  if (custom.length > 0 && r.type === 'dns') {
+    spec.customDomains = custom;
+    if (input.customCertificatesIssued?.includes(r.id)) spec.customCertificateIssued = true;
+  }
+  if (custom.length > 0 && r.type === 'web.frontend') spec.domains = [...new Set([...r.domains, ...custom])].sort();
   if (r.type === 'ingress') {
     // Services attach to their ingress (not the other way round), so give each route the
     // routed service's port and health path up front.

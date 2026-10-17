@@ -41,7 +41,7 @@ export const REQUIRED_ACTIONS: Record<string, string[]> = {
   ],
   dns: [
     'route53:CreateHostedZone', 'route53:ChangeResourceRecordSets', 'route53:DeleteHostedZone', 'acm:RequestCertificate',
-    'acm:DeleteCertificate', 'acm:DescribeCertificate', 'elasticloadbalancing:CreateListener',
+    'acm:DeleteCertificate', 'acm:DescribeCertificate', 'elasticloadbalancing:CreateListener', 'elasticloadbalancing:AddListenerCertificates',
   ],
 };
 

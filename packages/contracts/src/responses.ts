@@ -494,3 +494,23 @@ export interface LicenseDto {
   expiresAt: string | null;
   message: string;
 }
+
+/** A hostname an instance serves, with what its owner still has to do (open item 9). */
+export interface DomainDto {
+  id: string;
+  instanceId: string;
+  resourceId: string;
+  hostname: string;
+  kind: 'PLATFORM' | 'CUSTOM';
+  status: 'PENDING_VERIFICATION' | 'VERIFIED' | 'FAILED';
+  verifiedAt: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  certificateStatus: 'NONE' | 'PENDING_VALIDATION' | 'ISSUED' | 'EXPIRING' | 'EXPIRED' | 'FAILED';
+  certificateExpiresAt: string | null;
+  /** DNS records to create at the domain's DNS provider: ownership, routing and certificate validation. */
+  records: { purpose: 'ownership' | 'routing' | 'certificate'; name: string; type: 'TXT' | 'CNAME' | 'A'; value: string }[];
+  /** True when a deployment is needed to start serving it (verified, not in the applied spec yet). */
+  needsDeploy: boolean;
+  createdAt: string;
+}

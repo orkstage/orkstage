@@ -6,5 +6,6 @@ export * from './adapters.js';
 export * from './redis.js';
 export * from './crypto.js';
 export * from './webhooks.js';
+export * from './dns.js';
 export * from './rate-limit.js';
 export * from './metrics.js';

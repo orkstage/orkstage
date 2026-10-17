@@ -77,6 +77,13 @@ export class CompileService {
     );
 
     const flags = await this.flags.forTenant(req.tenantId);
+    // Verified custom domains (open item 9) join the spec of the resource that serves them.
+    const domains = await this.prisma.domain.findMany({ where: { instanceId: req.instanceId, kind: 'CUSTOM', status: 'VERIFIED' }, orderBy: { hostname: 'asc' } });
+    const customDomains: Record<string, string[]> = {};
+    for (const d of domains) (customDomains[d.resourceId] ??= []).push(d.hostname);
+    const customCertificatesIssued = Object.keys(customDomains).filter((resourceId) =>
+      domains.filter((d) => d.resourceId === resourceId).every((d) => d.certificateStatus === 'ISSUED' || d.certificateStatus === 'EXPIRING'),
+    );
     return compileInfrastructure(
       {
         template: applied.template,
@@ -89,6 +96,8 @@ export class CompileService {
         images,
         policy: (policySetting?.value ?? {}) as PolicyConfig,
         providerEnabled: (provider) => isProviderEnabled(flags, provider),
+        customDomains,
+        customCertificatesIssued,
       },
       this.adapters.registry,
     );

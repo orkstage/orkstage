@@ -8,6 +8,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { ACMClient } from '@aws-sdk/client-acm';
 import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { IAMClient } from '@aws-sdk/client-iam';
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
@@ -22,6 +23,7 @@ import {
   type DriftChange,
   type HealthResult,
   type LogLine,
+  type CertificateInfo,
   type MetricPoint,
   type ProviderContext,
   type ResourceIdentifier,
@@ -35,6 +37,7 @@ import {
 } from '@orkstage/cloud-core';
 import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
 import { AWS_CAPABILITIES } from './catalog.js';
+import { readCertificates } from './certificates.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, REFRESH_MARGIN_MS, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
@@ -249,6 +252,14 @@ export class AwsAdapter implements CloudProviderAdapter {
     const query = cloudWatchQuery(res.serviceKind, outputs, metric);
     if (!query) return [];
     return readCloudWatch(new CloudWatchClient(await this.creds.clientConfig(ctx)), query, minutes, ctx.signal);
+  }
+
+  /** ACM certificates of a `dns` resource: the platform subdomain and the verified custom domains. */
+  async getCertificates(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<CertificateInfo[]> {
+    if (res.serviceKind !== 'dns') return [];
+    const ctx = this.effective(rawCtx);
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    return readCertificates(new ACMClient(await this.creds.clientConfig(ctx)), outputs, ctx.signal);
   }
 
   /**

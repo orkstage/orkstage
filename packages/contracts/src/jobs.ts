@@ -81,6 +81,10 @@ export const NOTIFICATION_EVENTS = [
   'maintenance.scheduled',
   'maintenance.started',
   'maintenance.completed',
+  'domain.verified',
+  'domain.verification_failed',
+  'domain.certificate_issued',
+  'domain.certificate_expiring',
   'cloud_target.unhealthy',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];

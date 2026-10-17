@@ -20,6 +20,10 @@ import {
   worstStatus,
   isRetryable,
   maintenanceState,
+  certificateState,
+  domainRecords,
+  dueExpiryNotice,
+  isWithinZone,
   publicIncidentTitle,
   publicIncidentUpdate,
 } from './index.js';
@@ -185,5 +189,41 @@ describe('feature flags', () => {
   it('knows its own keys', () => {
     expect(isFeatureFlag('PROVIDER_GCP')).toBe(true);
     expect(isFeatureFlag('PROVIDER_NOPE')).toBe(false);
+  });
+});
+
+describe('custom domains', () => {
+  const now = new Date('2026-10-17T12:00:00Z');
+  const days = (n: number) => new Date(now.getTime() + n * 86_400_000);
+
+  it('lists the records the owner creates', () => {
+    const records = domainRecords({ hostname: 'api.acme.com', kind: 'CUSTOM', verificationToken: 'tok', certificateRecords: [{ name: '_a.api.acme.com', type: 'CNAME', value: '_b.acm' }] }, 'prod-acme.apps.example.com');
+    expect(records).toEqual([
+      { purpose: 'ownership', name: '_orkstage-challenge.api.acme.com', type: 'TXT', value: 'tok' },
+      { purpose: 'routing', name: 'api.acme.com', type: 'CNAME', value: 'prod-acme.apps.example.com' },
+      { purpose: 'certificate', name: '_a.api.acme.com', type: 'CNAME', value: '_b.acm' },
+    ]);
+    expect(domainRecords({ hostname: 'x.apps.example.com', kind: 'PLATFORM', verificationToken: '' }, null)).toEqual([]);
+  });
+
+  it('knows the platform zone', () => {
+    expect(isWithinZone('a.apps.example.com', 'apps.example.com')).toBe(true);
+    expect(isWithinZone('apps.example.com', 'apps.example.com')).toBe(true);
+    expect(isWithinZone('evilapps.example.com', 'apps.example.com')).toBe(false);
+  });
+
+  it('turns issued certificates expiring 30 days ahead', () => {
+    expect(certificateState('ISSUED', days(60).toISOString(), now)).toBe('ISSUED');
+    expect(certificateState('ISSUED', days(20).toISOString(), now)).toBe('EXPIRING');
+    expect(certificateState('ISSUED', days(-1).toISOString(), now)).toBe('EXPIRED');
+    expect(certificateState('PENDING_VALIDATION', undefined, now)).toBe('PENDING_VALIDATION');
+  });
+
+  it('sends each expiry warning once', () => {
+    expect(dueExpiryNotice(days(40), null, now)).toBeNull();
+    expect(dueExpiryNotice(days(29), null, now)).toBe(30);
+    expect(dueExpiryNotice(days(29), 30, now)).toBeNull();
+    expect(dueExpiryNotice(days(6), 30, now)).toBe(7);
+    expect(dueExpiryNotice(days(-1), 7, now)).toBeNull();
   });
 });
