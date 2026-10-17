@@ -5,6 +5,7 @@ import {
   type CloudTargetDto,
   createCloudTargetSchema,
   fixedConfigKeys,
+  PROVIDER_FORMS,
   providerConfigIssues,
   type ProviderDto,
   updateCloudTargetSchema,
@@ -68,6 +69,7 @@ export class CloudController {
       kind: PROVIDER_INFO[provider].kind,
       simulated: this.adapters.registry.get(provider).simulated,
       enabled: enabled(provider),
+      form: PROVIDER_FORMS[provider],
     }));
   }
 

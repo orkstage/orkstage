@@ -225,7 +225,11 @@ describe('cloud targets with API keys', () => {
     const platform = await admin.post('/api-keys', { name: `targets ${unique()}`, role: 'PlatformAdmin', scopes: ['targets:manage', 'instances:read'] });
     expect(platform.status, JSON.stringify(platform.body)).toBe(201);
     const key = api.withKey(platform.body.token);
-    expect((await key.get('/cloud/providers')).status).toBe(200);
+    const providers = await key.get('/cloud/providers');
+    expect(providers.status).toBe(200);
+    const aws = (providers.body as { provider: string; form: { config: { key: string }[]; credentialFields: string[] } }[]).find((p) => p.provider === 'aws')!;
+    expect(aws.form.config.map((f) => f.key)).toContain('accountId');
+    expect(aws.form.credentialFields).toEqual(['externalId']);
     const created = await key.post('/cloud/targets', {
       provider: 'mock',
       name: `Key target ${unique()}`,
