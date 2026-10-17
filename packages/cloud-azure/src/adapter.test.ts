@@ -209,7 +209,7 @@ describe('provisioning', () => {
 describe('module inputs', () => {
   it('wires a container app to Key Vault secrets, storage, the shared environment and Front Door', () => {
     const vaultId = `/subscriptions/${SUB}/resourceGroups/db-rg/providers/Microsoft.KeyVault/vaults/ork-db-abc123`;
-    const { module, inputs } = moduleCall(ctx, request({
+    const call = moduleCall(ctx, request({
       spec: { image: 'img', cpu: 0.25, memoryMiB: 2048, replicas: 1, port: 8080, public: true, autoscaling: { minReplicas: 1, maxReplicas: 5, targetCpuPercent: 70 } },
       dependencyOutputs: {
         network,
@@ -219,6 +219,7 @@ describe('module inputs', () => {
         edge: { kind: 'ingress', origin_groups: JSON.stringify({ api: 'og-1' }) },
       },
     }));
+    const { module, inputs } = call;
     expect(module).toBe('container-service');
     expect(inputs).toMatchObject({
       name: 'ork-acme-prod-api',
@@ -230,7 +231,19 @@ describe('module inputs', () => {
       secrets: { ORDERS_DB_CREDENTIALS: { secret_id: 'https://ork-db-abc123.vault.azure.net/secrets/credentials', vault_id: vaultId } },
       autoscaling: { min_replicas: 1, max_replicas: 5, target_cpu_percent: 70 },
     });
-    expect(inputs.environment).toMatchObject({ PORT: '8080', ORDERS_DB_HOST: 'db.private.postgres.database.azure.com', FILES_BUCKET: 'files', CACHE_CREDENTIALS_REF: 'arn:aws:secretsmanager:x' });
+    expect(inputs.environment).toMatchObject({ PORT: '8080', ORDERS_DB_HOST: 'db.private.postgres.database.azure.com', FILES_BUCKET: 'files' });
+    // Credentials on another provider are copied into Container Apps secrets at deploy time (open item 4).
+    expect(call.externalSecrets).toEqual(['cache']);
+    expect((inputs.environment as Record<string, string>).CACHE_CREDENTIALS_REF).toBeUndefined();
+  });
+
+  it('opens PostgreSQL only to the egress addresses of consumers on other providers (open item 4)', () => {
+    const { inputs } = moduleCall(ctx, request({
+      resourceId: 'db', serviceKind: 'database.postgresql', capability: 'flexible-server', name: 'ork-acme-prod-db',
+      spec: { version: '17', size: 'small', storageGiB: 32, publicAccess: false, allowlistNetworks: ['aws-net'] },
+      dependencyOutputs: { network, 'aws-net': { kind: 'network', egress_ips: '198.51.100.7,198.51.100.8' } },
+    }));
+    expect(inputs).toMatchObject({ delegated_subnet_id: '', vnet_id: '', allowed_ips: ['198.51.100.7', '198.51.100.8'] });
   });
 
   it('places PostgreSQL in the delegated subnet and upgrades burstable sizes for HA', () => {

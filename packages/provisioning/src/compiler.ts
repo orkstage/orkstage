@@ -11,7 +11,7 @@ import {
   type TemplateResource,
   type ValidationIssue,
 } from '@orkstage/templates';
-import { resolveConnectivity } from './connectivity.js';
+import { resolveConnectivity, wireAllowlist } from './connectivity.js';
 import { categoryOf, estimateResourceMonthly, summarizeCost } from './cost.js';
 import { evaluatePolicies } from './policies.js';
 import type { CompileInput, CostLine, ResolvedConnectivity, ResolvedInfrastructure, ResolvedResource } from './types.js';
@@ -158,6 +158,14 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
   const connectivity: ResolvedConnectivity[] = template.spec.connectivity
     .filter((c) => byId.has(c.from) && byId.has(c.to))
     .map((c) => resolveConnectivity(c, byId.get(c.from)!, byId.get(c.to)!));
+  // Allowlists change the database (a dependency on the consumer's network, the networks to allow):
+  // its hash follows, so a new allowlist is a planned change.
+  for (const link of connectivity) {
+    const changed = wireAllowlist(link, resources);
+    if (changed) {
+      changed.specHash = desiredStateHash({ target: changed.targetId, region: changed.region, capability: changed.capability, name: changed.name, spec: changed.spec });
+    }
+  }
 
   const cost = summarizeCost(costLines);
   const policyResults =

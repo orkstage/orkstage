@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { ProviderError, byKind, envKey, needKind, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
+import { ProviderError, allowlistAddresses, byKind, envKey, needKind, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
 import type { ModuleCall, RootParts } from '@orkstage/cloud-tofu';
 import { fitName, sha256 } from '@orkstage/domain';
 import { azureConfig } from './config.js';
@@ -106,8 +106,10 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
         },
       };
     }
-    case 'container-service':
-      return { module, inputs: { ...common, ...containerInputs(ctx, req, spec, deps) } };
+    case 'container-service': {
+      const { inputs, externalSecrets } = containerInputs(ctx, req, spec, deps);
+      return { module, inputs: { ...common, ...inputs }, ...(externalSecrets.length ? { externalSecrets } : {}) };
+    }
     case 'postgres': {
       const publicAccess = Boolean(spec.publicAccess);
       const network = publicAccess ? undefined : needKind('azure', deps, 'network', `${req.resourceId} (private PostgreSQL)`);
@@ -118,6 +120,7 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
         sku = POSTGRES_SKU.medium!;
         ctx.log?.('warn', `${req.resourceId}: high availability needs the General Purpose tier; using ${sku}.`);
       }
+      const allowlisted = Array.isArray(spec.allowlistNetworks) && spec.allowlistNetworks.length > 0;
       const storageMb = POSTGRES_STORAGE_MB.find((mb) => mb >= Number(spec.storageGiB ?? 32) * 1024) ?? POSTGRES_STORAGE_MB.at(-1)!;
       return {
         module,
@@ -131,8 +134,10 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
           high_availability: ha,
           backup_retention_days: Math.min(35, Math.max(7, backup.enabled === false ? 7 : Number(backup.retentionDays ?? 7))),
           production,
-          delegated_subnet_id: network ? String(network.postgres_subnet_id) : '',
-          vnet_id: network ? String(network.network_id) : '',
+          // Consumers on other providers need the public endpoint, limited to their egress addresses.
+          delegated_subnet_id: network && !allowlisted ? String(network.postgres_subnet_id) : '',
+          vnet_id: network && !allowlisted ? String(network.network_id) : '',
+          allowed_ips: allowlistAddresses(spec, deps),
         },
       };
     }
@@ -179,7 +184,13 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
   }
 }
 
-function containerInputs(ctx: ProviderContext, req: ResourceRequest, spec: Spec, deps: Record<string, ResourceOutputs>): Record<string, unknown> {
+function containerInputs(
+  ctx: ProviderContext,
+  req: ResourceRequest,
+  spec: Spec,
+  deps: Record<string, ResourceOutputs>,
+): { inputs: Record<string, unknown>; externalSecrets: string[] } {
+  const externalSecrets: string[] = [];
   const network = byKind(deps, 'network');
   const ingress = byKind(deps, 'ingress');
   const port = spec.port === undefined || spec.port === null ? null : Number(spec.port);
@@ -200,15 +211,14 @@ function containerInputs(ctx: ProviderContext, req: ResourceRequest, spec: Spec,
     if (ref && isKeyVaultSecretId(ref) && out.key_vault_id) {
       secrets[`${key}_CREDENTIALS`] = { secret_id: ref, vault_id: String(out.key_vault_id) };
     } else if (ref) {
-      // Another provider's reference: Container Apps cannot resolve it natively.
-      environment[`${key}_CREDENTIALS_REF`] = ref;
-      ctx.log?.('warn', `${id} publishes credentials outside Azure Key Vault; ${req.resourceId} receives only the reference.`);
+      // Credentials owned by another provider: copied into Container Apps secrets at deploy time.
+      externalSecrets.push(id);
     }
   }
   const originGroups = ingress?.origin_groups ? (JSON.parse(String(ingress.origin_groups)) as Record<string, string>) : {};
   const size = containerSize(Number(spec.cpu ?? 0.25), Number(spec.memoryMiB ?? 512));
   const a = spec.autoscaling as { minReplicas: number; maxReplicas: number; targetCpuPercent: number } | undefined;
-  return {
+  return { externalSecrets, inputs: {
     name: fitName(req.name, 32),
     image: spec.image,
     cpu: size.cpu,
@@ -224,7 +234,7 @@ function containerInputs(ctx: ProviderContext, req: ResourceRequest, spec: Spec,
     log_workspace_id: network?.log_workspace_id ? String(network.log_workspace_id) : '',
     origin_group_id: originGroups[req.resourceId] ?? '',
     autoscaling: a ? { min_replicas: a.minReplicas, max_replicas: a.maxReplicas, target_cpu_percent: a.targetCpuPercent } : null,
-  };
+  } };
 }
 
 /**

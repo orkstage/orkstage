@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   savedPlanFor,
+  secretEnvironment,
   ProviderError,
   type CloudCapability,
   type CloudProviderAdapter,
@@ -42,6 +43,12 @@ export interface ModuleCall {
   /** Directory under /modules/<provider>/, e.g. `container-service`. */
   module: string;
   inputs: Record<string, unknown>;
+  /**
+   * Dependencies whose credentials live in another provider's secret store and must be copied into
+   * this module (open item 4). Their values reach the module's sensitive `external_secrets` input
+   * through `TF_VAR_external_secrets`, never through the stored configuration.
+   */
+  externalSecrets?: string[];
 }
 
 /** Provider specific parts of the root configuration. Never put secret values here. */
@@ -54,10 +61,13 @@ export interface RootParts {
    * runner environment. This is how a secret that has no native environment variable (an OCI
    * private key, a Magalu API key) reaches the provider without being written to disk.
    */
-  variables?: Record<string, { type?: string; sensitive?: boolean }>;
+  variables?: Record<string, { type?: string; sensitive?: boolean; default?: unknown }>;
 }
 
 export const stateKeyFor = (name: string) => `orkstage/${name}.tfstate`;
+
+/** Root variable behind `ModuleCall.externalSecrets`: sensitive, empty unless the runner sets it. */
+const EXTERNAL_SECRETS_VARIABLE = { type: 'map(string)', sensitive: true, default: {} };
 const configKeyFor = (name: string) => `${stateKeyFor(name)}.config.json`;
 const virtualKeyFor = (name: string) => `${stateKeyFor(name)}.virtual.json`;
 
@@ -171,7 +181,8 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     const runner = this.requireRunner();
     const config = this.rootConfig(ctx, req);
     try {
-      const result = await runner.apply(this.stack(ctx, creds, req.name, config, savedPlanFor(req)));
+      const secrets = await this.externalSecretValues(ctx, req);
+      const result = await runner.apply(this.stack(ctx, creds, req.name, config, savedPlanFor(req), secrets));
       // Keep the exact configuration beside its state so destroy never depends on a stale template.
       await store.put(configKeyFor(req.name), JSON.stringify(config), ctx.signal);
       const outputs = flattenOutputs(result.outputs.all);
@@ -187,7 +198,8 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     const runner = this.requireRunner();
     const creds = await this.credentials(ctx);
     try {
-      const plan = await runner.plan(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req), savedPlanFor(req)));
+      const secrets = await this.externalSecretValues(ctx, req);
+      const plan = await runner.plan(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req), savedPlanFor(req), secrets));
       return { ...plan, destructive: isDestructivePlan(plan.actions, this.routineReplacements) };
     } catch (err) {
       throw toProviderError(this.provider, err);
@@ -199,7 +211,8 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     const runner = this.requireRunner();
     const creds = await this.credentials(ctx);
     try {
-      return await runner.drift(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req)));
+      const secrets = await this.externalSecretValues(ctx, req);
+      return await runner.drift(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req), undefined, secrets));
     } catch (err) {
       throw toProviderError(this.provider, err);
     }
@@ -261,19 +274,42 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
 
   /** Complete root configuration (OpenTofu JSON syntax) for one resource's isolated state. */
   rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<string, unknown> {
-    const { module, inputs } = this.moduleCall(ctx, req);
+    const { module, inputs, externalSecrets } = this.moduleCall(ctx, req);
     const parts = this.rootParts(ctx, req);
+    const external = externalSecrets?.length ? true : false;
+    const variables = { ...(parts.variables ?? {}), ...(external ? { external_secrets: EXTERNAL_SECRETS_VARIABLE } : {}) };
     return {
       terraform: {
         required_version: '>= 1.11',
         required_providers: parts.requiredProviders,
         backend: this.backend(ctx, stateKeyFor(req.name)),
       },
-      ...(parts.variables && Object.keys(parts.variables).length ? { variable: parts.variables } : {}),
+      ...(Object.keys(variables).length ? { variable: variables } : {}),
       provider: parts.providers,
-      module: { resource: { source: `/modules/${this.provider}/${module}`, ...inputs } },
+      module: { resource: { source: `/modules/${this.provider}/${module}`, ...inputs, ...(external ? { external_secrets: '${var.external_secrets}' } : {}) } },
       output: { all: { value: '${module.resource}' } },
     };
+  }
+
+  /**
+   * Values for the module's `external_secrets`: the credentials of each dependency the module call
+   * named, read from the provider that owns them (`<ID>_<FIELD>` names). Apply, plan and drift
+   * pass them; destroy needs none (the variable defaults to an empty map).
+   */
+  protected async externalSecretValues(ctx: ProviderContext, req: ResourceRequest): Promise<Record<string, string> | undefined> {
+    const ids = this.moduleCall(ctx, req).externalSecrets ?? [];
+    if (ids.length === 0) return undefined;
+    if (!ctx.dependencySecret) {
+      throw new ProviderError(
+        `${this.provider.toUpperCase()}_EXTERNAL_SECRETS_UNAVAILABLE`,
+        `${req.resourceId} needs the credentials of ${ids.join(', ')}, which this operation cannot read.`,
+        'VALIDATION_ERROR',
+        this.provider,
+      );
+    }
+    const values: Record<string, string> = {};
+    for (const id of ids) Object.assign(values, secretEnvironment(id, await ctx.dependencySecret(id)));
+    return values;
   }
 
   protected requireRunner(): TofuRunner {
@@ -283,12 +319,19 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     return this.runner;
   }
 
-  protected stack(ctx: ProviderContext, creds: Creds, name: string, config: Record<string, unknown>, savedPlan?: TofuStack['savedPlan']): TofuStack {
+  protected stack(
+    ctx: ProviderContext,
+    creds: Creds,
+    name: string,
+    config: Record<string, unknown>,
+    savedPlan?: TofuStack['savedPlan'],
+    externalSecrets?: Record<string, string>,
+  ): TofuStack {
     return {
       stateKey: `${ctx.target.id}/${ctx.region}/${stateKeyFor(name)}`,
       config,
       savedPlan,
-      env: this.runnerEnv(ctx, creds),
+      env: { ...this.runnerEnv(ctx, creds), ...(externalSecrets ? { TF_VAR_external_secrets: JSON.stringify(externalSecrets) } : {}) },
       signal: ctx.signal,
       onLog: (l) => ctx.log?.(l.level, l.message),
     };

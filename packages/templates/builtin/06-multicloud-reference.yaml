@@ -2,7 +2,7 @@ apiVersion: platform/v1
 kind: EnvironmentTemplate
 metadata:
   name: multicloud-reference
-  version: 1.0.0
+  version: 1.1.0
   displayName: Multi-cloud reference
   description: >
     Reference topology from spec §42.17 — API on AWS ECS Fargate behind an ALB with ECR and
@@ -24,6 +24,8 @@ spec:
     - id: network
       type: network
       availabilityZones: 2
+      # A fixed egress address: the database on another cloud allows only this network.
+      natGateway: true
     - id: registry
       type: container-registry
       implementation: ecr

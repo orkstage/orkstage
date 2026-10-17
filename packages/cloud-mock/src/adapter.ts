@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  allowlistAddresses,
   ProviderError,
+  secretEnvironment,
   type CloudCapability,
   type CloudProviderAdapter,
   type CloudTarget,
@@ -130,10 +132,21 @@ export class MockAdapter implements CloudProviderAdapter {
     const simulate = cfg.simulate ?? 'aws';
     const providerResourceId =
       existing?.providerResourceId ?? `sim-${simulate}-${req.serviceKind.split('.')[0]}-${hash(`${ctx.target.id}:${ctx.region}:${req.name}`).slice(0, 10)}`;
+    const outputs = outputsFor(req, ctx.region, simulate, providerResourceId);
+    // Like the real adapters: a service copies the credentials of a dependency on another
+    // (simulated) provider into its own secret store. Only the names are kept, never the values.
+    if (req.serviceKind === 'compute.container-service') {
+      const foreign = Object.entries(req.dependencyOutputs).filter(([, o]) => typeof o.secret_ref === 'string' && o.provider !== simulate);
+      if (foreign.length && ctx.dependencySecret) {
+        const names: string[] = [];
+        for (const [id] of foreign) names.push(...Object.keys(secretEnvironment(id, await ctx.dependencySecret(id))));
+        outputs.external_secrets = names.sort().join(',');
+      }
+    }
     const stored: StoredResource = {
       providerResourceId,
       idempotencyKey: req.idempotencyKey,
-      outputs: outputsFor(req, ctx.region, simulate, providerResourceId),
+      outputs,
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
     await this.store.set(key, JSON.stringify(stored));
@@ -186,6 +199,12 @@ export class MockAdapter implements CloudProviderAdapter {
       message: state === 'HEALTHY' ? 'Simulated health check passed.' : 'Simulated health check failed.',
       checkedAt,
     };
+  }
+
+  /** Simulated credentials of a database: stable per reference, never a real secret. */
+  async readSecret(_ctx: ProviderContext, ref: string): Promise<Record<string, string>> {
+    if (!ref.startsWith('secret://')) throw new ProviderError('SIM_SECRET_UNKNOWN', `${ref} is not a simulated secret.`, 'VALIDATION_ERROR', 'mock');
+    return { username: 'app', password: `sim-${hash(ref).slice(0, 16)}` };
   }
 
   /** The actions real platforms offer, simulated, so templates with triggers work without accounts. */
@@ -312,13 +331,24 @@ function outputsFor(req: ResourceRequest, region: string, simulate: string, id: 
   const domain = `${simulate}.sim.internal`;
   switch (req.serviceKind) {
     case 'network':
-      return { networkId: `net-${short}`, privateSubnets: 2, publicSubnets: 2 };
+      // A NAT gateway gives the network a fixed egress address (TEST-NET-3, never routable).
+      return { networkId: `net-${short}`, privateSubnets: 2, publicSubnets: 2, egress_ips: req.spec.natGateway ? `203.0.113.${(parseInt(short.slice(-2), 36) % 250) + 1}` : '' };
     case 'container-registry':
       return { repositoryUri: `registry.${region}.${domain}/${req.name}` };
     case 'compute.container-service':
       return { serviceId: id, internalEndpoint: `http://${req.name}.svc.${domain}:${req.spec.port ?? 8080}` };
-    case 'database.postgresql':
-      return { host: `${req.name}.pg.${region}.${domain}`, port: 5432, secretRef: `secret://${req.name}/credentials` };
+    case 'database.postgresql': {
+      const ref = `secret://${req.name}/credentials`;
+      const allowed = allowlistAddresses(req.spec, req.dependencyOutputs);
+      return {
+        host: `${req.name}.pg.${region}.${domain}`,
+        port: 5432,
+        secretRef: ref,
+        secret_ref: ref,
+        provider: simulate,
+        ...(allowed.length ? { allowed_ips: allowed.join(',') } : {}),
+      };
+    }
     case 'cache.redis':
       return { host: `${req.name}.redis.${region}.${domain}`, port: 6379 };
     case 'queue':

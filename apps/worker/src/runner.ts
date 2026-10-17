@@ -431,7 +431,18 @@ export class DeploymentRunner {
     }
     for (const c of resolved.connectivity) {
       const ok = (await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, resourceId: { in: [c.from, c.to] }, health: 'HEALTHY' } })).length === 2;
-      await this.event(d.id, ok ? 'info' : 'warn', PHASE.verify, `Connectivity ${c.from} → ${c.to} via ${c.strategy}: ${ok ? 'reachable' : 'NOT reachable'}${resolved.resources.every((r) => r.provider === 'mock') ? ' (simulated)' : ''}.`);
+      // Both ends healthy is what the worker can tell: it does not sit in either network, so a TCP
+      // connect from here would prove nothing about the path between them (open item 4).
+      const wired = [
+        c.wiring?.credentials === 'copied' ? 'credentials copied' : '',
+        c.wiring?.allowlistNetwork ? `firewall allows ${c.wiring.allowlistNetwork} egress` : '',
+      ].filter(Boolean);
+      await this.event(
+        d.id,
+        ok ? 'info' : 'warn',
+        PHASE.verify,
+        `Connectivity ${c.from} → ${c.to} via ${c.strategy}${wired.length ? ` (${wired.join(', ')})` : ''}: ${ok ? 'both ends healthy' : 'an end is NOT healthy'}${resolved.resources.every((r) => r.provider === 'mock') ? ' (simulated)' : ''}.`,
+      );
       if (!ok) unhealthyOther++;
     }
     if (unhealthyCritical > 0) throw new PhaseFailure('HEALTH_CHECK_FAILED', `${unhealthyCritical} critical resource(s) failed health checks.`);

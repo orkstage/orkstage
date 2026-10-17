@@ -14,6 +14,7 @@ import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import {
   ProviderError,
   savedPlanFor,
+  secretEnvironment,
   type CloudCapability,
   type CloudProviderAdapter,
   type CloudTarget,
@@ -36,7 +37,7 @@ import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, REFRESH_MARGIN_MS, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
 import { probePermissions } from './permissions.js';
-import { flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
+import { externalSecretIds, flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 
 export interface AwsAdapterOptions {
   resolveExternalId: ExternalIdResolver;
@@ -153,7 +154,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     }
     await this.ensureStateBucket(ctx);
     const config = rootConfig(ctx, req);
-    const stack = await this.stack(ctx, req.name, config, savedPlanFor(req));
+    const stack = await this.stack(ctx, req.name, config, savedPlanFor(req), await this.externalSecrets(ctx, req));
     try {
       const result = await runner.apply(stack);
       // Keep the exact configuration beside its state so destroy never depends on a stale template.
@@ -170,7 +171,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
     try {
-      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req), savedPlanFor(req)));
+      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req), savedPlanFor(req), await this.externalSecrets(ctx, req)));
       return { ...plan, destructive: isDestructivePlan(plan.actions) };
     } catch (err) {
       throw toProviderError(err);
@@ -181,7 +182,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
     try {
-      return await runner.drift(await this.stack(ctx, req.name, rootConfig(ctx, req)));
+      return await runner.drift(await this.stack(ctx, req.name, rootConfig(ctx, req), undefined, await this.externalSecrets(ctx, req)));
     } catch (err) {
       throw toProviderError(err);
     }
@@ -264,7 +265,25 @@ export class AwsAdapter implements CloudProviderAdapter {
     return this.runner;
   }
 
-  private async stack(ctx: ProviderContext, name: string, config: Record<string, unknown>, savedPlan?: TofuStack['savedPlan']): Promise<TofuStack> {
+  /** Credentials of dependencies on other providers, for the module's `external_secrets` (open item 4). */
+  private async externalSecrets(ctx: ProviderContext, req: ResourceRequest): Promise<Record<string, string> | undefined> {
+    const ids = externalSecretIds(req);
+    if (ids.length === 0) return undefined;
+    if (!ctx.dependencySecret) {
+      throw new ProviderError('AWS_EXTERNAL_SECRETS_UNAVAILABLE', `${req.resourceId} needs the credentials of ${ids.join(', ')}, which this operation cannot read.`, 'VALIDATION_ERROR', 'aws');
+    }
+    const values: Record<string, string> = {};
+    for (const id of ids) Object.assign(values, secretEnvironment(id, await ctx.dependencySecret(id)));
+    return values;
+  }
+
+  private async stack(
+    ctx: ProviderContext,
+    name: string,
+    config: Record<string, unknown>,
+    savedPlan?: TofuStack['savedPlan'],
+    externalSecrets?: Record<string, string>,
+  ): Promise<TofuStack> {
     // The container keeps these credentials for the whole run: they must outlive its timeout.
     const c = await this.creds.get(ctx, this.requireRunner().timeoutMs + REFRESH_MARGIN_MS);
     return {
@@ -276,6 +295,7 @@ export class AwsAdapter implements CloudProviderAdapter {
         AWS_SECRET_ACCESS_KEY: c.secretAccessKey,
         ...(c.sessionToken ? { AWS_SESSION_TOKEN: c.sessionToken } : {}),
         AWS_REGION: ctx.region,
+        ...(externalSecrets ? { TF_VAR_external_secrets: JSON.stringify(externalSecrets) } : {}),
       },
       signal: ctx.signal,
       onLog: (l) => ctx.log?.(l.level, l.message),
