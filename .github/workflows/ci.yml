@@ -66,5 +66,11 @@ jobs:
           pnpm db:deploy
           pnpm db:seed
           pnpm db:seed
+      # Boots the built API against the services above: tenant isolation, API keys, team rules,
+      # audit, provider flags and rate limits (apps/api/test).
+      - name: API integration tests
+        env:
+          AUTH_DEV_LOGIN_ENABLED: 'true'
+        run: pnpm --filter @orkstage/api test:integration
       - name: Dependency audit
         run: pnpm audit --audit-level high
