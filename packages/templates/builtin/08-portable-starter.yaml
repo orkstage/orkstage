@@ -1,0 +1,40 @@
+apiVersion: platform/v1
+kind: EnvironmentTemplate
+metadata:
+  name: portable-starter
+  version: 1.0.0
+  displayName: Portable starter
+  description: >
+    The smallest environment every infrastructure provider can run: a network, one public web
+    service and the provider's ingress. No database, registry or DNS, so it fits free tier
+    accounts on AWS, Azure and OCI and proves a new cloud target end to end. NOT FOR PRODUCTION.
+  nonProduction: true
+  tags: [sandbox, low cost, portable]
+spec:
+  placements:
+    - name: primary
+      description: Everything runs in one account and region, on any infrastructure provider.
+  resources:
+    - id: network
+      type: network
+      strategy: shared
+      availabilityZones: 1
+    - id: web
+      type: compute.container-service
+      image: catalog://sample-api
+      replicas: 1
+      cpu: 0.25
+      memoryMiB: 512
+      port: 8080
+      public: true
+      healthCheckPath: /health
+    - id: ingress
+      type: ingress
+      routes:
+        - service: web
+  observability:
+    logs: true
+    metrics: true
+    traces: false
+    uptime: true
+    alerts: true

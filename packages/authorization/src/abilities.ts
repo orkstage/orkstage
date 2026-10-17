@@ -75,6 +75,9 @@ export const API_KEY_SCOPES = [
   'imports:write',
   'webhooks:manage',
   'audit:read',
+  // Register, edit and validate cloud targets (the `ork targets` commands). Platform keys only:
+  // tenant roles cannot manage targets.
+  'targets:manage',
 ] as const;
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 

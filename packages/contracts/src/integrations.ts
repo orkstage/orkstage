@@ -14,6 +14,7 @@ export const API_KEY_SCOPE_VALUES = [
   'imports:write',
   'webhooks:manage',
   'audit:read',
+  'targets:manage',
 ] as const;
 
 export const createApiKeySchema = z.object({

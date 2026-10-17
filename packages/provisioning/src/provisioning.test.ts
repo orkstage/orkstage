@@ -182,6 +182,20 @@ describe('compiler — same template, AWS-only variant', () => {
   });
 });
 
+describe('compiler: portable starter', () => {
+  it.each([
+    ['aws', aws, 'us-east-1'],
+    ['azure', azure, 'eastus'],
+    ['oci', oci, 'us-ashburn-1'],
+  ] as const)('resolves on %s alone', (provider, target, region) => {
+    const dev = input(templates['portable-starter']!, { primary: { target, region } });
+    const resolved = compileInfrastructure({ ...dev, instance: { ...dev.instance, environment: 'development' } }, registry());
+    expect(resolved.issues).toEqual([]);
+    expect(resolved.resources.map((r) => r.id).sort()).toEqual(['ingress', 'network', 'web']);
+    expect(new Set(resolved.resources.map((r) => r.simulatedProvider))).toEqual(new Set([provider]));
+  });
+});
+
 describe('compiler — failing before cloud mutation', () => {
   it('rejects unbound placement slots', () => {
     const resolved = compileInfrastructure(input(templates['multicloud-reference']!, { primary: multiCloudBindings.primary }), registry());

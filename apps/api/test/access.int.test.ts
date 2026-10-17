@@ -219,3 +219,26 @@ describe('cloud targets', () => {
     expect((await owner.patch(`/cloud/targets/${created.body.id}`, { name: `Mine ${unique()}` })).status).toBe(403);
   });
 });
+
+describe('cloud targets with API keys', () => {
+  it('need a platform key with targets:manage', async () => {
+    const platform = await admin.post('/api-keys', { name: `targets ${unique()}`, role: 'PlatformAdmin', scopes: ['targets:manage', 'instances:read'] });
+    expect(platform.status, JSON.stringify(platform.body)).toBe(201);
+    const key = api.withKey(platform.body.token);
+    expect((await key.get('/cloud/providers')).status).toBe(200);
+    const created = await key.post('/cloud/targets', {
+      provider: 'mock',
+      name: `Key target ${unique()}`,
+      config: { simulate: 'aws' },
+      allowedRegions: ['us-east-1'],
+      defaultRegion: 'us-east-1',
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect((await key.post(`/cloud/targets/${created.body.id}/validate`, {})).status).toBe(200);
+
+    const readOnly = await admin.post('/api-keys', { name: `read ${unique()}`, role: 'PlatformAdmin', scopes: ['instances:read'] });
+    const denied = await api.withKey(readOnly.body.token).post('/cloud/targets', { provider: 'mock', name: `No ${unique()}`, config: {}, allowedRegions: ['us-east-1'], defaultRegion: 'us-east-1' });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('API_KEY_SCOPE');
+  });
+});

@@ -57,6 +57,7 @@ export class CloudController {
   }
 
   /** Installed providers and whether their feature flag is on for the platform. */
+  @Scope('targets:manage')
   @Get('cloud/providers')
   async providers(@CurrentPrincipal() p: RequestPrincipal): Promise<ProviderDto[]> {
     authorize(p, 'read', 'CloudTarget');
@@ -78,6 +79,7 @@ export class CloudController {
     return rows.map((r) => this.toDto(r));
   }
 
+  @Scope('targets:manage')
   @Post('cloud/targets')
   @ApiZodBody(createCloudTargetSchema)
   async create(
@@ -107,6 +109,7 @@ export class CloudController {
    * The account and the state location stay (a different one is a new target), regions still in
    * use cannot be removed, and the last validation is cleared so the target is validated again.
    */
+  @Scope('targets:manage')
   @Patch('cloud/targets/:id')
   @ApiZodBody(updateCloudTargetSchema)
   async update(
@@ -193,6 +196,7 @@ export class CloudController {
     return [...used];
   }
 
+  @Scope('targets:manage')
   @Post('cloud/targets/:id/validate')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
