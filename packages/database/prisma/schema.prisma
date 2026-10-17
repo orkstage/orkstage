@@ -70,6 +70,7 @@ model Tenant {
   instances    Instance[]
   incidents    Incident[]
   cloudTargets CloudTarget[]
+  profiles     Profile[]
 
   @@index([organizationId])
 }
@@ -268,8 +269,6 @@ model CloudTarget {
   name           String
   /// The instance environment this target serves (production, staging, development, sandbox) or any.
   environment    String        @default("any")
-  /// Used for instance slots left unbound; one per tenant scope, provider and environment.
-  isDefault      Boolean       @default(false)
   /// Non-secret configuration (account id, role ARN, subscription id, simulation settings).
   config         Json
   /// Reference into the secret store. Raw credentials are never stored here (spec §11).
@@ -285,9 +284,46 @@ model CloudTarget {
   createdAt      DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
+  profileTargets ProfileTarget[]
 
   @@index([tenantId])
+}
+
+/// A named setup for an environment: the cloud target, and optionally the region, to use for each
+/// provider (ADR 0007). A new instance binds the slots it leaves unbound from its profile, or from
+/// the default profile of its environment. Names are unique per tenant scope ignoring case, and
+/// there is one default per tenant scope and environment (both are SQL indexes).
+model Profile {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// Null for profiles that platform staff share with every tenant.
+  tenantId    String?  @db.Uuid
+  name        String
+  /// production, staging, development, sandbox or any.
+  environment String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant    Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  targets   ProfileTarget[]
+  instances Instance[]
+
+  @@index([tenantId])
+}
+
+/// One provider of a profile: the target to use, and the region (null: the target's default).
+model ProfileTarget {
+  profileId String        @db.Uuid
+  provider  CloudProvider
+  targetId  String        @db.Uuid
+  region    String?
+
+  profile Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  target  CloudTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, provider])
+  @@index([targetId])
 }
 
 // ───────────────────────────── Instances & deployments ─────────────────────────────
@@ -335,6 +371,8 @@ model Instance {
   variables         Json           @default("{}")
   /// Placement slot → { targetId, region }.
   bindings          Json
+  /// The profile the unbound slots were bound from at creation; editing it later moves nothing.
+  profileId         String?        @db.Uuid
   desiredStateHash  String?
   protectedFromDestroy Boolean     @default(false)
   createdById       String?        @db.Uuid
@@ -343,6 +381,7 @@ model Instance {
 
   tenant          Tenant              @relation(fields: [tenantId], references: [id])
   templateVersion TemplateVersion     @relation(fields: [templateVersionId], references: [id])
+  profile         Profile?            @relation(fields: [profileId], references: [id], onDelete: SetNull)
   resources       InstanceResource[]
   deployments     Deployment[]
   transitions     InstanceTransition[]

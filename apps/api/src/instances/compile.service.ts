@@ -18,7 +18,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { unprocessable } from '../common/errors.js';
 import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
-import { pickDefaultBindings } from './default-targets.js';
+import { bindFromProfile, defaultProfile, serves, visibleTo } from './profiles.js';
 
 export interface CompileRequest {
   tenantId: string;
@@ -95,17 +95,39 @@ export class CompileService {
   }
 
   /**
-   * The request's bindings plus the default target for every slot it left unbound. Called when an
-   * instance is created, and the result is stored with it: a later change of default never moves
-   * an existing instance to another account.
+   * The request's bindings plus, for every slot it left unbound, the target of the chosen profile,
+   * or of the default profile of the instance's environment (ADR 0007). Called when an instance is
+   * created; the bindings and the profile are stored with it, so editing the profile later never
+   * moves an existing instance to another account.
    */
-  async withDefaultBindings(req: { tenantId: string; environment: string; templateVersionId: string; bindings: Record<string, { targetId: string; region: string }> }) {
+  async withProfileBindings(req: {
+    tenantId: string;
+    environment: string;
+    templateVersionId: string;
+    bindings: Record<string, { targetId: string; region: string }>;
+    profileId?: string;
+  }): Promise<{ bindings: Record<string, { targetId: string; region: string }>; profileId: string | null }> {
     const version = await this.prisma.templateVersion.findUniqueOrThrow({ where: { id: req.templateVersionId } });
     const template = environmentTemplate.parse(version.document);
     const unbound = template.spec.placements.filter((s) => !req.bindings[s.name]);
-    if (unbound.length === 0) return req.bindings;
-    const candidates = await this.prisma.cloudTarget.findMany({ where: { isDefault: true, status: 'ACTIVE', OR: [{ tenantId: null }, { tenantId: req.tenantId }] } });
-    return { ...req.bindings, ...pickDefaultBindings(unbound, req.bindings, req.environment, req.tenantId, candidates) };
+    const include = { targets: { include: { target: true } } } as const;
+    let profile;
+    if (req.profileId) {
+      profile = await this.prisma.profile.findUnique({ where: { id: req.profileId }, include });
+      if (!profile || !visibleTo(req.tenantId)(profile)) throw unprocessable('UNKNOWN_PROFILE', 'The profile does not exist or is not available to this tenant.');
+      if (!serves(req.environment)(profile)) {
+        throw unprocessable('PROFILE_ENVIRONMENT', `Profile ${profile.name} serves ${profile.environment}, not ${req.environment}.`);
+      }
+    } else {
+      if (unbound.length === 0) return { bindings: req.bindings, profileId: null };
+      const candidates = await this.prisma.profile.findMany({ where: { isDefault: true, OR: [{ tenantId: null }, { tenantId: req.tenantId }] }, include });
+      profile = defaultProfile(candidates, req.tenantId, req.environment);
+    }
+    if (!profile) return { bindings: req.bindings, profileId: null };
+    const picked = bindFromProfile(unbound, req.bindings, profile, req.tenantId, req.environment);
+    // A profile asked for is always recorded; a default one only when it bound a slot.
+    const used = Boolean(req.profileId) || Object.keys(picked).length > 0;
+    return { bindings: { ...req.bindings, ...picked }, profileId: used ? profile.id : null };
   }
 
   async knownResources(instanceId: string): Promise<KnownResource[]> {

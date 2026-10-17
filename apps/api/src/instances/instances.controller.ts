@@ -31,11 +31,13 @@ import { CompileService } from './compile.service.js';
 
 const instanceInclude = {
   tenant: { select: { name: true } },
+  profile: { select: { id: true, name: true } },
   templateVersion: { include: { template: { select: { id: true, name: true, displayName: true } } } },
 } as const;
 
 type LoadedInstance = Instance & {
   tenant: { name: string };
+  profile: { id: string; name: string } | null;
   templateVersion: { id: string; version: string; template: { id: string; name: string; displayName: string } };
 };
 
@@ -112,7 +114,13 @@ export class InstancesController {
 
     // Compile before saving so an undeployable configuration is rejected up front.
     const id = randomUUID();
-    const bindings = await this.compiler.withDefaultBindings({ tenantId: tenant.id, environment: body.environment, templateVersionId: version.id, bindings: body.bindings });
+    const { bindings, profileId } = await this.compiler.withProfileBindings({
+      tenantId: tenant.id,
+      environment: body.environment,
+      templateVersionId: version.id,
+      bindings: body.bindings,
+      profileId: body.profileId,
+    });
     const resolved = await this.compiler.compile({ ...body, bindings, tenantId: tenant.id, instanceId: id, instanceSlug: body.slug });
     const blocking = resolved.issues.filter((i) => i.severity === 'error' && i.stage !== 'policy');
     if (blocking.length > 0) throw unprocessable('VALIDATION_FAILED', 'The selected template and placement are not valid.', { issues: resolved.issues });
@@ -127,11 +135,12 @@ export class InstancesController {
         templateVersionId: version.id,
         variables: body.variables,
         bindings,
+        profileId,
         createdById: p.userId,
       },
       include: instanceInclude,
     });
-    await this.audit.record({ principal: p, tenantId: tenant.id, resourceType: 'Instance', resourceId: instance.id, action: 'CREATE', correlationId, changes: { name: body.name, template: version.id, bindings } });
+    await this.audit.record({ principal: p, tenantId: tenant.id, resourceType: 'Instance', resourceId: instance.id, action: 'CREATE', correlationId, changes: { name: body.name, template: version.id, bindings, profileId } });
     return this.toDto(instance, resolved.resources.every((r) => r.provider === 'mock'));
   }
 
@@ -378,6 +387,7 @@ export class InstancesController {
       },
       variables: i.variables as Record<string, unknown>,
       bindings: i.bindings as Record<string, { targetId: string; region: string }>,
+      profile: i.profile,
       protectedFromDestroy: i.protectedFromDestroy,
       createdAt: i.createdAt.toISOString(),
       updatedAt: i.updatedAt.toISOString(),
