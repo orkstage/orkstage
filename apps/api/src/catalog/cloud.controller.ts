@@ -262,6 +262,7 @@ export class CloudController {
       hasCredentialRef: Boolean(r.credentialRef),
       allowedRegions: r.allowedRegions,
       defaultRegion: r.defaultRegion,
+      maxConcurrentDeployments: r.maxConcurrentDeployments,
       status: r.status,
       health: r.health,
       lastValidation: (r.lastValidation ?? null) as CloudTargetDto['lastValidation'],

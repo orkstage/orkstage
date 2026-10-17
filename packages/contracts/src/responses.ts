@@ -80,6 +80,8 @@ export interface CloudTargetDto {
   hasCredentialRef: boolean;
   allowedRegions: string[];
   defaultRegion: string;
+  /** Deployments that may run on this target at the same time. */
+  maxConcurrentDeployments: number;
   status: 'ACTIVE' | 'DISABLED';
   health: string;
   lastValidation: { ok: boolean; checks: { name: string; status: string; message: string }[]; validatedAt: string; identity?: string } | null;
