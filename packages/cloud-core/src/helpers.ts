@@ -90,6 +90,14 @@ export function safeMessage(err: unknown): string {
 export const now = () => new Date().toISOString();
 
 /**
+ * How an IaC adapter keeps a deployment's plan for its apply: under the deployment id, strict in
+ * production (a plan that no longer matches fails the step instead of applying something else).
+ */
+export function savedPlanFor(req: { planId?: string; tags: Record<string, string> }): { id: string; strict: boolean } | undefined {
+  return req.planId ? { id: req.planId, strict: req.tags['platform:environment'] === 'production' } : undefined;
+}
+
+/**
  * HTTP reachability check used for public endpoints (service URLs, platform deployments).
  * 2xx and 3xx are healthy, 4xx is degraded (the app answers but not on that path), 5xx and
  * network errors are unhealthy.

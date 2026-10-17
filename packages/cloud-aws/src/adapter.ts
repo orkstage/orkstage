@@ -13,6 +13,7 @@ import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-sec
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import {
   ProviderError,
+  savedPlanFor,
   type CloudCapability,
   type CloudProviderAdapter,
   type CloudTarget,
@@ -152,7 +153,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     }
     await this.ensureStateBucket(ctx);
     const config = rootConfig(ctx, req);
-    const stack = await this.stack(ctx, req.name, config);
+    const stack = await this.stack(ctx, req.name, config, savedPlanFor(req));
     try {
       const result = await runner.apply(stack);
       // Keep the exact configuration beside its state so destroy never depends on a stale template.
@@ -169,7 +170,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
     try {
-      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req)));
+      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req), savedPlanFor(req)));
       return { ...plan, destructive: isDestructivePlan(plan.actions) };
     } catch (err) {
       throw toProviderError(err);
@@ -263,12 +264,13 @@ export class AwsAdapter implements CloudProviderAdapter {
     return this.runner;
   }
 
-  private async stack(ctx: ProviderContext, name: string, config: Record<string, unknown>): Promise<TofuStack> {
+  private async stack(ctx: ProviderContext, name: string, config: Record<string, unknown>, savedPlan?: TofuStack['savedPlan']): Promise<TofuStack> {
     // The container keeps these credentials for the whole run: they must outlive its timeout.
     const c = await this.creds.get(ctx, this.requireRunner().timeoutMs + REFRESH_MARGIN_MS);
     return {
       stateKey: `${ctx.target.id}/${ctx.region}/${stateKeyFor(name)}`,
       config,
+      savedPlan,
       env: {
         AWS_ACCESS_KEY_ID: c.accessKeyId,
         AWS_SECRET_ACCESS_KEY: c.secretAccessKey,

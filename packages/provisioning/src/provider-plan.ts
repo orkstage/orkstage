@@ -10,8 +10,10 @@ export type ProviderPlanEntry =
 
 export interface ProviderPlanSummary {
   entries: ProviderPlanEntry[];
-  /** Any planned delete/replace — production changes like this need explicit approval. */
+  /** Any planned delete/replace: production changes like this need explicit approval. */
   destructive: boolean;
+  /** A provider could not plan a resource: in production, nobody approves what was not seen. */
+  failed: boolean;
 }
 
 /**
@@ -25,6 +27,8 @@ export async function previewProviderPlans(opts: {
   tenantId: string;
   instanceId: string;
   correlationId: string;
+  /** The deployment id: plans are saved under it for the apply phase. Absent for previews. */
+  planId?: string;
   existing: Record<string, { idempotencyKey: string | null; outputs: ResourceOutputs }>;
   concurrency?: number;
 }): Promise<ProviderPlanSummary> {
@@ -49,6 +53,7 @@ export async function previewProviderPlans(opts: {
           spec: r.spec,
           dependencyOutputs: Object.fromEntries(r.dependsOn.map((d) => [d, existing[d]!.outputs])),
           idempotencyKey: idempotencyKeyFor(opts.tenantId, opts.instanceId, r),
+          planId: opts.planId,
         },
       );
       return { resourceId: r.id, status: 'planned', plan };
@@ -59,12 +64,16 @@ export async function previewProviderPlans(opts: {
 
   const limit = Math.max(1, opts.concurrency ?? 2);
   for (let i = 0; i < work.length; i += limit) entries.push(...(await Promise.all(work.slice(i, i + limit).map((w) => w()))));
-  return { entries, destructive: entries.some((e) => e.status === 'planned' && e.plan.destructive) };
+  return {
+    entries,
+    destructive: entries.some((e) => e.status === 'planned' && e.plan.destructive),
+    failed: entries.some((e) => e.status === 'error'),
+  };
 }
 
 export function describeProviderPlan(e: ProviderPlanEntry): string {
-  if (e.status !== 'planned') return `${e.resourceId}: provider plan ${e.status} — ${e.reason}`;
+  if (e.status !== 'planned') return `${e.resourceId}: provider plan ${e.status}: ${e.reason}`;
   const { add, change, remove } = e.plan.changes;
   const risky = e.plan.actions.filter((a) => a.action === 'delete' || a.action === 'replace').map((a) => `${a.action} ${a.address}`);
-  return `${e.resourceId}: ${add} to add, ${change} to change, ${remove} to destroy${risky.length ? ` — ${risky.join(', ')}` : ''}`;
+  return `${e.resourceId}: ${add} to add, ${change} to change, ${remove} to destroy${risky.length ? `; ${risky.join(', ')}` : ''}`;
 }

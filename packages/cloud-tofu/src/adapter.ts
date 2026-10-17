@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  savedPlanFor,
   ProviderError,
   type CloudCapability,
   type CloudProviderAdapter,
@@ -170,7 +171,7 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     const runner = this.requireRunner();
     const config = this.rootConfig(ctx, req);
     try {
-      const result = await runner.apply(this.stack(ctx, creds, req.name, config));
+      const result = await runner.apply(this.stack(ctx, creds, req.name, config, savedPlanFor(req)));
       // Keep the exact configuration beside its state so destroy never depends on a stale template.
       await store.put(configKeyFor(req.name), JSON.stringify(config), ctx.signal);
       const outputs = flattenOutputs(result.outputs.all);
@@ -186,7 +187,7 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     const runner = this.requireRunner();
     const creds = await this.credentials(ctx);
     try {
-      const plan = await runner.plan(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req)));
+      const plan = await runner.plan(this.stack(ctx, creds, req.name, this.rootConfig(ctx, req), savedPlanFor(req)));
       return { ...plan, destructive: isDestructivePlan(plan.actions, this.routineReplacements) };
     } catch (err) {
       throw toProviderError(this.provider, err);
@@ -282,10 +283,11 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
     return this.runner;
   }
 
-  protected stack(ctx: ProviderContext, creds: Creds, name: string, config: Record<string, unknown>): TofuStack {
+  protected stack(ctx: ProviderContext, creds: Creds, name: string, config: Record<string, unknown>, savedPlan?: TofuStack['savedPlan']): TofuStack {
     return {
       stateKey: `${ctx.target.id}/${ctx.region}/${stateKeyFor(name)}`,
       config,
+      savedPlan,
       env: this.runnerEnv(ctx, creds),
       signal: ctx.signal,
       onLog: (l) => ctx.log?.(l.level, l.message),

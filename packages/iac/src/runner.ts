@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 export interface TofuRunnerOptions {
@@ -27,6 +27,16 @@ export interface TofuRunnerOptions {
   dockerBin?: string;
   /** Hard ceiling for a single command. */
   timeoutMs?: number;
+  /** Tests only: runs one OpenTofu command instead of a container. */
+  exec?: TofuExec;
+}
+
+export type TofuExec = (stack: TofuStack, dir: string, args: string[]) => Promise<TofuExecResult>;
+export interface TofuExecResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+  kind: 'timeout' | 'cancelled' | 'failed';
 }
 
 export interface TofuStack {
@@ -38,6 +48,13 @@ export interface TofuStack {
   env: Record<string, string>;
   signal?: AbortSignal;
   onLog?: (line: TofuLogLine) => void;
+  /**
+   * The deployment's plan for this state (item 5 of open-items: what is approved is what is
+   * applied). `plan` saves it; `apply` applies exactly that file. When the configuration or the
+   * state changed in between, a strict plan (production) fails the step; otherwise the apply plans
+   * again and says so.
+   */
+  savedPlan?: { id: string; strict: boolean };
 }
 
 export interface TofuLogLine {
@@ -113,6 +130,11 @@ export function driftChanges(plan: ShownPlan): DriftChange[] {
   });
 }
 
+const planFile = (id: string) => `deploy-${id}.tfplan`;
+const planHashFile = (id: string) => `deploy-${id}.sha256`;
+/** What a saved plan was made from: applying it to another configuration is refused. */
+const configHash = (config: Record<string, unknown>) => createHash('sha256').update(JSON.stringify(config)).digest('hex');
+
 interface JsonLine {
   '@level'?: string;
   '@message'?: string;
@@ -138,21 +160,43 @@ export class TofuRunner {
   }
 
   async apply(stack: TofuStack): Promise<ApplyResult> {
-    const dir = await this.prepare(stack);
-    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
-    const lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
+    const dir = await this.prepare(stack, 'main');
+    await this.init(stack, dir);
+    const saved = stack.savedPlan ? await this.takeSavedPlan(stack, dir) : null;
+    let lines: JsonLine[];
+    if (saved) {
+      try {
+        lines = await this.run(stack, dir, ['apply', '-input=false', '-json', saved], true);
+      } catch (err) {
+        if (!(err instanceof TofuError) || !/stale/i.test(err.message)) throw err;
+        if (stack.savedPlan!.strict) {
+          throw new TofuError('The infrastructure changed after the plan was approved, so it was not applied. Deploy again to plan and approve the current changes.', err.diagnostics, 'failed');
+        }
+        stack.onLog?.({ level: 'warn', message: 'The saved plan was outdated (the state changed since it was made); planning and applying again.' });
+        lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
+      } finally {
+        await this.dropSavedPlan(stack, dir);
+      }
+    } else {
+      lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
+    }
     const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
     return { outputs: await this.outputs(stack, dir), changes: { add: summary.add, change: summary.change, remove: summary.remove } };
   }
 
   /**
-   * Speculative plan (no lock, no apply): what OpenTofu would change, per resource address.
-   * Used to show real changes before approval and to flag destructive actions.
+   * Plan of what OpenTofu would change, per resource address. With `savedPlan` (a deployment's plan
+   * phase) the plan is locked and saved for the apply; without it, it is speculative: no lock, its
+   * own working directory, nothing kept.
    */
   async plan(stack: TofuStack): Promise<PlanResult> {
-    const dir = await this.prepare(stack);
-    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
-    const lines = await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false'], true);
+    const dir = await this.prepare(stack, stack.savedPlan ? 'main' : 'preview');
+    await this.init(stack, dir);
+    const args = stack.savedPlan
+      ? ['plan', '-input=false', '-json', `-out=${planFile(stack.savedPlan.id)}`]
+      : ['plan', '-input=false', '-json', '-lock=false'];
+    const lines = await this.run(stack, dir, args, true);
+    if (stack.savedPlan) await writeFile(join(dir, planHashFile(stack.savedPlan.id)), configHash(stack.config));
     const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
     const actions = lines
       .filter((l) => l.type === 'planned_change' && l.change?.resource?.addr)
@@ -163,28 +207,69 @@ export class TofuRunner {
   /**
    * Refresh-only plan: what changed in the real infrastructure since the last apply (edited or
    * deleted outside OpenTofu). Configuration changes (e.g. a newer module) are not drift and do
-   * not appear here.
+   * not appear here. Runs in its own working directory, so a scan never touches a deployment's.
    */
   async drift(stack: TofuStack): Promise<DriftChange[]> {
-    const dir = await this.prepare(stack);
-    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
-    const planFile = 'drift.tfplan';
+    const dir = await this.prepare(stack, 'drift');
+    await this.init(stack, dir);
+    const file = 'drift.tfplan';
     try {
-      await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false', '-refresh-only', `-out=${planFile}`], true);
-      const shown = await this.exec(stack, dir, ['show', '-json', planFile]);
+      await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false', '-refresh-only', `-out=${file}`], true);
+      const shown = await this.exec(stack, dir, ['show', '-json', file]);
       if (shown.code !== 0) throw new TofuError(`tofu show failed: ${shown.stderr.slice(0, 300)}`, [], shown.kind);
       return driftChanges(JSON.parse(shown.stdout) as ShownPlan);
     } finally {
       // The saved plan holds attribute values (possibly sensitive): never leave it behind.
-      await rm(join(dir, planFile), { force: true });
+      await rm(join(dir, file), { force: true });
     }
   }
 
   async destroy(stack: TofuStack): Promise<void> {
-    const dir = await this.prepare(stack);
-    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
+    const dir = await this.prepare(stack, 'main');
+    await this.init(stack, dir);
     await this.run(stack, dir, ['destroy', '-auto-approve', '-input=false', '-json'], true);
     await rm(dir, { recursive: true, force: true });
+    for (const purpose of ['preview', 'drift'] as const) await rm(this.dirFor(stack, purpose), { recursive: true, force: true });
+  }
+
+  /** `init`, then `validate`: a configuration error stops before any plan or apply. */
+  private async init(stack: TofuStack, dir: string): Promise<void> {
+    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
+    const res = await this.exec(stack, dir, ['validate', '-json', '-no-color']);
+    let report: { valid?: boolean; diagnostics?: { severity: string; summary: string; detail?: string }[] } = {};
+    try {
+      report = JSON.parse(res.stdout || '{}');
+    } catch {
+      /* not JSON: judged by the exit code below */
+    }
+    if (res.code !== 0 || report.valid === false) {
+      const diagnostics = (report.diagnostics ?? []).filter((d) => d.severity === 'error').map((d) => `${d.summary}${d.detail ? `: ${d.detail}` : ''}`);
+      throw new TofuError(`tofu validate failed: ${diagnostics[0] ?? res.stderr.trim().slice(0, 300)}`.slice(0, 1500), diagnostics, res.kind);
+    }
+  }
+
+  /**
+   * The saved plan of this deployment, when it still matches the configuration about to be
+   * applied; null when there is none (a resource created by this deployment is not planned ahead).
+   */
+  private async takeSavedPlan(stack: TofuStack, dir: string): Promise<string | null> {
+    const { id, strict } = stack.savedPlan!;
+    const hash = await readFile(join(dir, planHashFile(id)), 'utf8').catch(() => null);
+    if (hash === null) return null;
+    if (hash === configHash(stack.config)) return planFile(id);
+    await this.dropSavedPlan(stack, dir);
+    if (strict) {
+      throw new TofuError('The configuration changed after the plan was approved (for example a dependency was replaced), so it was not applied. Deploy again to plan and approve the current changes.', [], 'failed');
+    }
+    stack.onLog?.({ level: 'warn', message: 'The configuration changed since the plan; planning and applying again.' });
+    return null;
+  }
+
+  /** A saved plan holds attribute values (possibly sensitive): used once, then deleted. */
+  private async dropSavedPlan(stack: TofuStack, dir: string): Promise<void> {
+    const { id } = stack.savedPlan!;
+    await rm(join(dir, planFile(id)), { force: true });
+    await rm(join(dir, planHashFile(id)), { force: true });
   }
 
   private async outputs(stack: TofuStack, dir: string): Promise<Record<string, unknown>> {
@@ -194,8 +279,18 @@ export class TofuRunner {
     return Object.fromEntries(Object.entries(parsed).filter(([, o]) => !o.sensitive).map(([k, o]) => [k, o.value]));
   }
 
-  private async prepare(stack: TofuStack): Promise<string> {
-    const dir = join(this.opts.workRoot, createHash('sha256').update(stack.stateKey).digest('hex').slice(0, 24));
+  /**
+   * One working directory per state and purpose: deployments (plan with -out, apply, destroy)
+   * share `main`; speculative previews and drift scans get their own, so they never run `init` in
+   * a directory an apply is using.
+   */
+  private dirFor(stack: TofuStack, purpose: 'main' | 'preview' | 'drift'): string {
+    const id = createHash('sha256').update(stack.stateKey).digest('hex').slice(0, 24);
+    return join(this.opts.workRoot, purpose === 'main' ? id : `${id}-${purpose}`);
+  }
+
+  private async prepare(stack: TofuStack, purpose: 'main' | 'preview' | 'drift'): Promise<string> {
+    const dir = this.dirFor(stack, purpose);
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'main.tf.json'), JSON.stringify(stack.config, null, 2));
     return dir;
@@ -226,12 +321,15 @@ export class TofuRunner {
     if (result.code !== 0) {
       if (!json) diagnostics.push(...result.stderr.split('\n').filter((l) => /error/i.test(l)).slice(0, 5));
       const message = diagnostics[0] ?? result.stderr.trim().split('\n').slice(-3).join(' ') ?? `tofu ${args[0]} failed`;
-      throw new TofuError(`tofu ${args[0]} failed: ${message}`.slice(0, 1500), diagnostics, result.kind);
+      // A stale lock is released by hand (docs: self-hosting/opentofu): say where to run it.
+      const where = /state lock/i.test(`${message} ${result.stderr}`) ? ` (work directory ${basename(dir)})` : '';
+      throw new TofuError(`tofu ${args[0]} failed: ${message}`.slice(0, 1400) + where, diagnostics, result.kind);
     }
     return lines;
   }
 
-  private exec(stack: TofuStack, dir: string, args: string[]): Promise<{ code: number; stdout: string; stderr: string; kind: 'timeout' | 'cancelled' | 'failed' }> {
+  private exec(stack: TofuStack, dir: string, args: string[]): Promise<TofuExecResult> {
+    if (this.opts.exec) return this.opts.exec(stack, dir, args);
     const name = `orkstage-tofu-${randomBytes(6).toString('hex')}`;
     const work = this.opts.workVolume
       ? ['-v', `${this.opts.workVolume}:/workspace`, '-w', `/workspace/${basename(dir)}`]

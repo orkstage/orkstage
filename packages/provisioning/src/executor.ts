@@ -29,6 +29,8 @@ export interface ExecuteOptions {
   tenantId: string;
   instanceId: string;
   correlationId: string;
+  /** The deployment id: adapters apply the plans its plan phase saved (open item 5). */
+  planId?: string;
   completed?: CompletedResources;
   /** Only run these resources (and skip the rest as already handled) — used by "retry failed". */
   only?: Set<string>;
@@ -105,6 +107,7 @@ export async function executeApply(opts: ExecuteOptions): Promise<ExecutionOutco
           spec: r.spec,
           dependencyOutputs,
           idempotencyKey: idempotencyKeyFor(opts.tenantId, opts.instanceId, r),
+          planId: opts.planId,
         });
         outputs[r.id] = result.outputs;
         status[r.id] = 'SUCCEEDED';

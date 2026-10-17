@@ -173,17 +173,22 @@ export class DeploymentRunner {
         tenantId: d.tenantId,
         instanceId: d.instanceId,
         correlationId: d.correlationId,
+        planId: d.id,
         existing: Object.fromEntries(rows.map((r) => [r.resourceId, { idempotencyKey: r.idempotencyKey, outputs: r.outputs as ResourceOutputs }])),
       });
       for (const e of provider.entries) {
         await this.event(d.id, e.status === 'planned' && e.plan.destructive ? 'warn' : 'info', PHASE.plan, describeProviderPlan(e));
       }
-      const escalate = provider.destructive && resolved.environment === 'production' && !d.approvalRequired;
+      // Production: a delete or replace, or a resource no provider could plan, waits for a person.
+      const escalate = (provider.destructive || provider.failed) && resolved.environment === 'production' && !d.approvalRequired;
       await prisma.deployment.update({
         where: { id: d.id },
         data: { plan: { ...plan, text, providerPlans: provider.entries } as object, ...(escalate ? { approvalRequired: true } : {}) },
       });
-      if (escalate) await this.event(d.id, 'warn', PHASE.plan, 'The provider plan deletes or replaces existing resources: production approval required.');
+      if (escalate) {
+        const why = provider.destructive ? 'The provider plan deletes or replaces existing resources' : 'A provider could not plan every changed resource';
+        await this.event(d.id, 'warn', PHASE.plan, `${why}: production approval required.`);
+      }
       return `Plan: ${plan.counts.CREATE} to create, ${plan.counts.UPDATE} to update, ${plan.counts.DELETE} to delete, ${plan.counts.NOOP} unchanged (risk ${provider.destructive ? 'high' : plan.risk}).`;
     });
 
@@ -286,6 +291,7 @@ export class DeploymentRunner {
         tenantId: d.tenantId,
         instanceId: d.instanceId,
         correlationId: d.correlationId,
+        planId: d.id,
         completed,
         only: d.onlyResources.length > 0 ? new Set(d.onlyResources) : undefined,
         concurrency: this.ctx.config.WORKER_CONCURRENCY,
