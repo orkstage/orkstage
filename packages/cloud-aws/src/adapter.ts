@@ -8,6 +8,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { IAMClient } from '@aws-sdk/client-iam';
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
@@ -21,6 +22,7 @@ import {
   type DriftChange,
   type HealthResult,
   type LogLine,
+  type MetricPoint,
   type ProviderContext,
   type ResourceIdentifier,
   type ResourcePlan,
@@ -36,6 +38,7 @@ import { AWS_CAPABILITIES } from './catalog.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
 import { AwsCredentialProvider, REFRESH_MARGIN_MS, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
+import { cloudWatchQuery, readCloudWatch } from './metrics.js';
 import { probePermissions } from './permissions.js';
 import { externalSecretIds, flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 
@@ -233,6 +236,19 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const state = await this.getResource(ctx, res);
     return state.exists ? readAwsLogs(state.outputs, await this.creds.clientConfig(ctx), limit, ctx.signal) : [];
+  }
+
+  /**
+   * Metrics from CloudWatch (`GetMetricData`, one point per minute): cpu and memory of ECS services,
+   * requests, errors_5xx and latency_ms of load balancers, cpu and connections of RDS and
+   * ElastiCache. An empty list when the resource kind has no such metric.
+   */
+  async getMetric(rawCtx: ProviderContext, res: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]> {
+    const ctx = this.effective(rawCtx);
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    const query = cloudWatchQuery(res.serviceKind, outputs, metric);
+    if (!query) return [];
+    return readCloudWatch(new CloudWatchClient(await this.creds.clientConfig(ctx)), query, minutes, ctx.signal);
   }
 
   /**

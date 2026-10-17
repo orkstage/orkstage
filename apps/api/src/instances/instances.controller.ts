@@ -326,6 +326,7 @@ export class InstancesController {
     if (resource.provider !== 'mock') throw unprocessable('NOT_SIMULATED', 'Simulation controls only apply to simulated resources.');
     if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, resource.name, body.health);
     if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, resource.name, body.drift);
+    if (body.metric) await this.adapters.mock.setMetricOverride(ctx, resource.name, body.metric.name, body.metric.value);
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'InstanceResource', resourceId: `${id}/${body.resourceId}`, action: 'SIMULATE', correlationId, changes: body });
   }
 

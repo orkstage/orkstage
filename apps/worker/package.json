@@ -25,6 +25,7 @@
     "pino": "10.4.0"
   },
   "devDependencies": {
+    "@orkstage/cloud-mock": "workspace:*",
     "@types/nodemailer": "8.0.2"
   }
 }

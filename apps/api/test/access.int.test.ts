@@ -246,3 +246,37 @@ describe('cloud targets with API keys', () => {
     expect(denied.body.error.code).toBe('API_KEY_SCOPE');
   });
 });
+
+describe('alert rules', () => {
+  const cpu = { signal: 'metric', metric: 'cpu', operator: '>', threshold: 80, windowMinutes: 5 };
+
+  it('platform rules are for staff; tenant owners manage their own tenant rules only', async () => {
+    const platform = await admin.post('/alert-rules', { name: `Platform CPU ${unique()}`, condition: cpu });
+    expect(platform.status, JSON.stringify(platform.body)).toBe(201);
+    expect(platform.body).toMatchObject({ tenantId: null, autoResolve: true, cooldownSeconds: 900, condition: { statistic: 'avg' } });
+
+    const owner = await api.as(ctx.acmeOwner);
+    expect((await owner.post('/alert-rules', { name: `Mine ${unique()}`, condition: cpu })).status).toBe(403);
+    const mine = await owner.post('/alert-rules', { tenantId: ctx.acme.id, name: `Acme CPU ${unique()}`, condition: cpu, severity: 'high' });
+    expect(mine.status, JSON.stringify(mine.body)).toBe(201);
+    expect((await owner.post('/alert-rules', { tenantId: ctx.globex.id, name: `Theirs ${unique()}`, condition: cpu })).status).toBe(403);
+    expect((await owner.patch(`/alert-rules/${platform.body.id}`, { enabled: false })).status).toBe(403);
+    expect((await owner.patch(`/alert-rules/${mine.body.id}`, { threshold: 90 })).status).toBe(400);
+    expect((await owner.patch(`/alert-rules/${mine.body.id}`, { enabled: false })).body.enabled).toBe(false);
+
+    const globexRule = await admin.post('/alert-rules', { tenantId: ctx.globex.id, name: `Globex ${unique()}`, condition: cpu });
+    const seen = (await owner.get('/alert-rules')).body as { id: string }[];
+    expect(seen.map((r) => r.id)).toEqual(expect.arrayContaining([platform.body.id, mine.body.id]));
+    expect(seen.some((r) => r.id === globexRule.body.id)).toBe(false);
+    expect((await owner.del(`/alert-rules/${globexRule.body.id}`)).status).toBe(404);
+    expect((await owner.del(`/alert-rules/${mine.body.id}`)).status).toBe(204);
+  });
+
+  it('developers read rules but cannot change them; conditions are validated', async () => {
+    const dev = await api.as((await member(api.prisma, ctx.acme.id, 'CustomerDeveloper')).email);
+    expect((await dev.get('/alert-rules')).status).toBe(200);
+    expect((await dev.post('/alert-rules', { tenantId: ctx.acme.id, name: `Dev ${unique()}`, condition: cpu })).status).toBe(403);
+    const bad = await admin.post('/alert-rules', { name: `Bad ${unique()}`, condition: { signal: 'metric', metric: 'disk', operator: '>', threshold: 1, windowMinutes: 5 } });
+    expect(bad.status).toBe(400);
+  });
+});

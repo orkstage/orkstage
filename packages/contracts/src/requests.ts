@@ -194,7 +194,50 @@ export const simulateSchema = z.object({
   resourceId: z.string().min(1),
   health: z.enum(HEALTH_STATES).nullable().optional(),
   drift: z.boolean().optional(),
+  /** Pin a metric to a value (null: back to the simulated series), to exercise metric alerts. */
+  metric: z.object({ name: z.enum(['cpu', 'memory', 'requests', 'errors_5xx', 'latency_ms', 'connections']), value: z.number().nullable() }).optional(),
 });
+
+/** The platform's metric names, the same on every provider (open item 7). */
+export const PLATFORM_METRICS = ['cpu', 'memory', 'requests', 'errors_5xx', 'latency_ms', 'connections'] as const;
+export const ALERT_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+
+/** Health rule: consecutive failed health checks of a resource. */
+export const healthConditionSchema = z.object({
+  signal: z.literal('health'),
+  critical: z.boolean().optional(),
+  consecutiveFailures: z.number().int().min(1).max(20),
+});
+
+/** Metric rule: a statistic of a metric over a window, compared with a threshold. */
+export const metricConditionSchema = z.object({
+  signal: z.literal('metric'),
+  metric: z.enum(PLATFORM_METRICS),
+  /** Only these resource types (e.g. `compute.container-service`); all with the metric when absent. */
+  resourceTypes: z.array(z.string().min(1)).max(20).optional(),
+  operator: z.enum(['>', '>=', '<', '<=']),
+  threshold: z.number(),
+  windowMinutes: z.number().int().min(1).max(60),
+  statistic: z.enum(['avg', 'max', 'min']).default('avg'),
+});
+
+export const alertConditionSchema = z.discriminatedUnion('signal', [healthConditionSchema, metricConditionSchema]);
+
+export const createAlertRuleSchema = z.object({
+  /** Absent: a platform rule for every tenant (platform staff only). */
+  tenantId: uuid.optional(),
+  name: z.string().min(2).max(120),
+  condition: alertConditionSchema,
+  severity: z.enum(ALERT_SEVERITIES).default('medium'),
+  actions: z.array(z.enum(['create_incident', 'notify_owners'])).min(1).default(['create_incident', 'notify_owners']),
+  /** After an incident of this rule resolves, no new one for the same resource for this long. */
+  cooldownSeconds: z.number().int().min(0).max(86_400).default(900),
+  /** Resolve the incident when the condition clears; off means a person resolves it. */
+  autoResolve: z.boolean().default(true),
+  enabled: z.boolean().default(true),
+});
+/** Unknown keys are refused: a threshold belongs in `condition`, not beside it. */
+export const updateAlertRuleSchema = createAlertRuleSchema.omit({ tenantId: true }).partial().strict();
 
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
 export type CreateCloudTargetInput = z.infer<typeof createCloudTargetSchema>;

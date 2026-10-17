@@ -5,6 +5,7 @@ import { healthToStatus, type HealthState } from '@orkstage/domain';
 import { platformMetrics, toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
+import { MetricAlerts } from './metric-alerts.js';
 import { instanceHealth, syncStatusComponents } from './status.js';
 
 interface HealthCondition {
@@ -19,7 +20,11 @@ interface HealthCondition {
  * rules, and auto-resolves them when health returns. Also records drift (spec §31).
  */
 export class HealthMonitor {
-  constructor(private readonly ctx: WorkerContext) {}
+  private readonly metricAlerts: MetricAlerts;
+
+  constructor(private readonly ctx: WorkerContext) {
+    this.metricAlerts = new MetricAlerts(ctx);
+  }
 
   async tick(): Promise<void> {
     const { prisma } = this.ctx;
@@ -47,7 +52,9 @@ export class HealthMonitor {
         }
       }
       await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
-      await this.evaluateAlerts(instance, fresh, rules.filter((rule) => !rule.tenantId || rule.tenantId === instance.tenantId));
+      const scoped = rules.filter((rule) => !rule.tenantId || rule.tenantId === instance.tenantId);
+      await this.evaluateAlerts(instance, fresh, scoped);
+      await this.metricAlerts.evaluate(instance, fresh, scoped, targets);
     }
   }
 
@@ -115,7 +122,9 @@ export class HealthMonitor {
       const dedupKey = `health:${instance.id}:${r.resourceId}`;
       const open = await prisma.incident.findFirst({ where: { dedupKey, status: { not: 'RESOLVED' } } });
 
-      if (r.health === 'HEALTHY' && open?.source === 'AUTOMATED') {
+      // A matching health rule with auto resolve off leaves the incident for a person to resolve.
+      const keepOpen = rules.some((rule) => (rule.condition as unknown as HealthCondition).signal === 'health' && !rule.autoResolve);
+      if (r.health === 'HEALTHY' && open?.source === 'AUTOMATED' && !keepOpen) {
         await prisma.incident.update({
           where: { id: open.id },
           data: { status: 'RESOLVED', resolvedAt: new Date(), updates: { create: { status: 'RESOLVED', message: `Health restored for ${r.resourceId}.` } } },

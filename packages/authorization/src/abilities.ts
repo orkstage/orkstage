@@ -23,6 +23,7 @@ export const SUBJECTS = [
   'CloudTarget',
   'Profile',
   'Incident',
+  'AlertRule',
   'StatusPage',
   'Notification',
   'Policy',
@@ -129,6 +130,10 @@ export function defineAbilityFor(principal: Principal): AppAbility {
     can('read', 'Audit', admins);
     can(['create', 'update', 'delete'], 'Member', owners);
     can('update', 'Tenant', owners);
+    // Alert rules: every member sees what can open an incident; owners and admins change their tenant's.
+    can('read', 'AlertRule', all);
+    can('read', 'AlertRule', { tenantId: null });
+    can(['create', 'update', 'delete'], 'AlertRule', admins);
     // Integrations: tenant admins manage their tenant's keys and webhooks; developers can import IaC.
     can('manage', ['ApiKey', 'Webhook'], admins);
     // Profiles (ADR 0007): every member reads the tenant's and the shared ones, and creates

@@ -68,7 +68,7 @@ package is the source of truth, and this page is the map.
 | GET | `/instances/:id/deployments` | `Page<DeploymentSummaryDto>` |
 | GET | `/instances/:id/logs?resourceId=&limit=` | log lines (simulated for mock targets) |
 | GET | `/instances/:id/metrics?resourceId=&metric=cpu&minutes=60` | data points |
-| POST | `/instances/:id/simulate` `{resourceId, health?, drift?}` | mock targets only |
+| POST | `/instances/:id/simulate` `{resourceId, health?, drift?, metric?: {name, value}}` | mock targets only; `metric` pins a metric to a value (null: back to the series) |
 | GET | `/deployments` | `Page<DeploymentSummaryDto>` |
 | GET | `/deployments/:id` | `DeploymentDto` with steps, plan and cost |
 | GET | `/deployments/:id/events?after=<id>` | `DeploymentEventDto[]` (poll every 1 to 2 seconds) |
@@ -78,6 +78,8 @@ package is the source of truth, and this page is the map.
 | GET/POST | `/incidents` | list (`?tenantId&status`) or create one manually |
 | GET | `/incidents/:id` | includes updates |
 | POST | `/incidents/:id/updates` `{status, message, impact?}` | |
+| GET/POST | `/alert-rules` | `AlertRuleDto[]` (the tenant's and the platform's) or create one: `{tenantId?, name, condition, severity, actions, cooldownSeconds, autoResolve, enabled}`; `condition` is `{signal: 'health', consecutiveFailures, critical?}` or `{signal: 'metric', metric, operator, threshold, windowMinutes, statistic?, resourceTypes?}` |
+| PATCH/DELETE | `/alert-rules/:id` | platform rules: staff only; tenant rules: the tenant's owners and admins |
 | GET | `/status/:tenantId` | `StatusPageDto` (private customer status page) |
 | GET | `/notifications` | the current user's notifications |
 | POST | `/notifications/:id/read` | |
