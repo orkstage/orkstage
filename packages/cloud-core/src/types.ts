@@ -85,6 +85,11 @@ export interface ResourceRequest {
   dependencyOutputs: Record<string, ResourceOutputs>;
   /** Stable key for this desired state; adapters must treat repeats as no-ops. */
   idempotencyKey: string;
+  /**
+   * The deployment this request belongs to. Its plan phase saves each provider plan under this id
+   * and its apply phase applies exactly that plan (open item 5). Absent for previews.
+   */
+  planId?: string;
 }
 
 export type ResourceOutputs = Record<string, string | number | boolean>;
