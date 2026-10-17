@@ -6,6 +6,7 @@ import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templa
 import type { EnvironmentTemplate } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
 import {
+  effectivePolicy,
   compileInfrastructure,
   diffPlan,
   executeApply,
@@ -490,5 +491,44 @@ describe('custom domains (open item 9)', () => {
 
     const issued = compileInfrastructure({ ...base, customDomains: { dns: ['api.acme.test'] }, customCertificatesIssued: ['dns'] }, registry()).resources.find((r) => r.id === 'dns')!;
     expect(issued.spec.customCertificateIssued).toBe(true);
+  });
+});
+
+describe('data driven policies (open item 12)', () => {
+  it('lets a tenant tighten the platform policy, never loosen it', () => {
+    const merged = effectivePolicy(
+      { allowedRegions: ['us-east-1', 'eu-west-1'], maxReplicas: 10, approvedRegistries: ['123.dkr.ecr.us-east-1.amazonaws.com/'], minTlsVersion: '1.2', minLogRetentionDays: 30, disabled: ['max-monthly-cost'] },
+      { allowedRegions: ['eu-west-1', 'sa-east-1'], maxReplicas: 20, approvedRegistries: ['123.dkr.ecr.us-east-1.amazonaws.com/acme/', 'docker.io/'], requiredLabels: ['cost-center'], minTlsVersion: '1.3', minLogRetentionDays: 7, disabled: [] },
+    );
+    expect(merged).toEqual({
+      allowedRegions: ['eu-west-1'],
+      maxReplicas: 10,
+      approvedRegistries: ['123.dkr.ecr.us-east-1.amazonaws.com/acme/'],
+      requiredLabels: ['cost-center'],
+      minTlsVersion: '1.3',
+      minLogRetentionDays: 30,
+      disabled: ['max-monthly-cost'],
+    });
+    expect(effectivePolicy({}, {})).toEqual({});
+  });
+
+  it('checks sizes, registries and labels, and passes TLS and retention to the resources', () => {
+    const base = input(templates['multicloud-reference']!, multiCloudBindings);
+    const failing = compileInfrastructure(
+      { ...base, policy: { machineSizes: [{ cpu: 4, memoryMiB: 8192 }], approvedRegistries: ['registry.example.com/'], requiredLabels: ['cost-center'], minTlsVersion: '1.3', minLogRetentionDays: 90 } },
+      registry(),
+    );
+    const codes = failing.issues.filter((i) => i.stage === 'policy').map((i) => i.code);
+    expect(codes).toEqual(expect.arrayContaining(['POLICY_APPROVED_MACHINE_SIZES', 'POLICY_APPROVED_REGISTRIES', 'POLICY_REQUIRED_LABELS']));
+    expect(failing.resources.find((r) => r.type === 'dns')?.spec.minTlsVersion).toBe('1.3');
+    expect(failing.resources.find((r) => r.type === 'compute.container-service')?.spec.logRetentionDays).toBe(90);
+
+    const labelled = compileInfrastructure({ ...base, instance: { ...base.instance, labels: { 'cost-center': 'cc-42' } }, policy: { requiredLabels: ['cost-center'] } }, registry());
+    expect(labelled.issues.filter((i) => i.code === 'POLICY_REQUIRED_LABELS')).toEqual([]);
+    expect(labelled.resources[0]!.tags['cost-center']).toBe('cc-42');
+    expect(labelled.resources[0]!.tags['platform:managed']).toBe('true');
+
+    const off = compileInfrastructure({ ...base, policy: { requiredLabels: ['cost-center'], disabled: ['required-labels'] } }, registry());
+    expect(off.policyResults.some((p) => p.policy === 'required-labels')).toBe(false);
   });
 });

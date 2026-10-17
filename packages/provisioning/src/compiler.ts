@@ -128,15 +128,19 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
       capability: cap.capability,
       capabilityName: cap.displayName,
       name,
-      tags: standardTags({
-        organizationId: input.organizationId,
-        tenantId: tenant.id,
-        instanceId: instance.id,
-        resourceId: r.id,
-        environment: instance.environment,
-        templateName: template.metadata.name,
-        templateVersion: template.metadata.version,
-      }),
+      tags: {
+        // Instance labels first: the platform tags always win on a clash.
+        ...instance.labels,
+        ...standardTags({
+          organizationId: input.organizationId,
+          tenantId: tenant.id,
+          instanceId: instance.id,
+          resourceId: r.id,
+          environment: instance.environment,
+          templateName: template.metadata.name,
+          templateVersion: template.metadata.version,
+        }),
+      },
       spec,
       dependsOn: [...(graph.get(r.id) ?? [])].sort(),
       critical: isCritical(r),
@@ -180,6 +184,7 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
           connectivity,
           cost,
           config: input.policy ?? {},
+          labels: instance.labels,
           targetRegions: new Map(Object.values(targets).map((t) => [t.id, t.allowedRegions])),
           targets: Object.values(targets),
         })
@@ -218,6 +223,9 @@ function specFor(r: TemplateResource, input: CompileInput): Record<string, unkno
     spec.image = `${img.uri}@${img.digest}`;
   }
   if (r.type === 'dns') spec.subdomainLabel = `${input.instance.slug}-${input.tenant.slug}`;
+  // Data driven policies the providers enforce (open item 12).
+  if ((r.type === 'dns' || r.type === 'ingress') && input.policy?.minTlsVersion) spec.minTlsVersion = input.policy.minTlsVersion;
+  if (r.type === 'compute.container-service' && input.policy?.minLogRetentionDays) spec.logRetentionDays = input.policy.minLogRetentionDays;
   // Verified custom domains join the spec, so attaching one is a change the next deployment applies.
   const custom = [...(input.customDomains?.[r.id] ?? [])].sort();
   if (custom.length > 0 && r.type === 'dns') {

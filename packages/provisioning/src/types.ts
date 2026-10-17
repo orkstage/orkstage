@@ -18,7 +18,7 @@ export interface CompileInput {
   features: TenantFeatures;
   organizationId: string;
   tenant: { id: string; slug: string };
-  instance: { id: string; slug: string; environment: EnvironmentKind };
+  instance: { id: string; slug: string; environment: EnvironmentKind; labels?: Record<string, string> };
   /** Slot name → binding. Every slot used by an enabled resource must be bound. */
   bindings: Record<string, SlotBinding>;
   /** Container images by catalog ref (`catalog://name`), resolved to immutable digests. */
@@ -41,6 +41,18 @@ export interface PolicyConfig {
   allowedRegions?: string[];
   maxMonthlyCostUsd?: number;
   maxReplicas?: number;
+  /** Container sizes services may use (vCPU and MiB); any size when absent (open item 12). */
+  machineSizes?: { cpu: number; memoryMiB: number }[];
+  /** Image prefixes services may run, e.g. `123456789012.dkr.ecr.us-east-1.amazonaws.com/`. */
+  approvedRegistries?: string[];
+  /** Instance labels every instance must carry, e.g. `cost-center`; they become cloud tags. */
+  requiredLabels?: string[];
+  /** Lowest TLS version load balancers accept. */
+  minTlsVersion?: '1.2' | '1.3';
+  /** Days service logs are kept, at least. */
+  minLogRetentionDays?: number;
+  /** Built-in policies turned off. Platform scope only: a tenant cannot turn a policy off. */
+  disabled?: string[];
 }
 
 export interface ResolvedResource {

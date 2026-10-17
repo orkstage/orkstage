@@ -26,6 +26,8 @@ export interface PolicyInput {
   targetRegions: Map<string, string[]>;
   /** The bound targets, for checks on the target itself (its environment). */
   targets: CloudTarget[];
+  /** Labels of the instance (open item 12). */
+  labels?: Record<string, string>;
 }
 
 type Policy = (input: PolicyInput) => PolicyResult[];
@@ -152,6 +154,53 @@ export const POLICIES: Record<string, Policy> = {
     return results.length ? results : [pass('multi-cloud-allowed', 'The placement uses only allowed providers and regions.')];
   },
 
+  'approved-machine-sizes': ({ sources, config }) => {
+    if (!config.machineSizes) return [];
+    const sizes = config.machineSizes;
+    const bad = [...sources.values()].filter((r) => r.type === 'compute.container-service' && !sizes.some((s) => s.cpu === r.cpu && s.memoryMiB === r.memoryMiB));
+    const allowed = sizes.map((s) => `${s.cpu} vCPU / ${s.memoryMiB} MiB`).join(', ') || 'none';
+    return bad.length
+      ? bad.map((r) => {
+          const svc = r as Extract<TemplateResource, { type: 'compute.container-service' }>;
+          return { policy: 'approved-machine-sizes', status: 'fail' as const, resourceId: r.id, message: `Service "${r.id}" asks for ${svc.cpu} vCPU / ${svc.memoryMiB} MiB; approved sizes: ${allowed}.` };
+        })
+      : [pass('approved-machine-sizes', 'Every service uses an approved size.')];
+  },
+
+  'approved-registries': ({ resources, config }) => {
+    if (!config.approvedRegistries) return [];
+    const prefixes = config.approvedRegistries;
+    const bad = resources.filter((r) => r.type === 'compute.container-service' && !prefixes.some((p) => String(r.spec.image ?? '').startsWith(p)));
+    return bad.length
+      ? bad.map((r) => ({ policy: 'approved-registries', status: 'fail' as const, resourceId: r.id, message: `Service "${r.id}" runs ${String(r.spec.image)}, which is not in an approved registry.` }))
+      : [pass('approved-registries', 'Every image comes from an approved registry.')];
+  },
+
+  'required-labels': ({ config, labels }) => {
+    if (!config.requiredLabels?.length) return [];
+    const missing = config.requiredLabels.filter((k) => !labels?.[k]);
+    return missing.length
+      ? [{ policy: 'required-labels', status: 'fail', message: `The instance needs the labels ${missing.join(', ')}. They become tags on every cloud resource.` }]
+      : [pass('required-labels', 'The instance has every required label.')];
+  },
+
+  'minimum-tls': ({ resources, config }) => {
+    if (!config.minTlsVersion) return [];
+    const endpoints = resources.filter((r) => r.type === 'dns' || r.type === 'ingress');
+    const unenforced = endpoints.filter((r) => !['aws'].includes(effectiveProvider(r)) && r.provider !== 'mock');
+    return unenforced.length
+      ? unenforced.map((r) => ({ policy: 'minimum-tls', status: 'warn' as const, resourceId: r.id, message: `OrkStage cannot set the TLS version of "${r.id}" on ${effectiveProvider(r)}; check it with the provider.` }))
+      : [pass('minimum-tls', `Load balancers accept TLS ${config.minTlsVersion} and newer.`)];
+  },
+
+  'mandatory-logging': ({ resources, config }) => {
+    if (!config.minLogRetentionDays) return [];
+    const unenforced = resources.filter((r) => r.type === 'compute.container-service' && !['aws'].includes(effectiveProvider(r)) && r.provider !== 'mock');
+    return unenforced.length
+      ? unenforced.map((r) => ({ policy: 'mandatory-logging', status: 'warn' as const, resourceId: r.id, message: `OrkStage cannot set the log retention of "${r.id}" on ${effectiveProvider(r)}; check it with the provider.` }))
+      : [pass('mandatory-logging', `Service logs are kept at least ${config.minLogRetentionDays} days.`)];
+  },
+
   'cross-cloud-connectivity': ({ connectivity }) => {
     const results: PolicyResult[] = [];
     for (const c of connectivity) {
@@ -176,5 +225,8 @@ function dedupe(results: PolicyResult[]): PolicyResult[] {
 }
 
 export function evaluatePolicies(input: PolicyInput): PolicyResult[] {
-  return Object.values(POLICIES).flatMap((policy) => policy(input));
+  const off = new Set(input.config.disabled ?? []);
+  return Object.entries(POLICIES)
+    .filter(([name]) => !off.has(name))
+    .flatMap(([, policy]) => policy(input));
 }

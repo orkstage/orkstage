@@ -136,6 +136,8 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
           lb_sg_id: ingress?.lb_sg_id ?? '',
           ec2_ami_id: cfg.ecsAmiId ?? (isEmulator(cfg) ? 'ami-0emulated0000000' : ''),
           autoscaling: serviceAutoscaling(spec, isEmulator(cfg)),
+          // Policy minimum (open item 12); the module default otherwise.
+          ...(typeof spec.logRetentionDays === 'number' ? { log_retention_days: cloudWatchRetention(spec.logRetentionDays) } : {}),
         },
       };
     }
@@ -202,6 +204,7 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
           default_target_group_arn: tgs[0] ?? '',
           tls: true,
           custom_domains: Array.isArray(spec.customDomains) ? spec.customDomains : [],
+          ssl_policy: spec.minTlsVersion === '1.3' ? 'ELBSecurityPolicy-TLS13-1-3-2021-06' : 'ELBSecurityPolicy-TLS13-1-2-2021-06',
           attach_custom_certificate: spec.customCertificateIssued === true,
         },
       };
@@ -282,4 +285,11 @@ export function serviceAutoscaling(spec: Spec, emulator: boolean): { min_replica
   const a = spec.autoscaling as { minReplicas: number; maxReplicas: number; targetCpuPercent: number } | undefined;
   if (!a || emulator) return null;
   return { min_replicas: a.minReplicas, max_replicas: a.maxReplicas, target_cpu_percent: a.targetCpuPercent };
+}
+
+/** Retention periods CloudWatch Logs accepts; a minimum is rounded up to the next one. */
+const CLOUDWATCH_RETENTION = [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653];
+
+export function cloudWatchRetention(days: number): number {
+  return CLOUDWATCH_RETENTION.find((d) => d >= days) ?? 3653;
 }
