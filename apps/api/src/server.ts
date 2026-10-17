@@ -14,7 +14,7 @@ async function bootstrap() {
     new DocumentBuilder()
       .setTitle('OrkStage Control API')
       .setVersion('v1')
-      .setDescription('OrkStage — command every stage of your cloud. Control plane for multi-cloud customer environments. See docs/API.md.')
+      .setDescription('OrkStage: orchestrate every cloud from one stage. Control plane for multicloud customer environments. See docs/API.md.')
       .addServer(config.API_PUBLIC_URL)
       .addCookieAuth('orkstage_session')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'ork_<env>_<id>_<secret>', description: 'Organization API key (scoped). Sessions use the cookie instead.' }, 'apiKey')

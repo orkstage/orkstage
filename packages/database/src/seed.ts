@@ -176,14 +176,16 @@ async function main() {
     create: { tenantId: acme.id, userId: customer.id, role: 'CustomerOwner' },
   });
 
+  // `legacy`: the names before 2026-10-17, renamed in place so existing databases keep one target each.
   const targets = [
-    { name: 'Simulated AWS — us-east-1', simulate: 'aws', regions: ['us-east-1', 'us-west-2', 'sa-east-1'] },
-    { name: 'Simulated Azure — East US', simulate: 'azure', regions: ['eastus', 'westeurope', 'brazilsouth'] },
-    { name: 'Simulated OCI — Ashburn', simulate: 'oci', regions: ['us-ashburn-1', 'sa-saopaulo-1'] },
+    { name: 'Simulated AWS (us-east-1)', legacy: 'Simulated AWS \u2014 us-east-1', simulate: 'aws', regions: ['us-east-1', 'us-west-2', 'sa-east-1'] },
+    { name: 'Simulated Azure (East US)', legacy: 'Simulated Azure \u2014 East US', simulate: 'azure', regions: ['eastus', 'westeurope', 'brazilsouth'] },
+    { name: 'Simulated OCI (Ashburn)', legacy: 'Simulated OCI \u2014 Ashburn', simulate: 'oci', regions: ['us-ashburn-1', 'sa-saopaulo-1'] },
   ];
   const targetIds: Record<string, string> = {};
   for (const t of targets) {
-    const existing = await prisma.cloudTarget.findFirst({ where: { name: t.name, provider: 'mock' } });
+    let existing = await prisma.cloudTarget.findFirst({ where: { name: { in: [t.name, t.legacy] }, provider: 'mock' } });
+    if (existing && existing.name !== t.name) existing = await prisma.cloudTarget.update({ where: { id: existing.id }, data: { name: t.name } });
     const row =
       existing ??
       (await prisma.cloudTarget.create({

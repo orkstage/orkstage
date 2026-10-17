@@ -26,7 +26,7 @@ export class EnvSecretResolver implements SecretResolver {
 
   async resolve(ref: string): Promise<string> {
     const match = /^env:\/\/([A-Z0-9_]+)$/.exec(ref);
-    if (!match) throw new Error(`Unsupported secret reference scheme in "${ref.split('://')[0]}://…".`);
+    if (!match) throw new Error(`Unsupported secret reference scheme "${ref.split('://')[0]}://". Use env:// or aws-sm://.`);
     if (RESERVED_ENV.test(match[1]!)) throw new Error(`env://${match[1]} is platform configuration and cannot be used as a credential reference.`);
     const value = this.env[match[1]!];
     if (!value) throw new Error(`Secret ${match[1]} is not set.`);
@@ -122,7 +122,7 @@ export function createSecretResolver(opts: { awsRegion: string; awsEndpoint?: st
 
 /** Secret ids in error messages: keep the name, drop the account id of an ARN. */
 function redact(secretId: string): string {
-  return secretId.replace(/^arn:aws[\w-]*:secretsmanager:([a-z0-9-]+):\d{12}:secret:/, 'arn:…:secret:');
+  return secretId.replace(/^arn:aws[\w-]*:secretsmanager:([a-z0-9-]+):\d{12}:secret:/, 'arn:<redacted>:secret:');
 }
 
 /** Keys that suggest someone put a secret into non-secret target config. */
