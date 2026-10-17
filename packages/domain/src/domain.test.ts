@@ -20,6 +20,8 @@ import {
   worstStatus,
   isRetryable,
   maintenanceState,
+  uptimeDays,
+  uptimeOf,
   certificateState,
   domainRecords,
   dueExpiryNotice,
@@ -225,5 +227,23 @@ describe('custom domains', () => {
     expect(dueExpiryNotice(days(29), 30, now)).toBeNull();
     expect(dueExpiryNotice(days(6), 30, now)).toBe(7);
     expect(dueExpiryNotice(days(-1), 7, now)).toBeNull();
+  });
+});
+
+describe('uptime', () => {
+  it('lists the last days, oldest first', () => {
+    expect(uptimeDays(3, new Date('2026-10-17T05:00:00Z'))).toEqual(['2026-10-15', '2026-10-16', '2026-10-17']);
+  });
+
+  it('adds the checks of the resources asked for, per day and overall', () => {
+    const days = ['2026-10-16', '2026-10-17'];
+    const rows = [
+      { resourceId: 'api', day: '2026-10-16', up: 100, total: 100 },
+      { resourceId: 'api', day: '2026-10-17', up: 90, total: 100 },
+      { resourceId: 'db', day: '2026-10-17', up: 0, total: 50 },
+    ];
+    expect(uptimeOf(rows, ['api'], days)).toEqual({ overall: 95, days: [{ day: '2026-10-16', uptime: 100 }, { day: '2026-10-17', uptime: 90 }] });
+    expect(uptimeOf(rows, ['api', 'db'], days).overall).toBe(76);
+    expect(uptimeOf(rows, ['cache'], days)).toEqual({ overall: null, days: [{ day: '2026-10-16', uptime: null }, { day: '2026-10-17', uptime: null }] });
   });
 });

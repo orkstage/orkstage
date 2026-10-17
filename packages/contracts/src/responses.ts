@@ -514,3 +514,24 @@ export interface DomainDto {
   needsDeploy: boolean;
   createdAt: string;
 }
+
+/** The first screen of a tenant (spec §42 customer dashboard, open item 11). */
+export interface CustomerOverviewDto {
+  tenant: { id: string; name: string };
+  totals: { instances: number; healthy: number; deploying: number; openIncidents: number; estimatedMonthlyCost: number };
+  instances: {
+    id: string;
+    name: string;
+    environment: string;
+    status: string;
+    health: string;
+    simulated: boolean;
+    lastDeployment: { id: string; kind: string; status: string; at: string } | null;
+    estimatedMonthlyCost: number | null;
+    /** Percent over the last 30 days; null without health history. */
+    uptime30d: number | null;
+    components: { name: string; status: string; uptime30d: number | null; days: { day: string; uptime: number | null }[] }[];
+  }[];
+  openIncidents: IncidentDto[];
+  recentActivity: { at: string; kind: 'deployment' | 'incident'; message: string; link: string }[];
+}
