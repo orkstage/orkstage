@@ -58,6 +58,9 @@ const schema = z
     // OrkStage Enterprise license key (orkstage-license.v1.…). Empty = Community edition.
     ORKSTAGE_LICENSE_KEY: z.string().optional(),
     TOFU_TIMEOUT_MINUTES: z.coerce.number().int().min(1).max(240).default(45),
+    // AWS AssumeRole session length. Each OpenTofu run needs credentials that outlive
+    // TOFU_TIMEOUT_MINUTES; above 60, raise the role's MaxSessionDuration to match.
+    AWS_ROLE_SESSION_MINUTES: z.coerce.number().int().min(15).max(720).default(60),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     // Reverse proxies in front of the API (the console's rewrite counts as one). The client
     // address is read that many hops back in X-Forwarded-For, so clients cannot spoof it.

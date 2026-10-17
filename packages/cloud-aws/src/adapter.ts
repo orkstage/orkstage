@@ -32,7 +32,7 @@ import {
 import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
-import { AwsCredentialProvider, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
+import { AwsCredentialProvider, REFRESH_MARGIN_MS, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
 import { probePermissions } from './permissions.js';
 import { flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
@@ -40,6 +40,8 @@ import { flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 export interface AwsAdapterOptions {
   resolveExternalId: ExternalIdResolver;
   stsFactory?: StsClientFactory;
+  /** AssumeRole session length (AWS_ROLE_SESSION_MINUTES); the role's MaxSessionDuration must allow it. */
+  sessionSeconds?: number;
   /** OpenTofu runner. Without it, the adapter can validate targets but not provision. */
   runner?: TofuRunner;
   /**
@@ -67,7 +69,7 @@ export class AwsAdapter implements CloudProviderAdapter {
 
   constructor(opts: AwsAdapterOptions) {
     this.stsFactory = opts.stsFactory ?? ((region) => new STSClient({ region }));
-    this.creds = new AwsCredentialProvider(opts.resolveExternalId, this.stsFactory);
+    this.creds = new AwsCredentialProvider(opts.resolveExternalId, this.stsFactory, opts.sessionSeconds);
     this.runner = opts.runner;
     this.emulatorEndpoint = opts.emulatorEndpoint;
   }
@@ -262,7 +264,8 @@ export class AwsAdapter implements CloudProviderAdapter {
   }
 
   private async stack(ctx: ProviderContext, name: string, config: Record<string, unknown>): Promise<TofuStack> {
-    const c = await this.creds.get(ctx);
+    // The container keeps these credentials for the whole run: they must outlive its timeout.
+    const c = await this.creds.get(ctx, this.requireRunner().timeoutMs + REFRESH_MARGIN_MS);
     return {
       stateKey: `${ctx.target.id}/${ctx.region}/${stateKeyFor(name)}`,
       config,
@@ -367,11 +370,16 @@ export function isDestructivePlan(actions: { address: string; action: string }[]
   return actions.some((a) => a.action === 'delete' || (a.action === 'replace' && !ROUTINE_REPLACEMENTS.test(a.address)));
 }
 
+/** The SDK found no credentials for OrkStage itself (the identity that assumes the roles). */
+export const NO_CONTROL_PLANE_IDENTITY =
+  'OrkStage has no AWS identity of its own to assume the deployment role with. Give the API and the worker one: an EC2 instance profile (metadata hop limit 2 for containers), or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in their environment. See the control plane identity in the AWS connection docs.';
+
 export function safeAwsMessage(err: unknown): string {
   const e = err as { name?: string; message?: string };
   const name = e.name ?? 'Error';
   if (name === 'AccessDenied' || name === 'AccessDeniedException') {
     return 'Access denied assuming the deployment role. Check the trust policy and external id.';
   }
+  if (name === 'CredentialsProviderError' || /could not load credentials/i.test(e.message ?? '')) return NO_CONTROL_PLANE_IDENTITY;
   return `${name}: ${(e.message ?? 'unknown error').replace(/arn:aws[^\s"']*/g, '<arn>').slice(0, 200)}`;
 }

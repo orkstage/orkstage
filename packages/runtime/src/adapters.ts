@@ -42,6 +42,8 @@ export interface AdapterDeps {
   /** Only the worker has one: the API validates targets and reads state but never provisions. */
   runner?: TofuRunner;
   awsEmulatorEndpoint?: string;
+  /** AWS_ROLE_SESSION_MINUTES in seconds. */
+  awsSessionSeconds?: number;
 }
 
 export function createAdapterRegistry(deps: AdapterDeps): { registry: AdapterRegistry; mock: MockAdapter } {
@@ -50,7 +52,7 @@ export function createAdapterRegistry(deps: AdapterDeps): { registry: AdapterReg
   const mock = new MockAdapter(new RedisMockStateStore(deps.redis));
   const registry = new AdapterRegistry()
     .register(mock)
-    .register(new AwsAdapter({ resolveExternalId: resolveSecret, runner: deps.runner, emulatorEndpoint: deps.awsEmulatorEndpoint }))
+    .register(new AwsAdapter({ resolveExternalId: resolveSecret, runner: deps.runner, emulatorEndpoint: deps.awsEmulatorEndpoint, sessionSeconds: deps.awsSessionSeconds }))
     .register(new AzureAdapter(tofu))
     .register(new GcpAdapter(tofu))
     .register(new OciAdapter(tofu))

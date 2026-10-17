@@ -25,6 +25,14 @@ Parameters:
     Type: String
     Default: orkstage-deploy
     AllowedPattern: '^[\w+=,.@-]{1,64}$'
+  MaxSessionDuration:
+    Type: Number
+    Default: 3600
+    MinValue: 3600
+    MaxValue: 43200
+    Description: >-
+      Longest session OrkStage may request, in seconds. Keep it at least as long as
+      AWS_ROLE_SESSION_MINUTES (60 by default), which must outlive TOFU_TIMEOUT_MINUTES.
 
 Resources:
   DeploymentRole:
@@ -32,7 +40,7 @@ Resources:
     Properties:
       RoleName: !Ref RoleName
       Description: Assumed by OrkStage to provision infrastructure (external id required).
-      MaxSessionDuration: 3600
+      MaxSessionDuration: !Ref MaxSessionDuration
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

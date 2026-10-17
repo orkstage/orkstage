@@ -151,3 +151,71 @@ describe('platform guards', () => {
     expect((await api.withKey('ork_live_00000000_notarealkeynotarealkey').get('/instances')).status).toBe(401);
   });
 });
+
+describe('cloud targets', () => {
+  const aws = (name: string) => ({
+    provider: 'aws',
+    name,
+    environment: 'development',
+    config: { accountId: '123456789012', roleArn: 'arn:aws:iam::123456789012:role/orkstage-deploy' },
+    credentialRef: 'env://ORKSTAGE_TEST_EXTERNAL_ID',
+    allowedRegions: ['us-east-1', 'eu-west-1'],
+    defaultRegion: 'us-east-1',
+  });
+
+  it('refuse a role from another account', async () => {
+    const res = await admin.post('/cloud/targets', { ...aws(`AWS ${unique()}`), config: { accountId: '123456789012', roleArn: 'arn:aws:iam::210987654321:role/orkstage-deploy' } });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('INVALID_CONFIG');
+  });
+
+  it('can be edited, keep their account, and are validated again after a change', async () => {
+    const created = await admin.post('/cloud/targets', aws(`AWS ${unique()}`));
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const id = created.body.id as string;
+    await api.prisma.cloudTarget.update({ where: { id }, data: { lastValidation: { ok: true, checks: [], validatedAt: new Date().toISOString() }, lastValidatedAt: new Date(), health: 'HEALTHY' } });
+
+    // Only the name: the validation stands.
+    const renamed = await admin.patch(`/cloud/targets/${id}`, { name: `Renamed ${unique()}` });
+    expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
+    expect(renamed.body.lastValidation).not.toBeNull();
+
+    const edited = await admin.patch(`/cloud/targets/${id}`, {
+      config: { roleArn: 'arn:aws:iam::123456789012:role/orkstage-deploy-v2', dnsZone: 'apps.example.com' },
+      credentialRef: 'env://ORKSTAGE_TEST_EXTERNAL_ID_2',
+    });
+    expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+    expect(edited.body.config).toMatchObject({ accountId: '123456789012', roleArn: 'arn:aws:iam::123456789012:role/orkstage-deploy-v2', dnsZone: 'apps.example.com' });
+    expect(edited.body.lastValidation).toBeNull();
+    expect(edited.body.health).toBe('UNKNOWN');
+
+    const cleared = await admin.patch(`/cloud/targets/${id}`, { config: { dnsZone: null } });
+    expect(cleared.body.config.dnsZone).toBeUndefined();
+
+    const account = await admin.patch(`/cloud/targets/${id}`, { config: { accountId: '210987654321' } });
+    expect(account.status).toBe(422);
+    expect(account.body.error.code).toBe('FIELD_FIXED');
+    expect((await admin.patch(`/cloud/targets/${id}`, { environment: 'production' })).status).toBe(400);
+    expect((await admin.patch(`/cloud/targets/${id}`, { config: { roleArn: 'arn:aws:iam::210987654321:role/x' } })).body.error.code).toBe('INVALID_CONFIG');
+
+    const audit = await api.prisma.auditEvent.findMany({ where: { resourceId: id, action: 'UPDATE' } });
+    expect(audit.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(audit.map((a) => a.changes))).not.toContain('ORKSTAGE_TEST_EXTERNAL_ID_2');
+  });
+
+  it('keep regions that a profile still uses', async () => {
+    const created = await admin.post('/cloud/targets', aws(`AWS ${unique()}`));
+    const id = created.body.id as string;
+    const profile = await admin.post('/profiles', { name: `Europe ${unique()}`, environment: 'development', targets: [{ targetId: id, region: 'eu-west-1' }] });
+    expect(profile.status, JSON.stringify(profile.body)).toBe(201);
+    const res = await admin.patch(`/cloud/targets/${id}`, { allowedRegions: ['us-east-1'] });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('REGION_IN_USE');
+  });
+
+  it('are edited by platform staff only', async () => {
+    const created = await admin.post('/cloud/targets', aws(`AWS ${unique()}`));
+    const owner = await api.as(ctx.acmeOwner);
+    expect((await owner.patch(`/cloud/targets/${created.body.id}`, { name: `Mine ${unique()}` })).status).toBe(403);
+  });
+});

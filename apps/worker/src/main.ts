@@ -30,6 +30,7 @@ async function main() {
     deriveSecret: (purpose) => box.derive(purpose),
     runner: tofu,
     awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT,
+    awsSessionSeconds: config.AWS_ROLE_SESSION_MINUTES * 60,
   });
   const notifications = new Queue<NotificationJob>(QUEUES.notifications, { connection: redis.duplicate() });
   const ctx: WorkerContext = { config, prisma, redis, registry, logger, notifications };

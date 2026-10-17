@@ -31,6 +31,7 @@ export class Adapters {
       secrets: createSecretResolver({ awsRegion: config.SECRETS_AWS_REGION, awsEndpoint: config.SECRETS_AWS_ENDPOINT }),
       deriveSecret: (purpose) => box.derive(purpose),
       awsEmulatorEndpoint: config.AWS_EMULATOR_ENDPOINT,
+      awsSessionSeconds: config.AWS_ROLE_SESSION_MINUTES * 60,
     });
     this.registry = registry;
     this.mock = mock;
