@@ -153,9 +153,9 @@ export class DeploymentRunner {
           if (!result.ok) {
             const failed = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').map((c) => `${c.name}: ${c.message}`);
             const onlyPermissions = result.checks.filter((c) => c.status === 'error' || c.status === 'missing').every((c) => c.name.startsWith('Permissions'));
-            throw new PhaseFailure(onlyPermissions ? 'AUTHORIZATION_ERROR' : 'AUTHENTICATION_ERROR', `Cloud target ${row.name} (${region}) failed validation — ${failed.join('; ')}`);
+            throw new PhaseFailure(onlyPermissions ? 'AUTHORIZATION_ERROR' : 'AUTHENTICATION_ERROR', `Cloud target ${row.name} (${region}) failed validation: ${failed.join('; ')}`);
           }
-          for (const c of result.checks.filter((c) => c.status === 'warn' || c.status === 'skipped')) await this.event(d.id, 'warn', PHASE.targets, `${row.name} / ${region} — ${c.name}: ${c.message}`);
+          for (const c of result.checks.filter((c) => c.status === 'warn' || c.status === 'skipped')) await this.event(d.id, 'warn', PHASE.targets, `${row.name} (${region}), ${c.name}: ${c.message}`);
           await this.event(d.id, 'info', PHASE.targets, `${row.name} / ${region}: ${result.checks.filter((c) => c.status === 'ok').length} checks passed.`);
         }
       }
@@ -324,7 +324,7 @@ export class DeploymentRunner {
                 critical: r.critical,
               },
             });
-            if (attempt === 1) await this.event(d.id, 'info', id, `Provisioning ${r.capabilityName} "${r.name}" in ${r.simulatedProvider ?? r.provider}/${r.region}…`);
+            if (attempt === 1) await this.event(d.id, 'info', id, `Provisioning ${r.capabilityName} "${r.name}" in ${r.simulatedProvider ?? r.provider}/${r.region}.`);
           },
           onSuccess: async (id, result: ResourceResult) => {
             const r = byId.get(id)!;
@@ -415,7 +415,7 @@ export class DeploymentRunner {
           health = { ...health, state: 'UNHEALTHY', message: 'Resource no longer exists at the provider. Redeploy to re-create it.' };
           break;
         }
-        await this.event(d.id, 'info', PHASE.verify, `${r.id}: ${health.message ?? health.state}; waiting for it to settle…`);
+        await this.event(d.id, 'info', PHASE.verify, `${r.id}: ${health.message ?? health.state}; waiting for it to settle.`);
         await new Promise((resolve) => setTimeout(resolve, VERIFY_POLL_MS));
         health = await adapter.checkHealth(pctx, ident);
       }
@@ -488,7 +488,7 @@ export class DeploymentRunner {
       providerIds: Object.fromEntries(rows.map((r) => [r.resourceId, r.providerResourceId ?? undefined])),
       concurrency: this.ctx.config.WORKER_CONCURRENCY,
       hooks: {
-        onStart: async (id) => this.event(d.id, 'info', PHASE.prune, `Deleting ${id} (no longer in the template)…`),
+        onStart: async (id) => this.event(d.id, 'info', PHASE.prune, `Deleting ${id} (no longer in the template).`),
         onSuccess: async (id) => {
           await prisma.instanceResource.updateMany({ where: { instanceId: d.instanceId, resourceId: id }, data: { status: 'DELETED', knowledge: 'ACTUAL', health: 'UNKNOWN' } });
           await this.event(d.id, 'info', PHASE.prune, `${id} deleted.`);
@@ -517,7 +517,7 @@ export class DeploymentRunner {
         const backup = (db.spec.backup ?? {}) as { enabled?: boolean; retentionDays?: number };
         await this.event(d.id, backup.enabled ? 'info' : 'warn', PHASE.backup, backup.enabled
           ? `${db.id}: automated backups retained for ${backup.retentionDays} day(s) after deletion per provider policy${db.provider === 'mock' ? ' (simulated)' : ''}.`
-          : `${db.id}: backups are disabled — data will not be recoverable.`);
+          : `${db.id}: backups are disabled, so data will not be recoverable.`);
       }
       return dbs.length ? `${dbs.length} database(s) checked.` : 'No databases to back up.';
     });
@@ -547,7 +547,7 @@ export class DeploymentRunner {
       hooks: {
         onStart: async (id) => {
           await this.step(d.id, id, 'RUNNING', { attempt: 1 });
-          await this.event(d.id, 'info', id, `Deleting ${id}…`);
+          await this.event(d.id, 'info', id, `Deleting ${id}.`);
         },
         onSuccess: async (id) => {
           await prisma.instanceResource.updateMany({ where: { instanceId: d.instanceId, resourceId: id }, data: { status: 'DELETED', knowledge: 'ACTUAL', health: 'UNKNOWN' } });

@@ -57,7 +57,7 @@ export function workflowSteps(kind: WorkflowKind, resolved: ResolvedInfrastructu
     return {
       key: id,
       kind: 'RESOURCE' as const,
-      name: `${kind === 'APPLY' ? '' : 'Delete '}${r.capabilityName} — ${id}`,
+      name: `${kind === 'APPLY' ? '' : 'Delete '}${r.capabilityName}: ${id}`,
       provider: r.simulatedProvider ?? r.provider,
       region: r.region,
     };

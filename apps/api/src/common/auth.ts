@@ -45,7 +45,7 @@ function bearerToken(req: FastifyRequest): string | null {
   const header = req.headers.authorization;
   if (!header) return null;
   const match = BEARER.exec(header.trim());
-  if (!match) throw new AppError(401, 'INVALID_API_KEY', 'Malformed API key. Expected "Authorization: Bearer ork_…".');
+  if (!match) throw new AppError(401, 'INVALID_API_KEY', 'Malformed API key. Expected "Authorization: Bearer ork_<key>".');
   return match[1]!;
 }
 
