@@ -52,6 +52,7 @@ describe('built-in templates', () => {
       'scale-custom',
       'multicloud-reference',
       'web-platforms',
+      'portable-starter',
     ]);
   });
 

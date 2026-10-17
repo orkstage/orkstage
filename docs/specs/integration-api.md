@@ -14,7 +14,8 @@ The contract shared by the platform, the `ork` CLI and the docs. Base path: `/ap
   - an organization key (platform staff only) acts as `PlatformAdmin` or `PlatformOperator`.
 - `scopes` further restrict what the role allows. Available scopes:
   `instances:read`, `instances:write`, `instances:deploy`, `templates:read`, `templates:write`,
-  `applications:write`, `incidents:write`, `imports:write`, `webhooks:manage`, `audit:read`.
+  `applications:write`, `incidents:write`, `imports:write`, `webhooks:manage`, `audit:read`,
+  `targets:manage` (platform keys: register, edit and validate cloud targets).
 - `expiresAt` is optional. Keys can be revoked, and `lastUsedAt` is tracked. Every action taken
   with a key is audited with `actorType = API_KEY` and `actorLabel = "<key name> (<prefix>)"`.
 
