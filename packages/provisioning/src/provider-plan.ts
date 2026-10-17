@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { AdapterRegistry, ResourceOutputs, ResourcePlan } from '@orkstage/cloud-core';
-import { idempotencyKeyFor } from './executor.js';
+import { idempotencyKeyFor, readDependencySecret } from './executor.js';
 import type { ResolvedInfrastructure } from './types.js';
 
 export type ProviderPlanEntry =
@@ -43,7 +43,13 @@ export async function previewProviderPlans(opts: {
     if (missing.length) return { resourceId: r.id, status: 'skipped', reason: `Depends on resources not created yet: ${missing.join(', ')}.` };
     try {
       const plan = await adapter.planResource(
-        { target: resolved.targets[r.targetId]!, region: r.region, correlationId: opts.correlationId },
+        {
+          target: resolved.targets[r.targetId]!,
+          region: r.region,
+          correlationId: opts.correlationId,
+          // Plans of services that copy another provider's credentials need the same values as the apply.
+          dependencySecret: (depId) => readDependencySecret(registry, resolved, r, depId, existing[depId]?.outputs, opts.correlationId),
+        },
         {
           resourceId: r.id,
           serviceKind: r.type,

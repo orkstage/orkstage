@@ -139,7 +139,8 @@ describe('module inputs', () => {
       production: true,
     });
     expect((call.inputs.environment as Record<string, string>).ORDERS_DB_HOST).toBe('10.1.0.3');
-    expect(log).toHaveBeenCalledWith('warn', expect.stringContaining('LEGACY_DB'));
+    // Credentials on another provider are copied into Secret Manager at deploy time (open item 4).
+    expect(call.externalSecrets).toEqual(['legacy-db']);
   });
 
   it('makes services routed through the built in ingress public', () => {

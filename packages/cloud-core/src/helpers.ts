@@ -90,6 +90,17 @@ export function safeMessage(err: unknown): string {
 export const now = () => new Date().toISOString();
 
 /**
+ * Addresses a database firewall allows for consumers on other providers: the `egress_ips` of the
+ * networks the compiler listed in `spec.allowlistNetworks` (open item 4). Empty when there are none
+ * or a network has no NAT gateway (no fixed egress).
+ */
+export function allowlistAddresses(spec: Record<string, unknown>, deps: Deps): string[] {
+  const networks = Array.isArray(spec.allowlistNetworks) ? (spec.allowlistNetworks as string[]) : [];
+  const ips = networks.flatMap((id) => String(deps[id]?.egress_ips ?? '').split(',')).map((ip) => ip.trim());
+  return [...new Set(ips.filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))].sort();
+}
+
+/**
  * How an IaC adapter keeps a deployment's plan for its apply: under the deployment id, strict in
  * production (a plan that no longer matches fails the step instead of applying something else).
  */

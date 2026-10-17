@@ -231,8 +231,10 @@ async function main() {
     });
   }
 
+  // The newest published version: the demo instance follows the built in template as it evolves.
   const multicloud = await prisma.templateVersion.findFirstOrThrow({
-    where: { template: { name: 'multicloud-reference' }, version: '1.0.0' },
+    where: { template: { name: 'multicloud-reference' }, status: 'PUBLISHED' },
+    orderBy: { createdAt: 'desc' },
   });
   await prisma.instance.upsert({
     where: { tenantId_slug: { tenantId: acme.id, slug: 'production' } },

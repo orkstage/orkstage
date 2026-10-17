@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  allowlistAddresses,
   byKind,
   dependencyEnvironment,
   needKind,
@@ -97,8 +98,11 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
       const secrets: Record<string, string> = {};
       for (const [key, ref] of Object.entries(secretRefs)) {
         if (SECRET_NAME.test(ref)) secrets[`${key}_CREDENTIALS`] = ref;
-        else ctx.log?.('warn', `${req.resourceId}: ${key} credentials live outside Google Secret Manager and are not mounted.`);
       }
+      // Credentials owned by another provider: copied into Secret Manager at deploy time.
+      const externalSecrets = Object.entries(deps)
+        .filter(([, o]) => typeof o.secret_ref === 'string' && o.secret_ref && !SECRET_NAME.test(o.secret_ref))
+        .map(([id]) => id);
       const buckets = Object.values(deps)
         .filter((o) => o.kind === 'object-storage' && String(o.endpoint ?? '').startsWith('https://storage.googleapis.com/'))
         .map((o) => String(o.bucket));
@@ -124,6 +128,7 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
           buckets,
           production,
         },
+        ...(externalSecrets.length ? { externalSecrets } : {}),
       };
     }
     case 'postgres': {
@@ -140,7 +145,9 @@ export function moduleCall(ctx: ProviderContext, req: ResourceRequest): ModuleCa
           high_availability: spec.highAvailability === 'zone-redundant',
           backup_enabled: backup.enabled ?? true,
           backup_retention_days: Math.max(1, backup.retentionDays ?? 7),
-          public_access: Boolean(spec.publicAccess),
+          // Consumers on other providers need the public IP, limited to their egress addresses.
+          public_access: Boolean(spec.publicAccess) || allowlistAddresses(spec, deps).length > 0,
+          allowed_ips: allowlistAddresses(spec, deps),
           network_id: isGcpNetwork(network) ? network!.network_id : '',
           production,
         },

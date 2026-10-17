@@ -145,6 +145,25 @@ describe('compiler — spec §42.17 multi-cloud reference', () => {
     expect(resolved.policyResults.some((p) => p.policy === 'cross-cloud-connectivity' && p.status === 'warn')).toBe(true);
   });
 
+  it('wires the cross cloud database: credentials copied to AWS, firewall limited to the AWS egress (open item 4)', () => {
+    const apiDb = resolved.connectivity.find((c) => c.from === 'api' && c.to === 'database')!;
+    expect(apiDb.wiring).toEqual({ credentials: 'copied', allowlistNetwork: 'network' });
+    expect(resolved.connectivity.find((c) => c.from === 'api' && c.to === 'storage')!.wiring).toEqual({ credentials: 'none' });
+    const database = resolved.resources.find((r) => r.id === 'database')!;
+    expect(database.dependsOn).toContain('network');
+    expect(database.spec.allowlistNetworks).toEqual(['network']);
+    const text = renderPlan('acme-prod', diffPlan(resolved, []));
+    expect(text).toContain("api → database (public-tls-allowlist); credentials copied to api's secret store; firewall allows network egress only");
+  });
+
+  it('says when an allowlist cannot be made', () => {
+    const awsOnlyDb = { ...multiCloudBindings, data: { target: mockTarget('oci-d', 'oci', 'us-ashburn-1'), region: 'us-ashburn-1' } };
+    const viaOci = compileInfrastructure(input(templates['multicloud-reference']!, awsOnlyDb), registry());
+    const link = viaOci.connectivity.find((c) => c.from === 'api' && c.to === 'database')!;
+    expect(link.wiring.allowlistGap).toMatch(/oci PostgreSQL has no public endpoint/);
+    expect(viaOci.resources.find((r) => r.id === 'database')!.spec.allowlistNetworks).toBeUndefined();
+  });
+
   it('tags every resource for correlation and cleanup', () => {
     for (const r of resolved.resources) {
       expect(r.tags).toMatchObject({ 'platform:managed': 'true', 'platform:tenant-id': 'tenant-1', 'platform:instance-id': 'inst-1' });
@@ -246,6 +265,18 @@ describe('executor', () => {
     const order = events.filter((e) => e.startsWith('ok:')).map((e) => e.slice(3));
     expect(order.indexOf('database')).toBeLessThan(order.indexOf('api'));
     expect(order.indexOf('ingress')).toBeLessThan(order.indexOf('dns'));
+  });
+
+  it('copies the database credentials into the AWS service and allowlists its egress on the simulator', async () => {
+    const reg = registry();
+    const resolved = compileInfrastructure(input(templates['multicloud-reference']!, multiCloudBindings), reg);
+    const outputs: Record<string, Record<string, unknown>> = {};
+    const { hooks } = recordingHooks();
+    const outcome = await executeApply({ resolved, registry: reg, ...ids, hooks: { ...hooks, onSuccess: async (id, r) => void (outputs[id] = r.outputs) } });
+    expect(Object.values(outcome).every((st) => st === 'SUCCEEDED')).toBe(true);
+    expect(outputs.api!.external_secrets).toBe('DATABASE_PASSWORD,DATABASE_USERNAME');
+    expect(String(outputs.database!.allowed_ips)).toBe(String(outputs.network!.egress_ips));
+    expect(String(outputs.network!.egress_ips)).toMatch(/^203\.0\.113\.\d+$/);
   });
 
   it('isolates failures: OCI storage failing skips only its dependents (spec §42.12)', async () => {

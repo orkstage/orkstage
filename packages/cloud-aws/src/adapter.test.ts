@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AwsAdapter, isDestructivePlan } from './adapter.js';
 import { isAwsNotFound } from './health.js';
 import { probePermissions, REQUIRED_ACTIONS } from './permissions.js';
-import { moduleInputs, rootConfig, serviceAutoscaling } from './stacks.js';
+import { externalSecretIds, moduleInputs, rootConfig, serviceAutoscaling } from './stacks.js';
 
 const target: CloudTarget = {
   id: 't1',
@@ -207,15 +207,22 @@ describe('AwsAdapter.readSecret', () => {
 });
 
 describe('container service dependency secrets', () => {
-  it('maps Secrets Manager ARNs to ECS secrets and passes other providers references as plain references', () => {
-    const { inputs } = moduleInputs(ctx, request({
+  it('maps Secrets Manager ARNs to ECS secrets and copies the credentials of other providers (open item 4)', () => {
+    const req = request({
       dependencyOutputs: {
         network,
         db: { kind: 'database.postgresql', host: 'db', port: 5432, secret_ref: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' },
         cache: { kind: 'cache.redis', host: 'redis.example', port: 6380, secret_ref: 'https://kv-ork.vault.azure.net/secrets/cache' },
       },
-    }));
+    });
+    const { inputs } = moduleInputs(ctx, req);
     expect(inputs.secrets).toEqual({ DB_CREDENTIALS: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ork-db/credentials' });
-    expect((inputs.environment as Record<string, string>).CACHE_CREDENTIALS_REF).toBe('https://kv-ork.vault.azure.net/secrets/cache');
+    expect((inputs.environment as Record<string, string>).CACHE_CREDENTIALS_REF).toBeUndefined();
+    expect(externalSecretIds(req)).toEqual(['cache']);
+    const root = rootConfig(ctx, req) as { variable: Record<string, unknown>; module: { resource: Record<string, unknown> } };
+    expect(root.variable.external_secrets).toEqual({ type: 'map(string)', sensitive: true, default: {} });
+    expect(root.module.resource.external_secrets).toBe('${var.external_secrets}');
+    // Nothing secret in the stored configuration.
+    expect(JSON.stringify(root)).not.toContain('kv-ork.vault.azure.net');
   });
 });

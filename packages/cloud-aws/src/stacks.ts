@@ -108,7 +108,7 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
           // Vault, Secret Manager, a platform) is passed as a reference, never as a value.
           const ref = String(out.secret_ref);
           if (/^arn:aws[a-z-]*:(secretsmanager|ssm):/.test(ref)) secrets[`${key}_CREDENTIALS`] = ref;
-          else environment[`${key}_CREDENTIALS_REF`] = ref;
+          // Another provider's credentials: copied into this service's own secret (externalSecretIds).
         }
         // Simulated (non-AWS) dependencies expose camelCase outputs; pass their references too.
         if (out.secretRef) environment[`${key}_CREDENTIALS_REF`] = String(out.secretRef);
@@ -209,10 +209,22 @@ export function moduleInputs(ctx: ProviderContext, req: ResourceRequest): { modu
   }
 }
 
+/**
+ * Dependencies of a container service whose credentials live in another provider's secret store:
+ * their values reach the module's `external_secrets` through TF_VAR_external_secrets (open item 4).
+ */
+export function externalSecretIds(req: ResourceRequest): string[] {
+  if (MODULE_BY_CAPABILITY[req.capability] !== 'container-service') return [];
+  return Object.entries(req.dependencyOutputs)
+    .filter(([, o]) => typeof o.secret_ref === 'string' && o.secret_ref && !/^arn:aws[a-z-]*:(secretsmanager|ssm):/.test(o.secret_ref))
+    .map(([id]) => id);
+}
+
 /** Complete root configuration (OpenTofu JSON syntax) for one resource's isolated state. */
 export function rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<string, unknown> {
   const cfg = awsConfig(ctx.target);
   const { module, inputs } = moduleInputs(ctx, req);
+  const external = externalSecretIds(req).length > 0;
   const emulator = isEmulator(cfg);
   const runnerEndpoint = cfg.runnerEndpointUrl ?? cfg.endpointUrl;
   const skip = emulator
@@ -246,7 +258,8 @@ export function rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<s
           : {}),
       },
     },
-    module: { resource: { source: `/modules/aws/${module}`, ...inputs } },
+    ...(external ? { variable: { external_secrets: { type: 'map(string)', sensitive: true, default: {} } } } : {}),
+    module: { resource: { source: `/modules/aws/${module}`, ...inputs, ...(external ? { external_secrets: '${var.external_secrets}' } : {}) } },
     output: { all: { value: '${module.resource}' } },
   };
 }

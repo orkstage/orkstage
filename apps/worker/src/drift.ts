@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DriftChange, ResourceOutputs } from '@orkstage/cloud-core';
 import type { InstanceResource } from '@orkstage/database';
-import { idempotencyKeyFor, type ResolvedInfrastructure } from '@orkstage/provisioning';
+import { idempotencyKeyFor, readDependencySecret, type ResolvedInfrastructure } from '@orkstage/provisioning';
 import { toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
@@ -92,7 +92,14 @@ export class DriftDetector {
     // Not applied from this snapshot (a change is pending) or dependencies missing: not drift.
     if (!r || !target || row.idempotencyKey !== idempotencyKeyFor(tenantId, instanceId, r) || r.dependsOn.some((d) => !rows.has(d))) return 'skipped';
 
-    const ctx = { target: toCloudTarget(target), region: row.region, correlationId: `drift-${randomUUID()}` };
+    const correlationId = `drift-${randomUUID()}`;
+    const ctx = {
+      target: toCloudTarget(target),
+      region: row.region,
+      correlationId,
+      // Copied credentials are part of the desired state: without them every scan would see a change.
+      dependencySecret: (depId: string) => readDependencySecret(registry, snapshot, r, depId, rows.get(depId)?.outputs as ResourceOutputs | undefined, correlationId),
+    };
     let changes: DriftChange[];
     try {
       changes = await registry.get(row.provider).detectDrift!(ctx, {

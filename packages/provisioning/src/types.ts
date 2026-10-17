@@ -68,10 +68,29 @@ export type ConnectivityStrategy =
   | 'public-tls'
   | 'unsatisfiable';
 
+/**
+ * What OrkStage does for a link besides classifying it (open item 4): how the consumer gets the
+ * credentials the target publishes, and whether the target's firewall allows only the consumer.
+ */
+export interface LinkWiring {
+  /**
+   * `native`: same provider, the consumer reads the provider's secret store directly.
+   * `copied`: the values are copied into the consumer provider's secret store at deploy time.
+   * `reference`: the consumer only gets the reference (`<ID>_CREDENTIALS_REF`), its provider has no
+   * secret wiring. `none`: the target publishes no credentials.
+   */
+  credentials: 'native' | 'copied' | 'reference' | 'none';
+  /** The consumer network whose egress addresses the target's firewall allows. */
+  allowlistNetwork?: string;
+  /** Why an allowlist was wanted and could not be made, when that is the case. */
+  allowlistGap?: string;
+}
+
 export interface ResolvedConnectivity extends ConnectivityRequirement {
   strategy: ConnectivityStrategy;
   crossCloud: boolean;
   notes: string[];
+  wiring: LinkWiring;
 }
 
 export interface PolicyResult {

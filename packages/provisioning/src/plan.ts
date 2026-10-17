@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { effectiveProvider } from './connectivity.js';
-import type { ResolvedInfrastructure, ResolvedResource } from './types.js';
+import type { ResolvedConnectivity, ResolvedInfrastructure, ResolvedResource } from './types.js';
 
 export type PlanAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'NOOP';
 
@@ -90,7 +90,7 @@ export function diffPlan(resolved: ResolvedInfrastructure, known: KnownResource[
     groups: [...groups.values()],
     counts,
     risk,
-    crossCloud: resolved.connectivity.filter((c) => c.crossCloud).map((c) => `${c.from} → ${c.to} (${c.strategy})`),
+    crossCloud: resolved.connectivity.filter((c) => c.crossCloud).map(describeLink),
   };
 }
 
@@ -111,6 +111,16 @@ function change(r: ResolvedResource, k: KnownResource | undefined, resolved: Res
     region: r.region,
     replacement,
   };
+}
+
+/** One cross cloud link and what OrkStage wires for it. */
+function describeLink(c: ResolvedConnectivity): string {
+  const parts = [`${c.from} → ${c.to} (${c.strategy})`];
+  if (c.wiring.credentials === 'copied') parts.push(`credentials copied to ${c.from}'s secret store`);
+  if (c.wiring.credentials === 'reference') parts.push('credentials passed as a reference only');
+  if (c.wiring.allowlistNetwork) parts.push(`firewall allows ${c.wiring.allowlistNetwork} egress only`);
+  if (c.wiring.allowlistGap) parts.push('no allowlist');
+  return parts.join('; ');
 }
 
 /** Plain-text rendering of a plan, used in approval requests and logs. */
