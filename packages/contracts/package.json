@@ -17,7 +17,7 @@
     "test": "echo \"contracts: schemas exercised by API tests\""
   },
   "dependencies": {
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "files": [
     "dist"
