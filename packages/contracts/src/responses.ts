@@ -559,3 +559,6 @@ export interface TenantPolicyDto {
   /** Names of the built-in policies, for the platform's list of policies to turn off. */
   builtIn: string[];
 }
+
+/** The plan of an instance that does not exist yet, with the bindings its profile would add (open item 14). */
+export type NewInstancePreviewDto = PreviewDto & { bindings: Record<string, { targetId: string; region: string }> };
