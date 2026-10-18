@@ -215,6 +215,20 @@ export interface DnsRecord {
   value: string;
 }
 
+/** Backups of a database as the provider reports them (open item 18). */
+export interface BackupInfo {
+  enabled: boolean;
+  retentionDays?: number;
+  /** ISO times. */
+  lastBackupAt?: string;
+  nextBackupAt?: string;
+  /** Point in time restore window, when the provider offers one. */
+  earliestRestorableAt?: string;
+  latestRestorableAt?: string;
+  /** The most recent failed backup, when the provider reports one. */
+  lastFailure?: { at: string; message: string };
+}
+
 /** TLS certificate state for one hostname served by a resource (open item 9). */
 export interface CertificateInfo {
   hostname: string;
@@ -264,6 +278,9 @@ export interface CloudProviderAdapter {
 
   getLogs?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<LogLine[]>;
   getMetric?(ctx: ProviderContext, resource: ResourceIdentifier, metric: string, minutes: number): Promise<MetricPoint[]>;
+
+  /** Backups of a database resource; null for kinds without backups (open item 18). */
+  getBackups?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<BackupInfo | null>;
 
   /** Certificates of the hostnames a `dns` or `web.frontend` resource serves (open item 9). */
   getCertificates?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<CertificateInfo[]>;

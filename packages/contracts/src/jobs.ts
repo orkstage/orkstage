@@ -88,5 +88,6 @@ export const NOTIFICATION_EVENTS = [
   'cloud_target.unhealthy',
   'service.unhealthy',
   'quota.exceeded',
+  'backup.failed',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];

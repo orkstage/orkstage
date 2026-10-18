@@ -159,6 +159,11 @@ export const upgradeInstanceSchema = z.object({ templateVersionId: uuid });
 export const destroyInstanceSchema = z.object({
   /** Must equal the instance slug: an explicit confirmation for a destructive action. */
   confirm: z.string(),
+  /**
+   * Production only: destroy even though a database has no backup in the last day (open item 18).
+   * The final snapshot is still taken where the provider supports it.
+   */
+  withoutRecentBackup: z.boolean().optional(),
 });
 
 export const createTemplateSchema = z.object({ source: z.string().min(1).max(200_000) });
@@ -215,6 +220,8 @@ export const simulateSchema = z.object({
    * A domain of this instance in the simulated DNS: `ownershipRecord` creates (or removes) its TXT
    * record, `certificateExpiresAt` pins when its certificate expires (null: renewed as usual).
    */
+  /** Make the last backup of a simulated database fail (a message), or recover (null). */
+  backupFailure: z.string().min(1).max(200).nullable().optional(),
   domain: z
     .object({ hostname: z.string().min(4).max(253), ownershipRecord: z.boolean().optional(), certificateExpiresAt: z.iso.datetime({ offset: true }).nullable().optional() })
     .optional(),

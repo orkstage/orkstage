@@ -9,6 +9,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { ACMClient } from '@aws-sdk/client-acm';
+import { RDSClient } from '@aws-sdk/client-rds';
 import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { IAMClient } from '@aws-sdk/client-iam';
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
@@ -23,7 +24,11 @@ import {
   type DriftChange,
   type HealthResult,
   type LogLine,
+  type BackupInfo,
   type CertificateInfo,
+  type ResourceActionDescriptor,
+  type ResourceActionRequest,
+  type ResourceActionResult,
   type MetricPoint,
   type ProviderContext,
   type ResourceIdentifier,
@@ -36,6 +41,7 @@ import {
   type ValidateTargetOptions,
 } from '@orkstage/cloud-core';
 import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
+import { readBackups, RDS_ACTIONS, restoreToPointInTime } from './backups.js';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { readCertificates } from './certificates.js';
 import { awsConfig, isEmulator, stateBucketFor } from './config.js';
@@ -252,6 +258,31 @@ export class AwsAdapter implements CloudProviderAdapter {
     const query = cloudWatchQuery(res.serviceKind, outputs, metric);
     if (!query) return [];
     return readCloudWatch(new CloudWatchClient(await this.creds.clientConfig(ctx)), query, minutes, ctx.signal);
+  }
+
+  /** Automated backups of an RDS database (open item 18). */
+  async getBackups(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<BackupInfo | null> {
+    if (res.serviceKind !== 'database.postgresql') return null;
+    const ctx = this.effective(rawCtx);
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    if (!outputs.identifier) return null;
+    return readBackups(new RDSClient(await this.creds.clientConfig(ctx)), String(outputs.identifier), ctx.signal);
+  }
+
+  actions(capability: string): ResourceActionDescriptor[] {
+    return capability === 'rds-postgres' ? RDS_ACTIONS : [];
+  }
+
+  /** Provider actions for triggers: point in time restore of an RDS database to a new instance. */
+  async runAction(rawCtx: ProviderContext, res: ResourceIdentifier, request: ResourceActionRequest): Promise<ResourceActionResult> {
+    const ctx = this.effective(rawCtx);
+    if (res.capability !== 'rds-postgres' || request.action !== 'restore') {
+      throw new ProviderError('AWS_ACTION_UNKNOWN', `${request.action} is not available on ${res.capability}.`, 'VALIDATION_ERROR', 'aws');
+    }
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    if (!outputs.identifier) throw new ProviderError('AWS_DB_UNKNOWN', `${res.resourceId} has no RDS identifier yet.`, 'VALIDATION_ERROR', 'aws');
+    const at = typeof request.params.pointInTime === 'string' && request.params.pointInTime ? request.params.pointInTime : undefined;
+    return restoreToPointInTime(new RDSClient(await this.creds.clientConfig(ctx)), String(outputs.identifier), at, ctx.signal);
   }
 
   /** ACM certificates of a `dns` resource: the platform subdomain and the verified custom domains. */

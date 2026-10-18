@@ -46,6 +46,7 @@ export const WEBHOOK_EVENTS = [
   'domain.certificate_issued',
   'domain.certificate_expiring',
   'quota.exceeded',
+  'backup.failed',
 ] as const;
 
 /** ORKSTAGE: signed JSON events. SLACK and TEAMS: chat messages to an incoming webhook (open item 16). */
