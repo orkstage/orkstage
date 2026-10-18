@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "3.1146.0",
     "@orkstage/cloud-core": "workspace:*",
     "@orkstage/contracts": "workspace:*",
     "@orkstage/database": "workspace:*",

@@ -1,15 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { listQuerySchema, type AuditEventDto, type ListQuery, type NotificationDto, type OverviewDto } from '@orkstage/contracts';
+import {
+  listQuerySchema,
+  NOTIFICATION_EVENTS,
+  notificationPreferencesSchema,
+  PREFERENCE_CHANNELS,
+  type AuditEventDto,
+  type ListQuery,
+  type NotificationDto,
+  type NotificationPreferencesDto,
+  type OverviewDto,
+} from '@orkstage/contracts';
 import type { AuditEvent, PrismaClient } from '@orkstage/database';
 import { worstStatus, type StatusState } from '@orkstage/domain';
-import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Redis } from 'ioredis';
 import { authorize, CurrentPrincipal, isPlatformStaff, Public, Scope } from '../common/auth.js';
 import { AppError, forbidden, notFound } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
-import { ZodQuery } from '../common/validation.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
+import type { z } from 'zod';
 import { PRISMA, REDIS } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 import { toIncidentDto } from './incidents.controller.js';
@@ -147,6 +158,39 @@ export class OpsController {
       costByProvider: [...costByProvider].map(([provider, monthly]) => ({ provider, monthly: Math.round(monthly * 100) / 100 })).sort((a, b) => b.monthly - a.monthly),
       resourcesByHealth,
     };
+  }
+
+  /** The events and channels a person receives (open item 16); missing rows mean on. */
+  @Get('me/notification-preferences')
+  async preferences(@CurrentPrincipal() p: RequestPrincipal): Promise<NotificationPreferencesDto> {
+    const rows = await this.prisma.notificationPreference.findMany({ where: { userId: p.userId } });
+    const enabled = (event: string, channel: string) => rows.find((r) => r.event === event && r.channel === channel)?.enabled ?? true;
+    return {
+      events: [...NOTIFICATION_EVENTS],
+      channels: [...PREFERENCE_CHANNELS],
+      preferences: NOTIFICATION_EVENTS.flatMap((event) => PREFERENCE_CHANNELS.map((channel) => ({ event, channel, enabled: enabled(event, channel) }))),
+    };
+  }
+
+  @Put('me/notification-preferences')
+  @ApiZodBody(notificationPreferencesSchema)
+  async setPreferences(
+    @CurrentPrincipal() p: RequestPrincipal,
+    @ZodBody(notificationPreferencesSchema) body: z.infer<typeof notificationPreferencesSchema>,
+  ): Promise<NotificationPreferencesDto> {
+    if (p.apiKey) throw new AppError(403, 'API_KEY_NOT_ALLOWED', 'Preferences belong to a person.');
+    const unknown = body.preferences.filter((x) => !(NOTIFICATION_EVENTS as readonly string[]).includes(x.event)).map((x) => x.event);
+    if (unknown.length) throw new AppError(422, 'UNKNOWN_EVENT', `Unknown events: ${[...new Set(unknown)].join(', ')}.`);
+    await this.prisma.$transaction(
+      body.preferences.map((x) =>
+        this.prisma.notificationPreference.upsert({
+          where: { userId_event_channel: { userId: p.userId, event: x.event, channel: x.channel } },
+          update: { enabled: x.enabled },
+          create: { userId: p.userId, event: x.event, channel: x.channel, enabled: x.enabled },
+        }),
+      ),
+    );
+    return this.preferences(p);
   }
 
   @Get('notifications')

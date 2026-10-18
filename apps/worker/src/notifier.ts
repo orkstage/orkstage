@@ -3,8 +3,8 @@ import type { InvitationEmailJob, NotificationJob, StatusEmailJob } from '@orkst
 import { publicIncidentTitle, publicIncidentUpdate } from '@orkstage/domain';
 import { platformMetrics, unsubscribeToken } from '@orkstage/runtime';
 import type { Queue } from 'bullmq';
-import nodemailer, { type Transporter } from 'nodemailer';
 import type { WorkerContext } from './context.js';
+import { emailSender, type EmailSender } from './email.js';
 
 const MAX_EMAIL_ATTEMPTS = 5;
 
@@ -16,18 +16,14 @@ const SUBSCRIBER_EVENTS = new Set(['incident.opened', 'incident.updated', 'incid
  * an outbox: a failed email is retried on later ticks without duplicating in-app notifications.
  */
 export class Notifier {
-  private readonly mail: Transporter;
+  private readonly mail: EmailSender;
 
   constructor(
     private readonly ctx: WorkerContext,
     private readonly emails?: Pick<Queue<StatusEmailJob>, 'add'>,
+    mail?: EmailSender,
   ) {
-    this.mail = nodemailer.createTransport({
-      host: ctx.config.SMTP_HOST,
-      port: ctx.config.SMTP_PORT,
-      secure: ctx.config.SMTP_SECURE,
-      ...(ctx.config.SMTP_USER ? { auth: { user: ctx.config.SMTP_USER, pass: ctx.config.SMTP_PASSWORD ?? '' } } : {}),
-    });
+    this.mail = mail ?? emailSender(ctx.config);
   }
 
   async handle(job: NotificationJob): Promise<void> {
@@ -101,14 +97,13 @@ export class Notifier {
   }
 
   async sendStatusEmail(job: StatusEmailJob): Promise<void> {
-    await this.mail.sendMail({ from: this.ctx.config.EMAIL_FROM, to: job.to, subject: job.subject, text: job.text });
+    await this.mail.send({ to: job.to, subject: job.subject, text: job.text });
   }
 
   /** An invitation to someone who may not have an account yet. Throws so the queue retries. */
   async sendInvitation(job: InvitationEmailJob): Promise<void> {
     const expires = new Date(job.expiresAt).toUTCString();
-    await this.mail.sendMail({
-      from: this.ctx.config.EMAIL_FROM,
+    await this.mail.send({
       to: job.to,
       subject: `${job.inviterName} invited you to ${job.tenantName} on OrkStage`,
       text: `${job.inviterName} invited you to join ${job.tenantName} on OrkStage as ${job.role.replace('Customer', '').toLowerCase()}.
@@ -126,17 +121,27 @@ Sign in with this email address (${job.to}). The link works once and expires on 
       include: { notification: { include: { user: true } } },
       take: 50,
     });
+    const limit = this.ctx.config.EMAIL_RATE_LIMIT_PER_HOUR;
+    const sentLastHour = new Map<string, number>();
     for (const d of pending) {
       const n = d.notification;
+      // Email rate limit per person (open item 16): past it, the notification stays in the console only.
+      if (!sentLastHour.has(n.userId)) {
+        sentLastHour.set(n.userId, await prisma.notificationDelivery.count({ where: { channel: 'email', status: 'SENT', sentAt: { gte: new Date(Date.now() - 3_600_000) }, notification: { userId: n.userId } } }));
+      }
+      if (sentLastHour.get(n.userId)! >= limit) {
+        await prisma.notificationDelivery.update({ where: { id: d.id }, data: { status: 'SKIPPED', lastError: `More than ${limit} emails in an hour; shown in the console only.` } });
+        continue;
+      }
       const link = n.link ? `${this.ctx.config.WEB_PUBLIC_URL}${n.link}` : this.ctx.config.WEB_PUBLIC_URL;
       try {
-        await this.mail.sendMail({
-          from: this.ctx.config.EMAIL_FROM,
+        await this.mail.send({
           to: n.user.email,
           subject: n.title,
           text: `${n.body}\n\nOpen in the console: ${link}\n\nYou receive this because you are responsible for this environment.`,
         });
         await prisma.notificationDelivery.update({ where: { id: d.id }, data: { status: 'SENT', sentAt: new Date(), attempts: d.attempts + 1, lastError: null } });
+        sentLastHour.set(n.userId, sentLastHour.get(n.userId)! + 1);
       } catch (err) {
         const message = (err as Error).message.slice(0, 300);
         logger.warn({ deliveryId: d.id, err: message }, 'email delivery failed');

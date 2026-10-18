@@ -896,6 +896,12 @@ model ApiKey {
   @@index([tenantId])
 }
 
+enum WebhookFormat {
+  ORKSTAGE
+  SLACK
+  TEAMS
+}
+
 model WebhookEndpoint {
   id                  String   @id @default(uuid(7)) @db.Uuid
   organizationId      String   @db.Uuid
@@ -906,6 +912,8 @@ model WebhookEndpoint {
   events              String[]
   /// Signing secret, encrypted at rest (AES-256-GCM). Needed in clear to sign deliveries.
   secretEncrypted     String
+  /// ORKSTAGE: signed JSON. SLACK and TEAMS: a chat message to an incoming webhook (open item 16).
+  format              WebhookFormat @default(ORKSTAGE)
   enabled             Boolean  @default(true)
   consecutiveFailures Int      @default(0)
   disabledReason      String?

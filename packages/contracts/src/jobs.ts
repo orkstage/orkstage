@@ -86,5 +86,7 @@ export const NOTIFICATION_EVENTS = [
   'domain.certificate_issued',
   'domain.certificate_expiring',
   'cloud_target.unhealthy',
+  'service.unhealthy',
+  'quota.exceeded',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];

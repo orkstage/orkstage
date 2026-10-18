@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createWebhookSchema, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@orkstage/contracts';
 import type { PrismaClient, WebhookDelivery, WebhookEndpoint } from '@orkstage/database';
-import { assertSafeWebhookUrl, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError } from '@orkstage/runtime';
+import { assertSafeWebhookUrl, chatWebhookHostAllowed, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError, webhookBody, type WebhookFormat } from '@orkstage/runtime';
 import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -21,6 +21,7 @@ function toDto(w: WebhookEndpoint): WebhookDto {
     url: w.url,
     description: w.description,
     events: w.events,
+    format: w.format,
     enabled: w.enabled,
     consecutiveFailures: w.consecutiveFailures,
     disabledReason: w.disabledReason,
@@ -75,7 +76,7 @@ export class WebhooksController {
     @CorrelationId() correlationId: string,
   ): Promise<{ webhook: WebhookDto; secret: string }> {
     authorize(p, 'create', 'Webhook', { tenantId: body.tenantId ?? null });
-    await this.assertUrl(body.url);
+    await this.assertUrl(body.url, body.format);
     const organizationId = await this.organizationOf(body.tenantId);
     const secret = `whsec_${randomToken(32)}`;
     const webhook = await this.prisma.webhookEndpoint.create({
@@ -85,6 +86,7 @@ export class WebhooksController {
         url: body.url,
         description: body.description,
         events: body.events,
+        format: body.format,
         secretEncrypted: this.box.seal(secret),
         createdById: p.userId,
       },
@@ -103,7 +105,7 @@ export class WebhooksController {
     @CorrelationId() correlationId: string,
   ): Promise<WebhookDto> {
     const w = await this.load(p, id, 'update');
-    if (body.url) await this.assertUrl(body.url);
+    if (body.url) await this.assertUrl(body.url, w.format);
     const updated = await this.prisma.webhookEndpoint.update({
       where: { id },
       data: {
@@ -147,7 +149,7 @@ export class WebhooksController {
       data: {
         endpointId: id,
         event: 'ping',
-        payload: { type: 'ping', createdAt: new Date().toISOString(), tenantId: w.tenantId, data: { message: 'OrkStage webhook test' } },
+        payload: { type: 'ping', createdAt: new Date().toISOString(), tenantId: w.tenantId, data: { message: 'OrkStage webhook test', title: 'OrkStage webhook test', body: 'Deliveries to this endpoint work.' } },
         status: 'PENDING',
       },
     });
@@ -156,8 +158,9 @@ export class WebhooksController {
       secret: this.box.open(w.secretEncrypted),
       event: 'ping',
       deliveryId: delivery.id,
-      payload: { id: delivery.id, ...(delivery.payload as object) },
+      payload: webhookBody(w.format, { id: delivery.id, ...(delivery.payload as object) }, this.config.WEB_PUBLIC_URL),
       allowPrivate: this.config.WEBHOOK_ALLOW_PRIVATE,
+      format: w.format,
     });
     const done = await this.prisma.webhookDelivery.update({
       where: { id: delivery.id },
@@ -204,7 +207,10 @@ export class WebhooksController {
     return w;
   }
 
-  private async assertUrl(url: string) {
+  private async assertUrl(url: string, format: WebhookFormat = 'ORKSTAGE') {
+    if (!chatWebhookHostAllowed(format, url)) {
+      throw unprocessable('WEBHOOK_HOST_MISMATCH', format === 'SLACK' ? 'Slack incoming webhooks start with https://hooks.slack.com/.' : 'Teams incoming webhooks are on webhook.office.com, logic.azure.com or powerplatform.com.');
+    }
     try {
       await assertSafeWebhookUrl(url, this.config.WEBHOOK_ALLOW_PRIVATE);
     } catch (err) {

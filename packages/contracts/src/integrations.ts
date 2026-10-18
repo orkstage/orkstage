@@ -37,13 +37,26 @@ export const WEBHOOK_EVENTS = [
   'incident.updated',
   'incident.resolved',
   'cloud_target.unhealthy',
+  'service.unhealthy',
+  'maintenance.scheduled',
+  'maintenance.started',
+  'maintenance.completed',
+  'domain.verified',
+  'domain.verification_failed',
+  'domain.certificate_issued',
+  'domain.certificate_expiring',
+  'quota.exceeded',
 ] as const;
+
+/** ORKSTAGE: signed JSON events. SLACK and TEAMS: chat messages to an incoming webhook (open item 16). */
+export const WEBHOOK_FORMATS = ['ORKSTAGE', 'SLACK', 'TEAMS'] as const;
 
 export const createWebhookSchema = z.object({
   url: z.url().max(2000),
   description: z.string().max(200).default(''),
   events: z.array(z.enum(WEBHOOK_EVENTS)).min(1),
   tenantId: z.uuid().optional(),
+  format: z.enum(WEBHOOK_FORMATS).default('ORKSTAGE'),
 });
 
 export const updateWebhookSchema = z.object({
@@ -113,6 +126,7 @@ export interface WebhookDto {
   url: string;
   description: string;
   events: string[];
+  format: (typeof WEBHOOK_FORMATS)[number];
   enabled: boolean;
   consecutiveFailures: number;
   disabledReason: string | null;
