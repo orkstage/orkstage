@@ -342,6 +342,15 @@ export const addDomainSchema = z
   })
   .strict();
 
+/** The channels a person chooses per event (open item 16). Chat channels are tenant webhooks. */
+export const PREFERENCE_CHANNELS = ['in_app', 'email'] as const;
+
+export const notificationPreferencesSchema = z
+  .object({
+    preferences: z.array(z.object({ event: z.string().min(1).max(60), channel: z.enum(PREFERENCE_CHANNELS), enabled: z.boolean() }).strict()).max(200),
+  })
+  .strict();
+
 export const subscribeStatusSchema = z.object({ email: z.email().max(254) }).strict();
 
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;

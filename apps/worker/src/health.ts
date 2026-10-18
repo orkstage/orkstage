@@ -41,6 +41,20 @@ export class HealthMonitor {
     for (const instance of instances) {
       for (const r of instance.resources) await this.checkResource(r, targets.get(r.targetId));
       const fresh = await prisma.instanceResource.findMany({ where: { instanceId: instance.id, status: 'ACTIVE' } });
+      // A critical service that just turned unhealthy is news, before any incident opens (open item 16).
+      for (const r of fresh) {
+        const before = instance.resources.find((x) => x.id === r.id);
+        if (r.critical && r.health === 'UNHEALTHY' && before && before.health !== 'UNHEALTHY') {
+          await notify(this.ctx, {
+            tenantId: instance.tenantId,
+            event: 'service.unhealthy',
+            title: `${r.resourceId} is unhealthy on ${instance.name}`,
+            body: r.healthMessage ? `The last health check said: ${r.healthMessage.slice(0, 200)}` : 'The last health check failed.',
+            link: `/instances/${instance.id}`,
+            data: { instanceId: instance.id, resourceId: r.resourceId },
+          });
+        }
+      }
       const health = instanceHealth(fresh);
       const nextStatus = health === 'UNHEALTHY' || health === 'DEGRADED' ? 'DEGRADED' : health === 'HEALTHY' ? 'READY' : instance.status;
       if (health !== instance.health || nextStatus !== instance.status) {

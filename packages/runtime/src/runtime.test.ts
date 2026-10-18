@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, unsubscribeToken, verifyUnsubscribeToken, verifyWebhook } from './index.js';
+import { assertSafeWebhookUrl, AwsSecretsManagerResolver, CompositeSecretResolver, EnvSecretResolver, findSecretLikeKeys, loadConfig, SecretBox, signWebhook, unsubscribeToken, verifyUnsubscribeToken, verifyWebhook, webhookBody, chatWebhookHostAllowed } from './index.js';
 
 const base = {
   DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
@@ -142,5 +142,23 @@ describe('status unsubscribe tokens', () => {
     expect(verifyUnsubscribeToken('t'.repeat(40), token)).toBeNull();
     expect(verifyUnsubscribeToken(secret, 'sub-2' + token.slice(5))).toBeNull();
     expect(verifyUnsubscribeToken(secret, 'garbage')).toBeNull();
+  });
+});
+
+describe('chat webhooks (open item 16)', () => {
+  const payload = { type: 'incident.opened', data: { title: 'API unavailable on Acme', body: 'We opened an incident.', link: '/incidents/1' } };
+
+  it('formats Slack and Teams messages with a link to the console, and leaves OrkStage events alone', () => {
+    expect(webhookBody('SLACK', payload, 'https://console.example.com/')).toEqual({ text: '*API unavailable on Acme*\nWe opened an incident.\n<https://console.example.com/incidents/1|Open in OrkStage>' });
+    expect(webhookBody('TEAMS', payload, 'https://console.example.com')).toEqual({ text: '**API unavailable on Acme**\n\nWe opened an incident.\n\n[Open in OrkStage](https://console.example.com/incidents/1)' });
+    expect(webhookBody('ORKSTAGE', payload, 'https://console.example.com')).toBe(payload);
+  });
+
+  it('accepts only the hosts of each chat service', () => {
+    expect(chatWebhookHostAllowed('SLACK', 'https://hooks.slack.com/services/T/B/X')).toBe(true);
+    expect(chatWebhookHostAllowed('SLACK', 'https://hooks.slack.com.evil.example/x')).toBe(false);
+    expect(chatWebhookHostAllowed('TEAMS', 'https://acme.webhook.office.com/webhookb2/x')).toBe(true);
+    expect(chatWebhookHostAllowed('TEAMS', 'https://example.com/x')).toBe(false);
+    expect(chatWebhookHostAllowed('ORKSTAGE', 'https://example.com/hook')).toBe(true);
   });
 });

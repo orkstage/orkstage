@@ -279,6 +279,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@aws-sdk/client-sesv2':
+        specifier: 3.1146.0
+        version: 3.1146.0
       '@orkstage/cloud-core':
         specifier: workspace:*
         version: link:../../packages/cloud-core
@@ -798,6 +801,10 @@ packages:
 
   '@aws-sdk/client-secrets-manager@3.1146.0':
     resolution: {integrity: sha512-xNEA3vhaWUO7d2PQcKepyHwlTJAIPF8bJako7XK5kQOVekMHrS10RaoXONot8y9/CDRHYsqoAWP37er5+Wsc4w==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-sesv2@3.1146.0':
+    resolution: {integrity: sha512-3sMaymLxzaP1Ldqmu8mU4Uj2qLMDl8hHb3WYiM+H2fFHOnpTGVSToB5s15qCb0sAWqbXmFf+0vBLfwazpB8LzA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-sqs@3.1146.0':
@@ -2988,6 +2995,18 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.978.1
       '@aws-sdk/credential-provider-node': 3.972.84
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.35.1
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-sesv2@3.1146.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.1
+      '@aws-sdk/credential-provider-node': 3.972.84
+      '@aws-sdk/signature-v4-multi-region': 3.996.47
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.35.1
       '@smithy/fetch-http-handler': 5.8.0

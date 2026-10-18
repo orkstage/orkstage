@@ -31,6 +31,10 @@ const schema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
     EMAIL_FROM: z.string().default('OrkStage <noreply@example.local>'),
+    /** `smtp` (SMTP_*) or `ses` (Amazon SES v2 with the worker's AWS credentials and AWS_REGION). */
+    EMAIL_TRANSPORT: z.enum(['smtp', 'ses']).default('smtp'),
+    /** Notification emails one person receives per hour at most; the rest stay in the console. */
+    EMAIL_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).max(10_000).default(30),
     HEALTH_CHECK_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(30),
     // Days of per resource health check history kept (uptime and trends); older rows are deleted.
     HEALTH_HISTORY_DAYS: z.coerce.number().int().min(1).max(400).default(30),

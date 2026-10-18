@@ -562,3 +562,10 @@ export interface TenantPolicyDto {
 
 /** The plan of an instance that does not exist yet, with the bindings its profile would add (open item 14). */
 export type NewInstancePreviewDto = PreviewDto & { bindings: Record<string, { targetId: string; region: string }> };
+
+/** What a person receives, per event and channel; every combination is on until turned off. */
+export interface NotificationPreferencesDto {
+  events: string[];
+  channels: ('in_app' | 'email')[];
+  preferences: { event: string; channel: 'in_app' | 'email'; enabled: boolean }[];
+}

@@ -25,7 +25,7 @@ import { AppError, conflict, notFound, unprocessable } from '../common/errors.js
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { LauncherService, toDeploymentSummary } from '../deployments/launcher.service.js';
-import { Adapters, PRISMA } from '../infra/infra.module.js';
+import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 import { CompileService } from './compile.service.js';
 
@@ -76,6 +76,7 @@ export class InstancesController {
     private readonly launcher: LauncherService,
     private readonly adapters: Adapters,
     private readonly audit: AuditService,
+    private readonly queues: Queues,
   ) {}
 
   @Scope('instances:read')
@@ -138,7 +139,18 @@ export class InstancesController {
     const { maxInstances } = readTenantLimits(tenant.limits);
     if (maxInstances !== undefined) {
       const active = await this.prisma.instance.count({ where: { tenantId: tenant.id, status: { not: 'DESTROYED' } } });
-      if (active >= maxInstances) throw unprocessable('QUOTA_EXCEEDED', `${tenant.name} is limited to ${maxInstances} instance(s).`);
+      if (active >= maxInstances) {
+        // The owners hear about it: someone in the tenant needed more than the limit allows (open item 16).
+        await this.queues.notify({
+          tenantId: tenant.id,
+          event: 'quota.exceeded',
+          title: `${tenant.name} reached its instance limit`,
+          body: `Someone tried to create an instance, but ${tenant.name} is limited to ${maxInstances}. Destroy one or ask the platform team to raise the limit.`,
+          link: '/instances',
+          data: { limit: 'maxInstances', value: maxInstances },
+        });
+        throw unprocessable('QUOTA_EXCEEDED', `${tenant.name} is limited to ${maxInstances} instance(s).`);
+      }
     }
 
     // Compile before saving so an undeployable configuration is rejected up front.

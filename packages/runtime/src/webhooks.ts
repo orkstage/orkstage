@@ -108,6 +108,35 @@ function guardedLookup(hostname: string, options: { all?: boolean; family?: numb
 }
 
 /** One signed POST. Redirects are not followed; the response body is ignored. */
+export type WebhookFormat = 'ORKSTAGE' | 'SLACK' | 'TEAMS';
+
+/** Hosts that serve Slack and Teams incoming webhooks; other URLs are refused for those formats. */
+export function chatWebhookHostAllowed(format: WebhookFormat, url: string): boolean {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (format === 'SLACK') return host === 'hooks.slack.com';
+  if (format === 'TEAMS') return host.endsWith('.webhook.office.com') || host.endsWith('.logic.azure.com') || host.endsWith('.powerplatform.com');
+  return true;
+}
+
+/**
+ * The body of a delivery: the signed OrkStage event, or a chat message for Slack and Teams
+ * incoming webhooks (open item 16). Chat messages carry the title, body and a link only.
+ */
+export function webhookBody(format: WebhookFormat, payload: unknown, consoleUrl: string): unknown {
+  if (format === 'ORKSTAGE') return payload;
+  const data = ((payload as { data?: Record<string, unknown> })?.data ?? {}) as { title?: unknown; body?: unknown; link?: unknown };
+  const title = String(data.title ?? (payload as { type?: string })?.type ?? 'OrkStage');
+  const text = String(data.body ?? '');
+  const link = typeof data.link === 'string' && data.link ? `${consoleUrl.replace(/\/+$/, '')}${data.link}` : null;
+  if (format === 'SLACK') return { text: `*${title}*\n${text}${link ? `\n<${link}|Open in OrkStage>` : ''}` };
+  return { text: `**${title}**\n\n${text}${link ? `\n\n[Open in OrkStage](${link})` : ''}` };
+}
+
 export async function sendWebhook(opts: {
   url: string;
   secret: string;
@@ -115,17 +144,24 @@ export async function sendWebhook(opts: {
   deliveryId: string;
   payload: unknown;
   allowPrivate: boolean;
+  /** Chat formats are not signed: Slack and Teams do not check signatures. */
+  format?: WebhookFormat;
 }): Promise<WebhookAttempt> {
   try {
     const url = await assertSafeWebhookUrl(opts.url, opts.allowPrivate);
     const body = JSON.stringify(opts.payload);
+    const signed = (opts.format ?? 'ORKSTAGE') === 'ORKSTAGE';
     const headers = {
       'content-type': 'application/json',
       'content-length': String(Buffer.byteLength(body)),
       'user-agent': 'OrkStage-Webhooks/1.0',
-      'orkstage-event': opts.event,
-      'orkstage-delivery': opts.deliveryId,
-      'orkstage-signature': signWebhook(opts.secret, Math.floor(Date.now() / 1000), body),
+      ...(signed
+        ? {
+            'orkstage-event': opts.event,
+            'orkstage-delivery': opts.deliveryId,
+            'orkstage-signature': signWebhook(opts.secret, Math.floor(Date.now() / 1000), body),
+          }
+        : {}),
     };
     const status = await new Promise<number>((resolve, reject) => {
       const send = url.protocol === 'https:' ? httpsRequest : httpRequest;

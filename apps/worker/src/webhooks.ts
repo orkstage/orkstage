@@ -3,6 +3,7 @@ import type { NotificationJob } from '@orkstage/contracts';
 import {
   SecretBox,
   sendWebhook,
+  webhookBody,
   WEBHOOK_DISABLE_AFTER_FAILURES,
   platformMetrics,
   WEBHOOK_RETRY_DELAYS_S,
@@ -85,8 +86,9 @@ export class WebhookDispatcher {
         secret: this.box.open(d.endpoint.secretEncrypted),
         event: d.event,
         deliveryId: d.id,
-        payload: d.payload,
+        payload: webhookBody(d.endpoint.format, d.payload, config.WEB_PUBLIC_URL),
         allowPrivate: config.WEBHOOK_ALLOW_PRIVATE,
+        format: d.endpoint.format,
       });
       const attempt = d.attempts + 1;
       if (result.ok) {
