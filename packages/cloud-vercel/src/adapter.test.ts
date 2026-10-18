@@ -423,7 +423,8 @@ describe('VercelAdapter.validateTarget', () => {
   });
 });
 
+// Vercel plans nothing ahead (no planResource), so there is no replacing request to check.
 runAdapterContract('VercelAdapter', () => {
   const { adapter, ctx } = setup();
-  return { adapter, context: ctx, sampleRequest: request() };
+  return { adapter, context: ctx, sampleRequest: request(), secrets: [TOKEN] };
 });

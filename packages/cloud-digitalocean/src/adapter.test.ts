@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
-import type { StateStore } from '@orkstage/cloud-tofu';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import type { OpenTofuAdapterOptions } from '@orkstage/cloud-tofu';
+import { FakeTofu, MemoryStateStore } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
 import { DigitalOceanAdapter } from './adapter.js';
@@ -11,24 +13,14 @@ import { appAutoscaling, appInstanceSize, doTags, moduleCall, parseImage, postgr
 
 const SECRET = { token: 'dop_v1_secret_token', spacesAccessKeyId: 'SPACESKEY', spacesSecretAccessKey: 'spaces-secret-value' };
 
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
-
-/** Same adapter with state kept in memory instead of Spaces. */
+/** Same adapter with state kept in memory instead of Spaces (the S3 SDK does not use fetch). */
 class TestAdapter extends DigitalOceanAdapter {
-  readonly store = new MemoryStore();
+  constructor(
+    opts: OpenTofuAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   protected override stateStore() {
     return this.store;
   }
@@ -312,4 +304,39 @@ describe('DigitalOceanAdapter operations', () => {
     ]);
     expect(parseLogLine('plain text').message).toBe('plain text');
   });
+});
+
+/**
+ * Contract fixture: state in memory, a fake OpenTofu writing to the same store, and the API
+ * answering for the database clusters it has applied. The sample is a Managed PostgreSQL cluster
+ * in the network above; moving it to another VPC recreates it (DigitalOcean cannot change the
+ * private network of a cluster), which is the destructive change. A VPC or a Spaces bucket would
+ * be cheaper, but nothing a request can change on them forces a new resource.
+ */
+runAdapterContract('DigitalOceanAdapter', () => {
+  const store = new MemoryStateStore();
+  const f = fakeFetch((url) => {
+    const path = new URL(url).pathname;
+    if (path === '/v2/account') return { body: { account: { uuid: 'acc-uuid', status: 'active', team: { uuid: 'team-uuid', name: 'Acme' } } } };
+    if (path === '/v2/vpcs' || path === '/v2/apps' || path === '/v2/databases/options') return { body: {} };
+    const cluster = /^\/v2\/databases\/([^/]+)$/.exec(path)?.[1];
+    if (cluster && tofu.isLive('cluster_id', cluster)) return { body: { database: { id: cluster, status: 'online' } } };
+    return undefined;
+  });
+  const tofu = new FakeTofu({
+    state: store,
+    outputs: (inputs) => {
+      const id = `db-${String(inputs.name).slice(-8)}`;
+      return { kind: 'database.postgresql', cluster_id: id, cluster_name: String(inputs.name), host: `private-${String(inputs.name)}.db.ondigitalocean.com`, port: 25060, public_access: false, secret_ref: `do-db://${id}` };
+    },
+    replaceOn: ['vpc_id'],
+  });
+  const sampleRequest = request({ resourceId: 'db', serviceKind: 'database.postgresql', capability: 'managed-postgres', name: 'ork-acme-prod-db', spec: { size: 'micro', version: '17' } });
+  return {
+    adapter: new TestAdapter({ resolveSecret: async () => JSON.stringify(SECRET), fetch: f, runner: tofu.runner }, store),
+    context: ctx,
+    sampleRequest,
+    secrets: [SECRET.token, SECRET.spacesSecretAccessKey],
+    replacingRequest: { ...sampleRequest, dependencyOutputs: { network: { ...network, network_id: 'vpc-other', vpc_id: 'vpc-other' } }, idempotencyKey: 'k2' },
+  };
 });

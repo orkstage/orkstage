@@ -477,7 +477,8 @@ describe('actions', () => {
   });
 });
 
+// Supabase plans nothing ahead (no planResource), so there is no replacing request to check.
 runAdapterContract('SupabaseAdapter', () => {
   const { adapter, ctx } = setup();
-  return { adapter, context: ctx, sampleRequest: dbRequest() };
+  return { adapter, context: ctx, sampleRequest: dbRequest(), secrets: [TOKEN, databasePassword(derive('supabase:db:t1:ork-acme-prod-db'))] };
 });

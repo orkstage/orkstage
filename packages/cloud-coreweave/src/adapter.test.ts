@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
-import { stateKeyFor, type StateStore } from '@orkstage/cloud-tofu';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import { stateKeyFor, type OpenTofuAdapterOptions, type StateStore } from '@orkstage/cloud-tofu';
+import { FakeTofu, MemoryStateStore } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
 import { CoreWeaveAdapter } from './adapter.js';
@@ -9,24 +11,14 @@ import { coreweaveConfigChecks, labelsFrom, type CoreWeaveCredentials } from './
 import { parseKubeconfig } from './kube.js';
 import { gpuFrom, moduleCall, rootParts } from './stacks.js';
 
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
-
 /** The real adapter with state kept in memory instead of AI Object Storage. */
 class TestAdapter extends CoreWeaveAdapter {
-  readonly store = new MemoryStore();
+  constructor(
+    opts: OpenTofuAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   protected override stateStore(_ctx: ProviderContext, _creds: CoreWeaveCredentials): StateStore {
     return this.store;
   }
@@ -354,4 +346,31 @@ describe('parseKubeconfig', () => {
     expect(parseKubeconfig(json)).toEqual({ server: 'https://b', token: 't-b', ca: undefined });
     expect(() => parseKubeconfig('apiVersion: v1\nkind: Config\n')).toThrow('no cluster server');
   });
+});
+
+/**
+ * Contract fixture: state in memory, a fake OpenTofu writing to the same store, and the CoreWeave
+ * and Kubernetes APIs answering for the organization, the cluster and the VPCs it has applied.
+ * There is no replacing request: nothing a request can change on a VPC or a bucket forces a new
+ * one (the zone and the name, which pick the state, are the only inputs that would), and
+ * workloads on the cluster are rolled out, not replaced.
+ */
+runAdapterContract('CoreWeaveAdapter', () => {
+  const store = new MemoryStateStore();
+  const { fn } = fakeFetch(whoami, clusters, (u) => {
+    if (u.pathname === '/version') return { status: 200, body: { gitVersion: 'v1.35.0' } };
+    const vpc = /^\/v1beta1\/networking\/vpcs\/([^/]+)$/.exec(u.pathname)?.[1];
+    if (vpc === undefined) return undefined;
+    return tofu.isLive('network_id', decodeURIComponent(vpc)) ? { status: 200, body: { vpc: { id: vpc } } } : { status: 404, text: 'not found' };
+  });
+  const tofu = new FakeTofu({
+    state: store,
+    outputs: (inputs) => ({ kind: 'network', network_id: `vpc-${String(inputs.name)}`, name: String(inputs.name), zone: String(inputs.zone), pod_cidr: String(inputs.pod_cidr) }),
+  });
+  return {
+    adapter: new TestAdapter({ resolveSecret: async () => SECRET, fetch: fn, runner: tofu.runner }, store),
+    context: ctx,
+    sampleRequest: request({ resourceId: 'net', serviceKind: 'network', capability: 'vpc', name: 'ork-acme-prod-net', spec: {}, dependencyOutputs: {} }),
+    secrets: [TOKEN, 'state-secret-value'],
+  };
 });

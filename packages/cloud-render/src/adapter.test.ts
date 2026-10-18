@@ -295,9 +295,10 @@ const pgRequest = (spec: Record<string, unknown> = {}): ResourceRequest => ({
   idempotencyKey: 'k2',
 });
 
+// Render plans nothing ahead (no planResource), so there is no replacing request to check.
 runAdapterContract('render', () => {
   const { adapter, ctx } = setup();
-  return { adapter, context: ctx, sampleRequest: webRequest() };
+  return { adapter, context: ctx, sampleRequest: webRequest(), secrets: [API_KEY] };
 });
 
 describe('catalog and plans', () => {

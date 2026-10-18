@@ -26,10 +26,16 @@ function fixture(cfg: MockTargetConfig = {}) {
     dependencyOutputs: {},
     idempotencyKey: 'key-1',
   };
-  return { adapter: new MockAdapter(new InMemoryMockStateStore(), { sleep: noSleep }), context, sampleRequest };
+  return {
+    adapter: new MockAdapter(new InMemoryMockStateStore(), { sleep: noSleep }),
+    context,
+    sampleRequest,
+    // A new desired state for a resource listed in destructivePlans is planned as a replacement.
+    replacingRequest: { ...sampleRequest, idempotencyKey: 'key-2' },
+  };
 }
 
-runAdapterContract('MockAdapter', () => fixture());
+runAdapterContract('MockAdapter', () => fixture({ destructivePlans: ['database'] }));
 
 describe('MockAdapter simulation', () => {
   it('is deterministic for the same target and resource', async () => {

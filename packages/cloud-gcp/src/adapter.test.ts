@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createVerify, generateKeyPairSync } from 'node:crypto';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
 import { stateKeyFor } from '@orkstage/cloud-tofu';
+import { FakeTofu } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
-import { GcpAdapter } from './adapter.js';
+import { APIS_BY_KIND, GcpAdapter } from './adapter.js';
 import { signAssertion } from './auth.js';
 import { GCP_CAPABILITIES } from './catalog.js';
 import { gcpConfigChecks, labelsFrom } from './config.js';
@@ -310,4 +312,58 @@ describe('GcsStateStore', () => {
     await expect(store.delete('orkstage/x.tfstate.config.json')).resolves.toBeUndefined();
     await expect(store.check()).rejects.toThrow('HTTP 404');
   });
+});
+
+/** GCS JSON API over a map of object names, enough for the state store and the gcs backend. */
+const gcsBucket = (objects: Map<string, string>): Handler => (url, init) => {
+  const bucket = '/storage/v1/b/acme-orkstage-state';
+  if (url.pathname === bucket) return { status: 200, body: { name: 'acme-orkstage-state' } };
+  if (url.pathname === '/upload/storage/v1/b/acme-orkstage-state/o' && init.method === 'POST') {
+    objects.set(url.searchParams.get('name')!, String(init.body));
+    return { status: 200, body: {} };
+  }
+  if (!url.pathname.startsWith(`${bucket}/o/`)) return undefined;
+  const name = decodeURIComponent(url.pathname.slice(`${bucket}/o/`.length));
+  if (init.method === 'DELETE') return objects.delete(name) ? { status: 204 } : { status: 404, body: { error: { message: 'No such object' } } };
+  const body = objects.get(name);
+  return body === undefined ? { status: 404, body: { error: { message: 'No such object' } } } : { status: 200, body };
+};
+
+/**
+ * Contract fixture: state in a fake GCS bucket written by a fake OpenTofu through the real GCS
+ * store, and the Compute API answering for the networks it has applied. The sample is a VPC
+ * network with Cloud NAT; turning NAT off removes the router, which is the destructive change.
+ */
+runAdapterContract('GcpAdapter', () => {
+  const objects = new Map<string, string>();
+  const services = [...new Set(Object.values(APIS_BY_KIND).flat())].map((s) => ({ name: `projects/42/services/${s}`, state: 'ENABLED' }));
+  const { fetch } = fakeFetch(
+    gcsBucket(objects),
+    (url) => (url.hostname === 'cloudresourcemanager.googleapis.com' ? { status: 200, body: { projectId: 'acme-prod-123', state: 'ACTIVE' } } : undefined),
+    (url) => (url.hostname === 'serviceusage.googleapis.com' ? { status: 200, body: { services } } : undefined),
+    (url) => {
+      if (url.hostname !== 'compute.googleapis.com') return undefined;
+      const id = url.pathname.replace('/compute/v1/', '');
+      return tofu.isLive('network_id', id) ? { status: 200, body: { selfLink: url.toString() } } : undefined;
+    },
+  );
+  const tofu = new FakeTofu({
+    state: new GcsStateStore('acme-orkstage-state', async () => 'ya29.test', fetch),
+    outputs: (inputs) => ({
+      kind: 'network',
+      network_id: `projects/acme-prod-123/global/networks/${String(inputs.name)}`,
+      subnet_id: `projects/acme-prod-123/regions/${String(inputs.region)}/subnetworks/${String(inputs.name)}`,
+      cidr: String(inputs.subnet_cidr),
+      nat: inputs.nat_gateway === true,
+    }),
+    replaceOn: ['nat_gateway'],
+  });
+  const sampleRequest = request({ resourceId: 'net', serviceKind: 'network', capability: 'vpc', name: 'ork-acme-prod-net', spec: { natGateway: true }, dependencyOutputs: {} });
+  return {
+    adapter: adapterWith(fetch, tofu.runner),
+    context: ctx,
+    sampleRequest,
+    secrets: [key.private_key, key.private_key_id],
+    replacingRequest: { ...sampleRequest, spec: { natGateway: false }, idempotencyKey: 'k2' },
+  };
 });

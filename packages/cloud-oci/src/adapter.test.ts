@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { generateKeyPairSync } from 'node:crypto';
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
-import { stateKeyFor, type StateStore } from '@orkstage/cloud-tofu';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import { stateKeyFor, type OpenTofuAdapterOptions } from '@orkstage/cloud-tofu';
+import { FakeTofu, MemoryStateStore } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
 import { OciAdapter } from './adapter.js';
@@ -44,23 +46,14 @@ const request = (over: Partial<ResourceRequest>): ResourceRequest => ({
   ...over,
 });
 
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
-
+/** Same adapter with state kept in memory instead of Object Storage (the S3 SDK does not use fetch). */
 class TestAdapter extends OciAdapter {
-  readonly store = new MemoryStore();
+  constructor(
+    opts: OpenTofuAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   protected override stateStore() {
     return this.store;
   }
@@ -345,4 +338,35 @@ describe('catalog', () => {
     expect(OCI_CAPABILITIES.map((c) => c.capability)).toEqual(['vcn', 'container-instances', 'oci-postgresql', 'oci-cache', 'object-storage', 'flexible-load-balancer']);
     expect(OCI_CAPABILITIES.every((c) => c.pricing?.source.startsWith('Static OCI list prices'))).toBe(true);
   });
+});
+
+/**
+ * Contract fixture: state in memory, a fake OpenTofu writing to the same store, and the Core
+ * Services API answering for the VCNs it has applied. The sample is a VCN with a NAT gateway;
+ * turning NAT off removes the gateway, which is the destructive change. The target shares a
+ * vault so validation has nothing to warn about.
+ */
+runAdapterContract('OciAdapter', () => {
+  const fetchFn = fakeFetch([
+    [/identity\.us-ashburn-1\.oci\.oraclecloud\.com\/20160918\/compartments\//, () => json({ name: 'acme-prod', lifecycleState: 'ACTIVE' })],
+    [
+      /iaas\.us-ashburn-1\.oraclecloud\.com\/20160918\/vcns\//,
+      (url) => (tofu.isLive('network_id', url.split('/vcns/')[1]) ? json({ lifecycleState: 'AVAILABLE' }) : json({ code: 'NotAuthorizedOrNotFound' }, 404)),
+    ],
+  ]);
+  const store = new MemoryStateStore();
+  const tofu = new FakeTofu({
+    state: store,
+    outputs: (inputs) => ({ kind: 'network', network_id: `ocid1.vcn.oc1.iad.${String(inputs.dns_label)}`, vcn_id: `ocid1.vcn.oc1.iad.${String(inputs.dns_label)}`, cidr: String(inputs.cidr), private_egress: inputs.nat_gateway === true }),
+    replaceOn: ['nat_gateway'],
+  });
+  const adapter = new TestAdapter({ resolveSecret: async () => secret, fetch: fetchFn as unknown as typeof fetch, runner: tofu.runner }, store);
+  const sampleRequest = request({ resourceId: 'net', serviceKind: 'network', capability: 'vcn', name: 'ork-acme-prod-net', spec: { natGateway: true }, dependencyOutputs: {} });
+  return {
+    adapter,
+    context: withConfig({ vaultOcid: 'ocid1.vault.oc1.iad.b.aaaa', keyOcid: 'ocid1.key.oc1.iad.b.aaaa' }),
+    sampleRequest,
+    secrets: [pem, 'state-secret-value'],
+    replacingRequest: { ...sampleRequest, spec: { natGateway: false }, idempotencyKey: 'k2' },
+  };
 });
