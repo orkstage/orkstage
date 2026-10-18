@@ -32,6 +32,14 @@ async function seedPlatformOwner() {
   console.log(`Platform owner: ${email} (sign in with SSO using this verified email).`);
 }
 
+/** Older published versions of a system template are deprecated: their instances keep running (open item 13). */
+async function deprecateOlder(templateId: string, current: string) {
+  await prisma.templateVersion.updateMany({
+    where: { templateId, status: 'PUBLISHED', version: { not: current } },
+    data: { status: 'DEPRECATED', deprecatedAt: new Date(), deprecationNote: `Replaced by ${current}.` },
+  });
+}
+
 async function main() {
   for (const { source, template } of loadBuiltinTemplates()) {
     const t = await prisma.template.upsert({
@@ -57,6 +65,7 @@ async function main() {
         publishedAt: new Date(),
       },
     });
+    await deprecateOlder(t.id, template.metadata.version);
   }
 
   // Curated marketplace listings: system templates published as VERIFIED and DEVOPS by OrkStage.
@@ -79,6 +88,7 @@ async function main() {
         publishedAt: new Date(),
       },
     });
+    await deprecateOlder(t.id, m.template.metadata.version);
     const listing = { title: m.title, summary: m.summary, description: m.template.metadata.description, categories: m.categories, tags: m.tags, badges: m.badges };
     await prisma.marketplaceListing.upsert({
       where: { slug: m.slug },
@@ -278,7 +288,7 @@ async function main() {
       },
     }));
 
-  const starter = await prisma.templateVersion.findFirstOrThrow({ where: { template: { name: 'starter-standard' }, version: '1.0.0' } });
+  const starter = await prisma.templateVersion.findFirstOrThrow({ where: { template: { name: 'starter-standard' }, status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' } });
   await prisma.instance.upsert({
     where: { tenantId_slug: { tenantId: acme.id, slug: 'staging' } },
     update: {},

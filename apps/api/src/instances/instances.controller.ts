@@ -104,6 +104,9 @@ export class InstancesController {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: body.tenantId } });
     if (!tenant) throw notFound('Tenant');
     const version = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
+    if (version?.status === 'DEPRECATED') {
+      throw unprocessable('TEMPLATE_DEPRECATED', `Version ${version.version} is deprecated.${version.deprecationNote ? ` ${version.deprecationNote}` : ''} Choose a newer version.`);
+    }
     if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
 
     const { maxInstances } = readTenantLimits(tenant.limits);

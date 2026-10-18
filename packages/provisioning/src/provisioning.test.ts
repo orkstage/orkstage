@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { AdapterRegistry, type CloudTarget } from '@orkstage/cloud-core';
 import { InMemoryMockStateStore, MockAdapter, type MockTargetConfig } from '@orkstage/cloud-mock';
-import { ALL_FEATURES, type TenantFeatures } from '@orkstage/domain';
+import { ALL_FEATURES, isCloudProvider, PROVIDER_INFO, type CloudProvider, type TenantFeatures } from '@orkstage/domain';
 import { loadBuiltinTemplates, loadMarketplaceTemplates } from '@orkstage/templates/builtin';
 import type { EnvironmentTemplate } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
@@ -530,5 +530,30 @@ describe('data driven policies (open item 12)', () => {
 
     const off = compileInfrastructure({ ...base, policy: { requiredLabels: ['cost-center'], disabled: ['required-labels'] } }, registry());
     expect(off.policyResults.some((p) => p.policy === 'required-labels')).toBe(false);
+  });
+});
+
+describe('built in templates are portable (open item 13)', () => {
+  // Every provider a slot allows, with the other slots on their first provider.
+  const cases = loadBuiltinTemplates().flatMap(({ template }) =>
+    template.spec.placements.flatMap((slot) =>
+      slot.providers.filter((p): p is CloudProvider => p !== 'mock' && isCloudProvider(p)).map((provider) => [template.metadata.name, slot.name, provider] as const),
+    ),
+  );
+  const bind = (provider: CloudProvider, id: string) => {
+    const region = PROVIDER_INFO[provider].previewRegion;
+    return { target: mockTarget(id, provider as never, region), region };
+  };
+
+  it.each(cases)('%s compiles with slot %s on %s', (name, slotName, provider) => {
+    const template = templates[name]!;
+    const bindings = Object.fromEntries(
+      template.spec.placements.map((slot) => {
+        const p = slot.name === slotName ? provider : (slot.providers.find((x) => x !== 'mock' && isCloudProvider(x)) as CloudProvider | undefined) ?? 'aws';
+        return [slot.name, bind(p, `${slot.name}-${p}`)];
+      }),
+    );
+    const resolved = compileInfrastructure({ ...input(template, bindings), instance: { id: 'inst-1', slug: 'prod', environment: template.metadata.nonProduction ? 'sandbox' : 'production' } }, registry());
+    expect(resolved.issues.filter((i) => i.severity === 'error' && i.stage !== 'policy')).toEqual([]);
   });
 });

@@ -45,6 +45,8 @@ export interface TemplateVersionDto {
   document: Record<string, unknown>;
   validation: { valid: boolean; issues: ValidationIssueDto[] } | null;
   publishedAt: string | null;
+  deprecatedAt: string | null;
+  deprecationNote: string | null;
   createdAt: string;
   instanceCount?: number;
 }
