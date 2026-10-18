@@ -471,6 +471,8 @@ model InstanceResource {
   driftCheckedAt     DateTime?      @db.Timestamptz(3)
   /// Last drift scan: changes the provider would make to restore the applied configuration.
   driftDetails       Json?
+  /// Last backup check of a database (open item 18): what the provider reported, and when we warned.
+  backupState        Json?
   createdAt          DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime       @updatedAt @db.Timestamptz(3)
 

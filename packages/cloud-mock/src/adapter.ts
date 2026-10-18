@@ -3,6 +3,7 @@ import {
   allowlistAddresses,
   ProviderError,
   secretEnvironment,
+  type BackupInfo,
   type CertificateInfo,
   type CloudCapability,
   type CloudProviderAdapter,
@@ -249,6 +250,36 @@ export class MockAdapter implements CloudProviderAdapter {
   }
 
   /**
+   * Backups of a simulated database: one a day at 03:00 UTC, kept as long as the template says, a
+   * point in time window over the retention, and a failure when a test pinned one.
+   */
+  async getBackups(_ctx: ProviderContext, res: ResourceIdentifier): Promise<BackupInfo | null> {
+    if (res.serviceKind !== 'database.postgresql') return null;
+    const retentionDays = Number((res.outputs ?? {}).backup_retention_days ?? 7);
+    if (retentionDays <= 0) return { enabled: false };
+    const now = Date.now();
+    const today = new Date(now);
+    today.setUTCHours(3, 0, 0, 0);
+    const last = today.getTime() <= now ? today.getTime() : today.getTime() - 86_400_000;
+    const failure = await this.store.get(`backup-failure:${res.name}`);
+    return {
+      enabled: true,
+      retentionDays,
+      lastBackupAt: new Date(failure ? last - 86_400_000 : last).toISOString(),
+      nextBackupAt: new Date(last + 86_400_000).toISOString(),
+      earliestRestorableAt: new Date(now - retentionDays * 86_400_000).toISOString(),
+      latestRestorableAt: new Date(now - 5 * 60_000).toISOString(),
+      ...(failure ? { lastFailure: { at: new Date(last).toISOString(), message: failure } } : {}),
+    };
+  }
+
+  /** Simulation control: make the last backup of a database fail (null: back to normal). */
+  async setBackupFailure(name: string, message: string | null): Promise<void> {
+    if (message === null) await this.store.delete(`backup-failure:${name}`);
+    else await this.store.set(`backup-failure:${name}`, message);
+  }
+
+  /**
    * Certificates of a simulated `dns` or `web.frontend` resource: issued, valid for 60 days from
    * now (as if renewed on time), unless a test pinned an expiry with `setCertificateExpiry`.
    */
@@ -372,6 +403,11 @@ const SIMULATED_ACTIONS: ResourceActionDescriptor[] = [
   },
   { name: 'restart', description: 'Restart running instances (simulated).', params: [] },
   { name: 'backup', description: 'Take an on demand backup (simulated).', params: [] },
+  {
+    name: 'restore',
+    description: 'Restore the database to a point in time, as a new database (simulated).',
+    params: [{ name: 'pointInTime', type: 'string', description: 'ISO time within the restore window; the latest restorable time when empty.' }],
+  },
 ];
 
 /** The imitated provider; unknown values fall back to AWS instead of breaking the target. */
@@ -394,9 +430,11 @@ function outputsFor(req: ResourceRequest, region: string, simulate: string, id: 
     case 'database.postgresql': {
       const ref = `secret://${req.name}/credentials`;
       const allowed = allowlistAddresses(req.spec, req.dependencyOutputs);
+      const backup = (req.spec.backup ?? {}) as { enabled?: boolean; retentionDays?: number };
       return {
         host: `${req.name}.pg.${region}.${domain}`,
         port: 5432,
+        backup_retention_days: backup.enabled === false ? 0 : (backup.retentionDays ?? 7),
         secretRef: ref,
         secret_ref: ref,
         provider: simulate,

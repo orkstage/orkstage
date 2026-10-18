@@ -124,6 +124,20 @@ export interface ResourceDto {
   driftCheckedAt: string | null;
   /** From the last drift scan: what the provider would change to restore the applied configuration. */
   driftChanges: { address: string; action: string }[];
+  /** Databases: the last backup check (open item 18). */
+  backup: BackupStateDto | null;
+}
+
+export interface BackupStateDto {
+  checkedAt: string;
+  enabled: boolean;
+  retentionDays: number | null;
+  lastBackupAt: string | null;
+  nextBackupAt: string | null;
+  earliestRestorableAt: string | null;
+  latestRestorableAt: string | null;
+  /** Set while the last backup failed or is overdue. */
+  problem: string | null;
 }
 
 /** A profile (ADR 0007): the target and region per provider for one environment. */

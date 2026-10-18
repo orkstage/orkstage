@@ -6,6 +6,7 @@ import {
   simulateSchema,
   updateInstanceSchema,
   upgradeInstanceSchema,
+  type BackupStateDto,
   type InstanceDto,
   type ListQuery,
   type ResourceDto,
@@ -64,6 +65,7 @@ export function toResourceDto(r: InstanceResource): ResourceDto {
     drift: r.drift,
     driftCheckedAt: r.driftCheckedAt?.toISOString() ?? null,
     driftChanges: ((r.driftDetails as { actions?: { address: string; action: string }[] } | null)?.actions ?? []).slice(0, 50),
+    backup: (r.backupState as BackupStateDto | null) ?? null,
   };
 }
 
@@ -311,6 +313,17 @@ export class InstancesController {
   ) {
     const instance = await this.load(p, id, 'destroy');
     if (body.confirm !== instance.slug) throw unprocessable('CONFIRMATION_MISMATCH', 'Type the instance slug exactly to confirm.');
+    // Production data is only destroyed with a recent backup behind it (open item 18).
+    if (instance.environment === 'production' && !body.withoutRecentBackup) {
+      const stale = await this.databasesWithoutRecentBackup(id);
+      if (stale.length) {
+        throw unprocessable(
+          'BACKUP_NOT_RECENT',
+          `${stale.join(', ')} ${stale.length === 1 ? 'has' : 'have'} no backup from the last day. Run a backup trigger, wait for the next backup, or confirm with withoutRecentBackup.`,
+          { resources: stale },
+        );
+      }
+    }
     return toDeploymentSummary(await this.launcher.destroy(instance, p, correlationId));
   }
 
@@ -370,6 +383,7 @@ export class InstancesController {
     if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, resource.name, body.health);
     if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, resource.name, body.drift);
     if (body.metric) await this.adapters.mock.setMetricOverride(ctx, resource.name, body.metric.name, body.metric.value);
+    if (body.backupFailure !== undefined) await this.adapters.mock.setBackupFailure(resource.name, body.backupFailure);
     if (body.domain) {
       // Only hostnames of this instance: the simulated DNS is shared by every simulated target.
       const domain = await this.prisma.domain.findFirst({ where: { instanceId: id, hostname: body.domain.hostname.toLowerCase() } });
@@ -380,6 +394,19 @@ export class InstancesController {
       if (body.domain.certificateExpiresAt !== undefined) await this.adapters.mock.setCertificateExpiry(domain.hostname, body.domain.certificateExpiresAt);
     }
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'InstanceResource', resourceId: `${id}/${body.resourceId}`, action: 'SIMULATE', correlationId, changes: body });
+  }
+
+  /** Databases with backups on whose last known backup is older than a day (or unknown). */
+  private async databasesWithoutRecentBackup(instanceId: string): Promise<string[]> {
+    const dbs = await this.prisma.instanceResource.findMany({ where: { instanceId, status: 'ACTIVE', type: 'database.postgresql' } });
+    const dayAgo = Date.now() - 86_400_000;
+    return dbs
+      .filter((r) => {
+        const b = r.backupState as BackupStateDto | null;
+        if (b && !b.enabled) return false;
+        return !b?.lastBackupAt || Date.parse(b.lastBackupAt) < dayAgo;
+      })
+      .map((r) => r.resourceId);
   }
 
   private async load(p: RequestPrincipal, id: string, action: 'read' | 'update' | 'deploy' | 'destroy'): Promise<LoadedInstance> {
