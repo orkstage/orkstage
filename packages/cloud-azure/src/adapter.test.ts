@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import { FakeTofu } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
 import { AzureAdapter } from './adapter.js';
 import { AZURE_CAPABILITIES } from './catalog.js';
 import { configChecks } from './config.js';
-import { containerSize, globalName, isKeyVaultSecretId, moduleCall, storageAccountName } from './stacks.js';
+import { RESOURCE_PROVIDERS, containerSize, globalName, isKeyVaultSecretId, moduleCall, storageAccountName } from './stacks.js';
+import { AzureBlobStateStore } from './state.js';
 
 const SUB = '0b1f6471-1bf0-4dda-aec3-111111111111';
 const SECRET = 'very-secret-client-value';
@@ -342,4 +345,45 @@ describe('operations', () => {
     ]);
     expect(calls.find((c) => c.url.includes('loganalytics'))?.body).toContain("ContainerAppName_s == 'ork-acme-prod-api'");
   });
+});
+
+/**
+ * Contract fixture: state in a fake Blob container, a fake OpenTofu that writes to the same
+ * container through the real Blob store, and ARM answering for the networks it has applied.
+ * The sample is a virtual network; changing zone redundancy recreates its Container Apps
+ * environment, so that is the replacing change.
+ */
+runAdapterContract('AzureAdapter', () => {
+  const objects = new Map<string, string>();
+  const registered = [...new Set(Object.values(RESOURCE_PROVIDERS).flat())].map((namespace) => ({ namespace, registrationState: 'Registered' }));
+  const arm: Handler = (url) => {
+    if (url.host !== 'management.azure.com') return undefined;
+    if (url.pathname === `/subscriptions/${SUB}`) return Response.json({ subscriptionId: SUB, displayName: 'Acme Production', state: 'Enabled' });
+    if (url.pathname === `/subscriptions/${SUB}/providers`) return Response.json({ value: registered });
+    const id = decodeURIComponent(url.pathname);
+    return tofu.isLive('network_id', id) ? Response.json({ id, properties: { provisioningState: 'Succeeded' } }) : undefined;
+  };
+  const { fetch } = fakeFetch([blobStore(objects), arm]);
+  const tofu = new FakeTofu({
+    state: new AzureBlobStateStore({ account: 'orkstagestate01', container: 'orkstage-tfstate', fetch, token: async () => 'tok:storage' }),
+    outputs: (inputs) => {
+      const group = `/subscriptions/${SUB}/resourceGroups/${String(inputs.resource_group_name)}`;
+      return {
+        kind: 'network',
+        network_id: `${group}/providers/Microsoft.Network/virtualNetworks/${String(inputs.name)}`,
+        cidr: String(inputs.cidr),
+        container_app_environment_id: `${group}/providers/Microsoft.App/managedEnvironments/${String(inputs.environment_name)}`,
+        log_workspace_id: '9d3c1a40-0000-4000-8000-000000000001',
+      };
+    },
+    replaceOn: ['zone_redundant'],
+  });
+  const sampleRequest = request({ resourceId: 'net', serviceKind: 'network', capability: 'vnet', name: 'ork-acme-prod-net', spec: {}, dependencyOutputs: {} });
+  return {
+    adapter: new AzureAdapter({ resolveSecret: async () => JSON.stringify({ clientSecret: SECRET }), fetch, runner: tofu.runner }),
+    context: ctx,
+    sampleRequest,
+    secrets: [SECRET],
+    replacingRequest: { ...sampleRequest, spec: { availabilityZones: 3 }, idempotencyKey: 'k2' },
+  };
 });

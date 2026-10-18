@@ -1,12 +1,47 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import type { CloudProviderAdapter, ProviderContext, ResourceRequest } from '../types.js';
+import type { CloudProviderAdapter, ProviderContext, ResourceOutputs, ResourceRequest } from '../types.js';
 
 export interface ContractFixture {
   adapter: CloudProviderAdapter;
   context: ProviderContext;
   /** A request for a resource the adapter can create in this test environment. */
   sampleRequest: ResourceRequest;
+  /**
+   * Credential material the fixture configured for the target (API tokens, client secrets, key
+   * parts). None of it may appear in resource outputs. Leave it out only when the target needs
+   * no credentials (simulation).
+   */
+  secrets?: string[];
+  /**
+   * A change to `sampleRequest` the provider can only make by replacing the resource. When the
+   * adapter implements `planResource`, the plan for it must be flagged destructive. Leave it out
+   * only when the adapter has no way to plan a replacement in this environment, and say why.
+   */
+  replacingRequest?: ResourceRequest;
+  /**
+   * The adapter implements `probeExists` but cannot tell for the sample resource (no provider API
+   * describes it), so it answers `undefined` while the resource exists. Say why when set.
+   */
+  probeUndetermined?: boolean;
+}
+
+/** Output names that suggest a credential: they must hold a reference, never the value. */
+const SECRET_LIKE_KEY = /password|passwd|secret|token|private_?key|api_?key|credential/i;
+/** Names that say the value points somewhere else (`secret_ref`, `password_secret_arn`, `token_name`). */
+const REFERENCE_KEY = /(ref|_id|Id|_arn|Arn|_name|Name)$/;
+/** Values that are references: ARNs, secret store URIs without user info, Secret Manager names. */
+const REFERENCE_VALUE = /^(arn:|[a-z][a-z0-9+.-]*:\/\/[^\s:@]+$|projects\/[^/]+\/secrets\/)/i;
+/** A URL with a password in it, e.g. `postgres://user:pw@host/db`. */
+const URL_WITH_PASSWORD = /:\/\/[^/\s:@]+:[^/\s@]+@/;
+
+function expectNoSecrets(outputs: ResourceOutputs, secrets: string[], where: string): void {
+  for (const [key, value] of Object.entries(outputs)) {
+    if (typeof value !== 'string') continue;
+    for (const secret of secrets) expect(value.includes(secret), `${where}.${key} holds a configured secret`).toBe(false);
+    expect(URL_WITH_PASSWORD.test(value), `${where}.${key} is a URL with a password`).toBe(false);
+    if (SECRET_LIKE_KEY.test(key)) expect(REFERENCE_KEY.test(key) || REFERENCE_VALUE.test(value), `${where}.${key} looks like a secret value`).toBe(true);
+  }
 }
 
 /**
@@ -55,6 +90,39 @@ export function runAdapterContract(name: string, makeFixture: () => ContractFixt
       await adapter.deleteResource(context, ident);
       await adapter.deleteResource(context, ident);
       expect((await adapter.getResource(context, ident)).exists).toBe(false);
+    });
+
+    it('never puts secrets in outputs', async () => {
+      const { adapter, context, sampleRequest, secrets = [] } = await makeFixture();
+      const created = await adapter.ensureResource(context, sampleRequest);
+      const ident = { ...sampleRequest, providerResourceId: created.providerResourceId };
+      expectNoSecrets(created.outputs, secrets, 'ensureResource');
+      expectNoSecrets((await adapter.getResource(context, ident)).outputs, secrets, 'getResource');
+      expect(created.providerResourceId.length).toBeGreaterThan(0);
+      for (const secret of secrets) expect(created.providerResourceId).not.toContain(secret);
+      await adapter.deleteResource(context, ident);
+    });
+
+    it('flags plans that replace the resource as destructive', async () => {
+      const { adapter, context, sampleRequest, replacingRequest } = await makeFixture();
+      if (!adapter.planResource || !replacingRequest) return;
+      const created = await adapter.ensureResource(context, sampleRequest);
+      const same = await adapter.planResource(context, sampleRequest);
+      expect(same.destructive).toBe(false);
+      const replacing = await adapter.planResource(context, replacingRequest);
+      expect(replacing.destructive).toBe(true);
+      expect(replacing.actions.some((a) => a.action === 'replace' || a.action === 'delete')).toBe(true);
+      await adapter.deleteResource(context, { ...sampleRequest, providerResourceId: created.providerResourceId });
+    });
+
+    it('probeExists sees the resource after ensure and not after delete', async () => {
+      const { adapter, context, sampleRequest, probeUndetermined } = await makeFixture();
+      if (!adapter.probeExists) return;
+      const created = await adapter.ensureResource(context, sampleRequest);
+      const ident = { ...sampleRequest, providerResourceId: created.providerResourceId, outputs: created.outputs };
+      expect(await adapter.probeExists(context, ident)).toBe(probeUndetermined ? undefined : true);
+      await adapter.deleteResource(context, ident);
+      expect(await adapter.probeExists(context, ident)).toBe(false);
     });
   });
 }

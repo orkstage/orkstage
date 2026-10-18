@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceIdentifier, ResourceRequest } from '@orkstage/cloud-core';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
 import { stateKeyFor, type StateStore } from '@orkstage/cloud-tofu';
+import { FakeTofu, MemoryStateStore } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
-import { VultrAdapter } from './adapter.js';
+import { VultrAdapter, type VultrAdapterOptions } from './adapter.js';
 import type { VultrCredentials } from './api.js';
 import { VULTR_CAPABILITIES } from './catalog.js';
 import { vultrConfigChecks } from './config.js';
@@ -11,23 +13,14 @@ import { databaseState } from './health.js';
 import { databaseNodes, instancePlan, pickDatabasePlan, pickObjectStorage } from './sizing.js';
 import { singleRoute, vultrModuleCall, vultrTags } from './stacks.js';
 
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
-
+/** Same adapter with state kept in memory instead of Object Storage (the S3 SDK does not use fetch). */
 class TestAdapter extends VultrAdapter {
-  readonly store = new MemoryStore();
+  constructor(
+    opts: VultrAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   protected override stateStore(_ctx: ProviderContext, _creds: VultrCredentials): StateStore {
     return this.store;
   }
@@ -398,4 +391,42 @@ describe('health, probes, secrets and actions', () => {
     const a = new TestAdapter({ resolveSecret: async () => SECRET, runner: fakeRunner({}), fetch: fakeVultr({}).fetch });
     expect((await a.planResource(ctx, request({}))).destructive).toBe(false);
   });
+});
+
+/**
+ * Contract fixture: state in memory, a fake OpenTofu writing to the same store, and the API
+ * answering for the account, the Object Storage catalog and the subscriptions it has applied.
+ * The sample is an Object Storage subscription; moving it to another cluster recreates it,
+ * which is the destructive change.
+ */
+runAdapterContract('VultrAdapter', () => {
+  const store = new MemoryStateStore();
+  const api = fakeVultr({
+    '/account': { account: { name: 'Acme Ltda' } },
+    '/object-storage/clusters': { clusters: [{ id: 9, region: 'ewr', hostname: 'ewr2.vultrobjects.com', deploy: 'yes' }, { id: 11, region: 'ewr', hostname: 'ewr1.vultrobjects.com', deploy: 'yes' }] },
+    '/object-storage/clusters/9/tiers': { tiers: [{ id: 5, slug: 'tier_standard', price: 18 }] },
+    '/object-storage/clusters/11/tiers': { tiers: [{ id: 5, slug: 'tier_standard', price: 20 }] },
+    '/object-storage/os-files': () => (tofu.isLive('id', 'os-files') ? { object_storage: { id: 'os-files', status: 'active' } } : 404),
+  });
+  const tofu = new FakeTofu({
+    state: store,
+    outputs: (inputs) => ({
+      kind: 'object-storage',
+      id: 'os-files',
+      bucket: String(inputs.name),
+      cluster_id: Number(inputs.cluster_id),
+      tier_id: Number(inputs.tier_id),
+      endpoint: inputs.cluster_id === 9 ? 'https://ewr2.vultrobjects.com' : 'https://ewr1.vultrobjects.com',
+      secret_ref: 'vultr-objstore://os-files',
+    }),
+    replaceOn: ['cluster_id'],
+  });
+  const sampleRequest = request({ resourceId: 'files', serviceKind: 'object-storage', capability: 'object-storage', name: 'ork-acme-prod-files', spec: { versioning: true }, dependencyOutputs: {} });
+  return {
+    adapter: new TestAdapter({ resolveSecret: async () => SECRET, fetch: api.fetch, runner: tofu.runner }, store),
+    context: ctx,
+    sampleRequest,
+    secrets: ['vk-secret', 'sk-state'],
+    replacingRequest: { ...sampleRequest, spec: { versioning: true, providerOverrides: { vultr: { clusterId: 11, tierId: 5 } } }, idempotencyKey: 'k2' },
+  };
 });

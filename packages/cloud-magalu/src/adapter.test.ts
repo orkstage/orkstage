@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CloudTarget, ProviderContext, ResourceRequest } from '@orkstage/cloud-core';
-import { stateKeyFor, type StateStore } from '@orkstage/cloud-tofu';
+import { runAdapterContract } from '@orkstage/cloud-core/testing';
+import { stateKeyFor, type OpenTofuAdapterOptions } from '@orkstage/cloud-tofu';
+import { FakeTofu, MemoryStateStore } from '@orkstage/cloud-tofu/testing';
 import type { TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
 import { MagaluAdapter } from './adapter.js';
@@ -9,23 +11,14 @@ import { moduleCall } from './stacks.js';
 
 const SECRET = { apiKey: 'api-key-value', stateAccessKeyId: 'key-pair-id', stateSecretAccessKey: 'key-pair-secret' };
 
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
-
+/** Same adapter with state kept in memory instead of Object Storage (the S3 SDK does not use fetch). */
 class TestAdapter extends MagaluAdapter {
-  readonly store = new MemoryStore();
+  constructor(
+    opts: OpenTofuAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   protected override stateStore() {
     return this.store;
   }
@@ -253,4 +246,32 @@ describe('readSecret', () => {
     await expect(a.readSecret(ctx, 'mgc-db://ork-acme-prod-db/other')).rejects.toMatchObject({ code: 'MAGALU_SECRET_NOT_FOUND' });
     await expect(a.readSecret(ctx, 'arn:aws:secretsmanager:x')).rejects.toMatchObject({ code: 'MAGALU_SECRET_REF_INVALID' });
   });
+});
+
+/**
+ * Contract fixture: state in memory, a fake OpenTofu writing to the same store, and the regional
+ * API answering for the VPCs it has applied. There is no replacing request: a VPC takes only its
+ * name and a CIDR derived from it, a bucket only versioning, and VM replacements are routine
+ * rollouts on Magalu Cloud, so nothing a request can change is planned as a destructive change.
+ */
+runAdapterContract('MagaluAdapter', () => {
+  const store = new MemoryStateStore();
+  const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    expect((init?.headers as Record<string, string> | undefined)?.['X-API-Key']).toBe(SECRET.apiKey);
+    if (url.pathname === '/br-se1/network/v0/vpcs') return Response.json({ vpcs: [{ id: 'vpc-default', tenant_id: 'tenant-1' }] });
+    const vpc = /^\/br-se1\/network\/v0\/vpcs\/([^/]+)$/.exec(url.pathname)?.[1];
+    if (vpc && tofu.isLive('vpc_id', decodeURIComponent(vpc))) return Response.json({ id: vpc, status: 'created' });
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+  const tofu = new FakeTofu({
+    state: store,
+    outputs: (inputs) => ({ kind: 'network', vpc_id: `vpc-${String(inputs.name)}`, network_id: `vpc-${String(inputs.name)}`, subnet_id: 'sn-1', subnetpool_id: 'sp-1', availability_zone: 'br-se1-a', cidr: String(inputs.cidr), internal_sg_id: 'sg-1' }),
+  });
+  return {
+    adapter: new TestAdapter({ resolveSecret: async () => JSON.stringify(SECRET), fetch: fetchFn, runner: tofu.runner }, store),
+    context: ctx,
+    sampleRequest: request({ resourceId: 'net', serviceKind: 'network', capability: 'vpc', name: 'ork-acme-prod-net', spec: {}, dependencyOutputs: {} }),
+    secrets: [SECRET.apiKey, SECRET.stateSecretAccessKey],
+  };
 });

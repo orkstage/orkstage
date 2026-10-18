@@ -2,30 +2,21 @@
 import { dependencyEnvironment, readCredentialFields, redact, secretEnvironment, ProviderError, type CloudCapability, type CloudTarget, type ProviderContext, type ResourceRequest } from '@orkstage/cloud-core';
 import { TofuError, type TofuRunner } from '@orkstage/iac';
 import { describe, expect, it, vi } from 'vitest';
-import { OpenTofuAdapter, stateKeyFor, type ModuleCall, type RootParts } from './adapter.js';
+import { OpenTofuAdapter, stateKeyFor, type ModuleCall, type OpenTofuAdapterOptions, type RootParts } from './adapter.js';
 import { isDestructivePlan, toProviderError } from './helpers.js';
-import { s3CompatibleBackend, type StateStore } from './state.js';
-
-class MemoryStore implements StateStore {
-  readonly location = 'memory://state';
-  readonly objects = new Map<string, string>();
-  async check() {}
-  async get(key: string) {
-    return this.objects.get(key) ?? null;
-  }
-  async put(key: string, body: string) {
-    this.objects.set(key, body);
-  }
-  async delete(key: string) {
-    this.objects.delete(key);
-  }
-}
+import { s3CompatibleBackend } from './state.js';
+import { FAKE_RESOURCE_ADDRESS, FakeTofu, MemoryStateStore } from './testing.js';
 
 type Creds = { token: string };
 
 class TestAdapter extends OpenTofuAdapter<Creds> {
   readonly provider = 'digitalocean' as const;
-  readonly store = new MemoryStore();
+  constructor(
+    opts: OpenTofuAdapterOptions,
+    readonly store = new MemoryStateStore(),
+  ) {
+    super(opts);
+  }
   capabilities(): CloudCapability[] {
     return [];
   }
@@ -154,6 +145,36 @@ describe('OpenTofuAdapter', () => {
     expect(good).toMatchObject({ ok: true, identity: 'team-1' });
     const noRef = await a.validateTarget({ ...ctx, target: { ...target, credentialRef: undefined } });
     expect(noRef.checks[0]).toMatchObject({ name: 'Credentials', status: 'error' });
+  });
+});
+
+describe('FakeTofu', () => {
+  it('keeps state where the backend points, so repeats change nothing and destroy empties it', async () => {
+    const store = new MemoryStateStore();
+    const tofu = new FakeTofu({ state: store, outputs: (inputs) => ({ kind: 'object-storage', bucket: String(inputs.name) }), replaceOn: ['region'] });
+    const a = new TestAdapter({ resolveSecret: async () => 'tok', runner: tofu.runner }, store);
+    const first = await a.ensureResource(ctx, req());
+    expect(first).toEqual({ providerResourceId: 'ork-acme-prod-files', outputs: { kind: 'object-storage', bucket: 'ork-acme-prod-files' }, unchanged: false });
+    expect((await a.ensureResource(ctx, req())).unchanged).toBe(true);
+    expect(tofu.isLive('bucket', 'ork-acme-prod-files')).toBe(true);
+    expect((await a.planResource(ctx, req())).actions).toEqual([]);
+
+    const id = { resourceId: 'files', serviceKind: 'object-storage', capability: 'spaces', name: 'ork-acme-prod-files' };
+    await a.deleteResource(ctx, id);
+    expect(await a.getResource(ctx, id)).toEqual({ exists: false, outputs: {} });
+    expect(JSON.parse(store.objects.get(stateKeyFor('ork-acme-prod-files'))!)).toMatchObject({ resources: [] });
+    expect(tofu.liveOutputs()).toEqual([]);
+    expect(tofu.commands.map((c) => c.command)).toEqual(['apply', 'apply', 'plan', 'destroy']);
+    expect(tofu.commands[0]!.env).toEqual({ DIGITALOCEAN_TOKEN: 'tok' });
+  });
+
+  it('plans a replacement only for the listed inputs', async () => {
+    const store = new MemoryStateStore();
+    const tofu = new FakeTofu({ state: store, outputs: () => ({ bucket: 'b' }), replaceOn: ['region'] });
+    const stack = (inputs: Record<string, unknown>) => ({ stateKey: 's', env: {}, config: { terraform: { backend: { s3: { key: 'k' } } }, module: { resource: { source: '/m', ...inputs } } } });
+    await tofu.apply(stack({ region: 'nyc3', versioning: false }));
+    expect(await tofu.plan(stack({ region: 'nyc3', versioning: true }))).toEqual({ changes: { add: 0, change: 1, remove: 0 }, actions: [{ address: FAKE_RESOURCE_ADDRESS, action: 'update' }] });
+    expect(await tofu.plan(stack({ region: 'ams3', versioning: false }))).toEqual({ changes: { add: 1, change: 0, remove: 1 }, actions: [{ address: FAKE_RESOURCE_ADDRESS, action: 'replace' }] });
   });
 });
 
