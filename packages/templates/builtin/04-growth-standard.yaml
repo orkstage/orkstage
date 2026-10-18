@@ -2,14 +2,16 @@ apiVersion: platform/v1
 kind: EnvironmentTemplate
 metadata:
   name: growth-standard
-  version: 1.0.0
+  version: 1.1.0
   displayName: Growth standard
   description: Higher resilience and performance — multiple replicas, autoscaling, zone-redundant database.
   tags: [growth]
 spec:
   placements:
     - name: primary
-      providers: [aws, azure, gcp, mock]
+      # AWS only: Azure and Google Cloud offer no registry, queue or DNS through OrkStage yet, and no
+      # multi zone network. The portable-starter template runs on every infrastructure provider.
+      providers: [aws, mock]
   resources:
     - id: network
       type: network
@@ -19,7 +21,6 @@ spec:
       type: container-registry
     - id: api
       type: compute.container-service
-      implementation: ecs-fargate
       image: catalog://sample-api
       replicas: 2
       cpu: 1
@@ -30,7 +31,6 @@ spec:
       autoscaling: { minReplicas: 2, maxReplicas: 4, targetCpuPercent: 60 }
     - id: worker
       type: compute.container-service
-      implementation: ecs-fargate
       image: catalog://sample-worker
       replicas: 2
       cpu: 0.5

@@ -2,14 +2,16 @@ apiVersion: platform/v1
 kind: EnvironmentTemplate
 metadata:
   name: starter-standard
-  version: 1.0.0
+  version: 1.1.0
   displayName: Starter standard
   description: Balanced production environment with a dedicated network, managed Postgres, cache and queue.
   tags: [starter]
 spec:
   placements:
     - name: primary
-      providers: [aws, azure, gcp, mock]
+      # AWS only: Azure and Google Cloud offer no registry, queue or DNS through OrkStage yet, and no
+      # multi zone network. The portable-starter template runs on every infrastructure provider.
+      providers: [aws, mock]
   variables:
     - name: apiReplicas
       type: number
@@ -30,7 +32,6 @@ spec:
       type: container-registry
     - id: api
       type: compute.container-service
-      implementation: ecs-fargate
       image: catalog://sample-api
       replicas: 1
       cpu: 0.5
@@ -40,7 +41,6 @@ spec:
       healthCheckPath: /health
     - id: worker
       type: compute.container-service
-      implementation: ecs-fargate
       image: catalog://sample-worker
       cpu: 0.25
       memoryMiB: 512

@@ -2,7 +2,7 @@ apiVersion: platform/v1
 kind: EnvironmentTemplate
 metadata:
   name: web-platforms
-  version: 1.0.0
+  version: 1.1.0
   displayName: Web app on managed platforms
   description: >
     A frontend on Vercel or Render, PostgreSQL on Supabase or Render, and files in an object
@@ -20,7 +20,8 @@ spec:
       providers: [supabase, render, aws, gcp, azure, mock]
     - name: files
       description: Uploads and static files.
-      providers: [aws, gcp, azure, supabase, digitalocean, mock]
+      # Supabase Storage has no versioning, which the files bucket asks for.
+      providers: [aws, gcp, azure, digitalocean, mock]
   variables:
     - name: databaseSize
       type: string

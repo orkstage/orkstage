@@ -167,6 +167,11 @@ export const validateTemplateSchema = z.object({
   /** Also check this tenant's limits and features (ADR 0007). */
   tenantId: uuid.optional(),
 });
+/** Replaces the source of a draft version (open item 13); published versions never change. */
+export const updateDraftSchema = z.object({ source: z.string().min(1).max(200_000) }).strict();
+
+export const deprecateVersionSchema = z.object({ note: z.string().trim().max(300).optional() }).strict();
+
 export const cloneTemplateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]{1,62}$/),
   displayName: z.string().min(2).max(80),

@@ -200,9 +200,14 @@ model TemplateVersion {
   validation    Json?
   publishedAt   DateTime?             @db.Timestamptz(3)
   publishedById String?               @db.Uuid
+  /// Deprecated versions keep their instances running; new instances and upgrades cannot use them.
+  deprecatedAt  DateTime?             @db.Timestamptz(3)
+  deprecationNote String?
   createdAt     DateTime              @default(now()) @db.Timestamptz(3)
 
   template  Template   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  // Plus a trigger in SQL (migration 20261018110000): the source and document of a version that
+  // is not a draft never change.
   instances Instance[]
 
   @@unique([templateId, version])
