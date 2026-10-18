@@ -92,6 +92,32 @@ export class InstancesController {
     return page(rows, q.limit, (r) => this.toDto(r, simulated.get(r.id) ?? false));
   }
 
+  /**
+   * The plan of an instance before it exists (open item 14): resolved resources, policies, cost
+   * and connectivity for the wizard's review step. Nothing is saved and no cloud is called.
+   */
+  @Scope('instances:read')
+  @Post('preview')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiZodBody(createInstanceSchema)
+  async previewNew(@CurrentPrincipal() p: RequestPrincipal, @ZodBody(createInstanceSchema) body: z.infer<typeof createInstanceSchema>) {
+    authorize(p, 'create', 'Instance', { tenantId: body.tenantId });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: body.tenantId } });
+    if (!tenant) throw notFound('Tenant');
+    const version = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
+    if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
+    const { bindings } = await this.compiler.withProfileBindings({
+      tenantId: tenant.id,
+      environment: body.environment,
+      templateVersionId: version.id,
+      bindings: body.bindings,
+      profileId: body.profileId,
+    });
+    const resolved = await this.compiler.compile({ ...body, bindings, tenantId: tenant.id, instanceId: randomUUID(), instanceSlug: body.slug });
+    return { ...this.compiler.toPreview(resolved, [], body.name), bindings };
+  }
+
   @Scope('instances:write')
   @Post()
   @ApiZodBody(createInstanceSchema)
