@@ -132,7 +132,9 @@ export function webhookBody(format: WebhookFormat, payload: unknown, consoleUrl:
   const data = ((payload as { data?: Record<string, unknown> })?.data ?? {}) as { title?: unknown; body?: unknown; link?: unknown };
   const title = String(data.title ?? (payload as { type?: string })?.type ?? 'OrkStage');
   const text = String(data.body ?? '');
-  const link = typeof data.link === 'string' && data.link ? `${consoleUrl.replace(/\/+$/, '')}${data.link}` : null;
+  let base = consoleUrl;
+  while (base.endsWith('/')) base = base.slice(0, -1);
+  const link = typeof data.link === 'string' && data.link ? `${base}${data.link}` : null;
   if (format === 'SLACK') return { text: `*${title}*\n${text}${link ? `\n<${link}|Open in OrkStage>` : ''}` };
   return { text: `**${title}**\n\n${text}${link ? `\n\n[Open in OrkStage](${link})` : ''}` };
 }
