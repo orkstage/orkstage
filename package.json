@@ -5,7 +5,7 @@
   "description": "Multi-cloud instance management platform (control plane)",
   "packageManager": "pnpm@12.5.1",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.22.1"
   },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=4 run build",
