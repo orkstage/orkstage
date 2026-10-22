@@ -4,7 +4,7 @@
 
 # Pinned to a Node release with the October 2026 security fixes (Brotli, TLS hostname checks,
 # dns.resolve, OpenSSL 3.5.9); `apk upgrade` refreshes ca-certificates and the other OS packages.
-FROM mirror.gcr.io/library/node:24.22.1-alpine AS base
+FROM mirror.gcr.io/library/node:26.12.1-alpine AS base
 # openssl: Prisma schema engine (migrations). docker-cli: the worker launches OpenTofu runner containers.
 RUN apk upgrade --no-cache  && apk add --no-cache openssl docker-cli \
  && npm install -g pnpm@12.5.1 \
