@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",
-    "prisma": "7.10.0"
+    "prisma": "7.10.1"
   },
   "files": [
     "dist",
