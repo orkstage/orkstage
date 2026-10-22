@@ -11,7 +11,7 @@ const base = {
 describe('config', () => {
   it('applies defaults', () => {
     const c = loadConfig(base);
-    expect(c.TOFU_IMAGE).toBe('ghcr.io/opentofu/opentofu:1.12.7');
+    expect(c.TOFU_IMAGE).toBe('ghcr.io/opentofu/opentofu:1.12.9');
     expect(c.AUTH_DEV_LOGIN_ENABLED).toBe(false);
   });
 

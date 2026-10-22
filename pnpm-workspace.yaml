@@ -15,5 +15,7 @@ minimumReleaseAge: 1440
 # Security floors for transitive dependencies of the Prisma CLI (GHSA-ggr8-5vv4-36mx,
 # GHSA-3f6p-5ww8-9rcr). Remove once Prisma ships them.
 overrides:
+  # GHSA for launch-editor in vite 8.3.0 to 8.3.2 (Windows path check bypass), through vitest.
+  vite: '^8.3.3'
   deepmerge-ts: '^8.0.2'
   mysql2: '^3.22.0'

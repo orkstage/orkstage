@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 export interface TofuRunnerOptions {
-  /** Pinned OpenTofu image, e.g. ghcr.io/opentofu/opentofu:1.12.7. */
+  /** Pinned OpenTofu image, e.g. ghcr.io/opentofu/opentofu:1.12.9. */
   image: string;
   /**
    * Host directory holding the module library, mounted read-only at /modules. Omit when the

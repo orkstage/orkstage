@@ -2,9 +2,11 @@
 # One image for the control plane (api, worker, migrate); each Compose service picks
 # its command. Built from the repository root: docker build -f infra/docker/platform.Dockerfile .
 
-FROM mirror.gcr.io/library/node:24-alpine AS base
+# Pinned to a Node release with the October 2026 security fixes (Brotli, TLS hostname checks,
+# dns.resolve, OpenSSL 3.5.9); `apk upgrade` refreshes ca-certificates and the other OS packages.
+FROM mirror.gcr.io/library/node:24.22.1-alpine AS base
 # openssl: Prisma schema engine (migrations). docker-cli: the worker launches OpenTofu runner containers.
-RUN apk add --no-cache openssl docker-cli \
+RUN apk upgrade --no-cache  && apk add --no-cache openssl docker-cli \
  && npm install -g pnpm@12.5.1 \
  && addgroup -S orkstage && adduser -S orkstage -G orkstage
 WORKDIR /repo
