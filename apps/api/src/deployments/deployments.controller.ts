@@ -7,7 +7,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { conflict, notFound } from '../common/errors.js';
-import { iso, page } from '../common/pagination.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
 import { ZodQuery } from '../common/validation.js';
 import { PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
@@ -32,9 +32,8 @@ export class DeploymentsController {
         ...(q.instanceId ? { instanceId: q.instanceId } : {}),
         ...(q.status ? { status: q.status as never } : {}),
       },
-      orderBy: { id: 'desc' },
-      take: q.limit + 1,
-      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      orderBy: listOrder(q.sort, { createdAt: 'id' }, '-createdAt'),
+      ...pageArgs(q),
     });
     return page(rows, q.limit, toDeploymentSummary);
   }

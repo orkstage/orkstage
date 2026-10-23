@@ -23,7 +23,7 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { AppError, conflict, notFound, unprocessable } from '../common/errors.js';
-import { iso, page } from '../common/pagination.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { LauncherService, toDeploymentSummary } from '../deployments/launcher.service.js';
 import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
@@ -87,9 +87,8 @@ export class InstancesController {
     const rows = await this.prisma.instance.findMany({
       where: { ...scopedToTenant(p, q.tenantId), ...(q.status ? { status: q.status as never } : {}) },
       include: instanceInclude,
-      orderBy: { id: 'desc' },
-      take: q.limit + 1,
-      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      orderBy: listOrder(q.sort, { createdAt: 'id', name: 'name' }, '-createdAt'),
+      ...pageArgs(q),
     });
     const simulated = await this.simulatedMap(rows);
     return page(rows, q.limit, (r) => this.toDto(r, simulated.get(r.id) ?? false));

@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {
-  cloneTemplateSchema,
-  createTemplateSchema,
-  deprecateVersionSchema,
-  updateDraftSchema,
-  validateTemplateSchema,
-  type TemplateDto,
-  type TemplateVersionDto,
-} from '@orkstage/contracts';
+import { cloneTemplateSchema, createTemplateSchema, deprecateVersionSchema, type ListQuery, listQuerySchema, type Page, type TemplateDto, type TemplateVersionDto, updateDraftSchema, validateTemplateSchema } from '@orkstage/contracts';
 import { Prisma, type PrismaClient, type TemplateVersion } from '@orkstage/database';
 import { parseTemplate, type EnvironmentTemplate } from '@orkstage/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
@@ -18,8 +10,8 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
 import { conflict, notFound, unprocessable } from '../common/errors.js';
-import { iso } from '../common/pagination.js';
-import { ApiZodBody, ZodBody } from '../common/validation.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { PRISMA } from '../infra/infra.module.js';
 import { TemplateValidationService } from './template-validation.service.js';
 import type { RequestPrincipal } from '../types.js';
@@ -47,13 +39,14 @@ export class TemplatesController {
 
   @Scope('templates:read')
   @Get()
-  async list(@CurrentPrincipal() p: RequestPrincipal): Promise<TemplateDto[]> {
+  async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery): Promise<Page<TemplateDto>> {
     authorize(p, 'read', 'Template');
     const templates = await this.prisma.template.findMany({
       include: { versions: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 1 } },
-      orderBy: { name: 'asc' },
+      orderBy: listOrder(q.sort, { name: 'name', createdAt: 'createdAt' }, 'name'),
+      ...pageArgs(q),
     });
-    return templates.map((t) => ({
+    return page(templates, q.limit, (t) => ({
       id: t.id,
       name: t.name,
       displayName: t.displayName,

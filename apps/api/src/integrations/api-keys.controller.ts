@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { createApiKeySchema, type ApiKeyDto } from '@orkstage/contracts';
+import { type ApiKeyDto, createApiKeySchema, type ListQuery, listQuerySchema, type Page } from '@orkstage/contracts';
 import type { ApiKey, PrismaClient } from '@orkstage/database';
 import { sha256 } from '@orkstage/domain';
-import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { randomBytes } from 'node:crypto';
@@ -10,8 +10,8 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
-import { iso } from '../common/pagination.js';
-import { ApiZodBody, ZodBody } from '../common/validation.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 
@@ -43,7 +43,8 @@ export class ApiKeysController {
   ) {}
 
   @Get()
-  async list(@CurrentPrincipal() p: RequestPrincipal, @Query('tenantId') tenantId?: string): Promise<ApiKeyDto[]> {
+  async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery): Promise<Page<ApiKeyDto>> {
+    const tenantId = q.tenantId;
     // With a tenant filter: CASL check. Without: staff see all, customers only tenants they administer.
     if (tenantId) authorize(p, 'read', 'ApiKey', { tenantId });
     const rows = await this.prisma.apiKey.findMany({
@@ -52,9 +53,10 @@ export class ApiKeysController {
         : isPlatformStaff(p)
           ? {}
           : { tenantId: { in: p.memberships.filter((m) => ['CustomerOwner', 'CustomerAdmin'].includes(m.role)).map((m) => m.tenantId) } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: listOrder(q.sort, { createdAt: 'createdAt', name: 'name' }, '-createdAt'),
+      ...pageArgs(q),
     });
-    return rows.map(toApiKeyDto);
+    return page(rows, q.limit, toApiKeyDto);
   }
 
   @Post()

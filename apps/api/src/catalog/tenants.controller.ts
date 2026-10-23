@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { createTenantSchema, updateTenantSchema, type TenantDto } from '@orkstage/contracts';
+import { createTenantSchema, type ListQuery, listQuerySchema, type Page, type TenantDto, updateTenantSchema } from '@orkstage/contracts';
 import type { PrismaClient } from '@orkstage/database';
 import { readTenantLimits } from '@orkstage/domain';
 import { Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
@@ -8,9 +8,10 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, Scope } from '../common/auth.js';
 import { notFound } from '../common/errors.js';
-import { ApiZodBody, ZodBody } from '../common/validation.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
+import { listOrder, page, pageArgs } from '../common/pagination.js';
 
 @ApiTags('tenants')
 @Controller()
@@ -22,13 +23,14 @@ export class TenantsController {
 
   @Scope('instances:read')
   @Get('tenants')
-  async list(@CurrentPrincipal() p: RequestPrincipal): Promise<TenantDto[]> {
+  async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery): Promise<Page<TenantDto>> {
     const tenants = await this.prisma.tenant.findMany({
       where: isPlatformStaff(p) ? {} : { id: { in: p.memberships.map((m) => m.tenantId) } },
       include: { _count: { select: { instances: { where: { status: { not: 'DESTROYED' } } } } } },
-      orderBy: { name: 'asc' },
+      orderBy: listOrder(q.sort, { name: 'name', createdAt: 'createdAt' }, 'name'),
+      ...pageArgs(q),
     });
-    return tenants.map((t) => this.toDto(t));
+    return page(tenants, q.limit, (t) => this.toDto(t));
   }
 
   @Post('tenants')

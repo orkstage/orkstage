@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { createWebhookSchema, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@orkstage/contracts';
+import { createWebhookSchema, type ListQuery, listQuerySchema, type Page, updateWebhookSchema, type WebhookDeliveryDto, type WebhookDto } from '@orkstage/contracts';
 import type { PrismaClient, WebhookDelivery, WebhookEndpoint } from '@orkstage/database';
 import { assertSafeWebhookUrl, chatWebhookHostAllowed, randomToken, sendWebhook, type PlatformConfig, type SecretBox, UnsafeWebhookUrlError, webhookBody, type WebhookFormat } from '@orkstage/runtime';
-import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
-import { iso } from '../common/pagination.js';
-import { ApiZodBody, ZodBody } from '../common/validation.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { CONFIG, PRISMA, SECRET_BOX } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 
@@ -56,14 +56,16 @@ export class WebhooksController {
 
   @Scope('webhooks:manage')
   @Get()
-  async list(@CurrentPrincipal() p: RequestPrincipal, @Query('tenantId') tenantId?: string): Promise<WebhookDto[]> {
+  async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery): Promise<Page<WebhookDto>> {
+    const tenantId = q.tenantId;
     if (tenantId) authorize(p, 'read', 'Webhook', { tenantId });
     const adminTenants = p.memberships.filter((m) => ['CustomerOwner', 'CustomerAdmin'].includes(m.role)).map((m) => m.tenantId);
     const rows = await this.prisma.webhookEndpoint.findMany({
       where: tenantId ? { tenantId } : isPlatformStaff(p) ? {} : { tenantId: { in: adminTenants } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: listOrder(q.sort, { createdAt: 'createdAt' }, '-createdAt'),
+      ...pageArgs(q),
     });
-    return rows.map(toDto);
+    return page(rows, q.limit, toDto);
   }
 
   @Scope('webhooks:manage')

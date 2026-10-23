@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {
-  type ApplicationDto,
-  type CapabilityDto,
-  type CloudTargetDto,
-  createCloudTargetSchema,
-  fixedConfigKeys,
-  PROVIDER_FORMS,
-  providerConfigIssues,
-  type ProviderDto,
-  updateCloudTargetSchema,
-  validateTargetSchema,
-} from '@orkstage/contracts';
+import { type ApplicationDto, type CapabilityDto, type CloudTargetDto, createCloudTargetSchema, fixedConfigKeys, type ListQuery, listQuerySchema, type Page, PROVIDER_FORMS, providerConfigIssues, type ProviderDto, updateCloudTargetSchema, validateTargetSchema } from '@orkstage/contracts';
 import { PROVIDER_INFO } from '@orkstage/domain';
 import { Prisma, type CloudTarget as CloudTargetRow, type PrismaClient } from '@orkstage/database';
 import { findSecretLikeKeys, toCloudTarget } from '@orkstage/runtime';
@@ -22,8 +11,8 @@ import { AuditService } from '../common/audit.service.js';
 import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, Scope } from '../common/auth.js';
 import { conflict, notFound, unprocessable } from '../common/errors.js';
-import { iso } from '../common/pagination.js';
-import { ApiZodBody, ZodBody } from '../common/validation.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
+import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 
@@ -75,10 +64,10 @@ export class CloudController {
 
   @Scope('instances:read')
   @Get('cloud/targets')
-  async list(@CurrentPrincipal() p: RequestPrincipal): Promise<CloudTargetDto[]> {
+  async list(@CurrentPrincipal() p: RequestPrincipal, @ZodQuery(listQuerySchema) q: ListQuery): Promise<Page<CloudTargetDto>> {
     authorize(p, 'read', 'CloudTarget');
-    const rows = await this.prisma.cloudTarget.findMany({ orderBy: { createdAt: 'asc' } });
-    return rows.map((r) => this.toDto(r));
+    const rows = await this.prisma.cloudTarget.findMany({ orderBy: listOrder(q.sort, { createdAt: 'createdAt', name: 'name' }, 'createdAt'), ...pageArgs(q) });
+    return page(rows, q.limit, (r) => this.toDto(r));
   }
 
   @Scope('targets:manage')

@@ -26,7 +26,9 @@ export const devLoginSchema = z.object({ email: z.email() });
 
 export const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
-  cursor: z.string().optional(),
+  cursor: z.string().max(64).optional(),
+  /** A field the list allows (`name`, `createdAt`), with a leading `-` for descending order. */
+  sort: z.string().regex(/^-?[A-Za-z]{1,40}$/).optional(),
   tenantId: uuid.optional(),
   instanceId: uuid.optional(),
   status: z.string().optional(),

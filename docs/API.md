@@ -15,9 +15,17 @@ package is the source of truth, and this page is the map.
   `x-correlation-id` and `x-request-id` on every response.
 - **Idempotency:** deployments are keyed by tenant, instance and the hash of the desired state.
   While an instance has an active operation, further deploy or destroy requests get
-  `409 INSTANCE_BUSY`, and the worker never creates converged resources again. An
-  `Idempotency-Key` header is accepted and currently ignored.
-- **Pagination:** `?limit=25&cursor=<id>` returns `{ items, nextCursor }`, newest first.
+  `409 INSTANCE_BUSY`, and the worker never creates converged resources again. Any mutating
+  request may carry an `Idempotency-Key` (8 to 200 of `A-Z a-z 0-9 - _ . :`): the first successful
+  response is kept for 24 hours per caller and replayed for a retry of the same request
+  (`idempotent-replayed: true`); the same key for a different request gets
+  `422 IDEMPOTENCY_KEY_REUSED`, and a retry while the first still runs gets
+  `409 IDEMPOTENCY_IN_PROGRESS`. Failed requests keep nothing (`common/idempotency.ts`).
+- **Pagination:** every list takes `?limit=25&cursor=<id>&sort=<field>` and returns
+  `{ items, nextCursor }`; pass `nextCursor` as `cursor` until it is `null`. `sort` names a field
+  the list allows (`name`, `createdAt`), with a leading `-` for descending order; anything else is
+  `400 INVALID_SORT`. Defaults: instances, deployments, incidents, API keys and webhooks newest
+  first; tenants and templates by name; cloud targets oldest first.
 - **Errors:** `{ "error": { code, message, requestId, correlationId, details } }`. No stack traces.
 - **Tenancy:** every read of tenant owned data is filtered by the caller's memberships, and
   every write is checked with CASL on the loaded record. Tenant ids in requests are never trusted
