@@ -20,7 +20,7 @@
     "@orkstage/provisioning": "workspace:*",
     "@orkstage/runtime": "workspace:*",
     "@orkstage/templates": "workspace:*",
-    "bullmq": "6.3.17",
+    "bullmq": "6.3.18",
     "ioredis": "6.0.0",
     "nodemailer": "10.1.7",
     "pino": "10.4.0"
