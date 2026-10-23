@@ -49,7 +49,7 @@
     "@orkstage/cloud-vultr": "workspace:*",
     "@orkstage/domain": "workspace:*",
     "@orkstage/iac": "workspace:*",
-    "@prisma/instrumentation": "7.10.0",
+    "@prisma/instrumentation": "7.10.1",
     "ioredis": "6.0.0",
     "pino": "10.4.0",
     "zod": "4.6.5"
