@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@casl/ability": "7.0.1"
+    "@casl/ability": "7.0.2"
   },
   "files": [
     "dist"
