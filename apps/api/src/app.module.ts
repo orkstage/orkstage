@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { loggerOptions, RedisRateLimitStorage, type PlatformConfig } from '@orkstage/runtime';
 import { Module, type DynamicModule, type Type } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import type { Redis } from 'ioredis';
 import type { IncomingMessage } from 'node:http';
@@ -11,6 +11,7 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { AuthGuard, CsrfGuard } from './common/auth.js';
 import { CommonModule } from './common/common.module.js';
 import { ErrorFilter } from './common/errors.js';
+import { IdempotencyInterceptor } from './common/idempotency.js';
 import { ClientThrottlerGuard } from './common/throttler.guard.js';
 import { CONFIG, InfraModule, REDIS } from './infra/infra.module.js';
 import { InstancesModule } from './instances/instances.module.js';
@@ -63,6 +64,7 @@ export class AppModule {
         { provide: APP_GUARD, useClass: CsrfGuard },
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_FILTER, useClass: ErrorFilter },
+        { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
       ],
     };
   }

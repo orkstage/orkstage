@@ -8,7 +8,7 @@ import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { notFound, unprocessable } from '../common/errors.js';
-import { iso, page } from '../common/pagination.js';
+import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import { PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
@@ -47,9 +47,8 @@ export class IncidentsController {
         ...(q.instanceId ? { instanceId: q.instanceId } : {}),
         ...(q.status === 'open' ? { status: { not: 'RESOLVED' } } : q.status ? { status: q.status as never } : {}),
       },
-      orderBy: { id: 'desc' },
-      take: q.limit + 1,
-      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      orderBy: listOrder(q.sort, { createdAt: 'id' }, '-createdAt'),
+      ...pageArgs(q),
     });
     return page(rows, q.limit, (i) => toIncidentDto(i));
   }
