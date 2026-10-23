@@ -7,6 +7,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { randomUUID } from 'node:crypto';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
+import { isDocsPath, relaxForDocs } from './common/csp.js';
 import { loadEnterpriseModule } from './enterprise.js';
 
 const CORRELATION_ID = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -44,12 +45,17 @@ export async function createApp(config: PlatformConfig): Promise<NestFastifyAppl
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        // Swagger UI needs inline styles/scripts; scoped to the docs route by the UI itself.
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'"],
+        scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:'],
       },
     },
+  });
+  // Swagger UI needs inline styles and scripts: only its pages get them (common/csp.ts).
+  fastify.addHook('onSend', async (req, reply, payload) => {
+    const policy = reply.getHeader('content-security-policy');
+    if (typeof policy === 'string' && isDocsPath(req.url)) reply.header('content-security-policy', relaxForDocs(policy));
+    return payload;
   });
   // The web console reaches the API through its own origin (Next.js rewrites), so CORS stays closed.
   return app;
