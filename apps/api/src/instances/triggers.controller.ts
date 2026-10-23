@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { listQuerySchema, runTriggerSchema, type ListQuery, type TriggerDto, type TriggerRunDto } from '@orkstage/contracts';
 import type { PrismaClient, TriggerRun } from '@orkstage/database';
-import { resolveTriggerParams, triggerAllows } from '@orkstage/provisioning';
+import { minimumRoleFor, readTenantLimits, roleAtLeast, stricterRole } from '@orkstage/domain';
+import { resolveAction, resolveTriggerParams, scaleRange, toProviderParams, triggerAllows, withProviderParams } from '@orkstage/provisioning';
 import { environmentTemplate, type TemplateTrigger } from '@orkstage/templates';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -9,7 +10,7 @@ import { Throttle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, Scope, tenantScope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, Scope, tenantScope } from '../common/auth.js';
 import { AppError, notFound, unprocessable } from '../common/errors.js';
 import { page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -63,8 +64,10 @@ export class TriggersController {
     return triggers.map((t) => {
       const row = resources.find((r) => r.resourceId === t.resource);
       const adapter = row && this.adapters.registry.has(row.provider) ? this.adapters.registry.get(row.provider) : undefined;
-      const descriptor = row ? adapter?.actions?.(row.capability).find((a) => a.name === t.action) : undefined;
-      const reason = !row ? 'The resource is not deployed.' : !descriptor ? `${row.provider} does not offer "${t.action}" for ${row.capability}.` : null;
+      const resolved = row && adapter?.actions ? resolveAction(t.action, row.type, row.provider, adapter.actions(row.capability)) : undefined;
+      const reason = !row ? 'The resource is not deployed.' : !resolved ? `${row.provider} does not offer "${t.action}" for ${row.capability}.` : null;
+      // Parameters under the names the template uses (catalog names for a catalog action).
+      const back = Object.fromEntries(Object.entries(resolved?.params ?? {}).map(([catalog, own]) => [own, catalog]));
       const last = runs.find((r) => r.trigger === t.name);
       return {
         name: t.name,
@@ -76,8 +79,10 @@ export class TriggersController {
         on: { manual: t.on.manual, webhook: t.on.webhook, schedule: t.on.schedule ?? null },
         available: reason === null,
         unavailableReason: reason,
-        actionParams: descriptor?.params ?? [],
+        actionParams: (resolved?.descriptor.params ?? []).map((param) => ({ ...param, name: back[param.name] ?? param.name })),
         provider: row?.provider ?? null,
+        catalogAction: resolved?.catalog ? { id: resolved.catalog.id, risk: resolved.catalog.risk, reversible: resolved.catalog.reversible } : null,
+        requiredRole: stricterRole(minimumRoleFor(resolved?.catalog?.risk), t.role),
         lastRun: last ? toTriggerRunDto(last) : null,
       };
     });
@@ -122,10 +127,24 @@ export class TriggersController {
     const row = await this.prisma.instanceResource.findUnique({ where: { instanceId_resourceId: { instanceId: id, resourceId: trigger.resource } } });
     if (row?.status !== 'ACTIVE') throw unprocessable('RESOURCE_NOT_DEPLOYED', `Resource "${trigger.resource}" is not deployed.`);
     const adapter = this.adapters.registry.has(row.provider) ? this.adapters.registry.get(row.provider) : undefined;
-    const descriptor = adapter?.actions?.(row.capability).find((a) => a.name === trigger.action);
-    if (!descriptor) throw unprocessable('ACTION_UNAVAILABLE', `${row.provider} does not offer "${trigger.action}" for ${row.capability}.`);
-    const resolved = resolveTriggerParams(trigger, body.params, descriptor);
+    const action = adapter?.actions ? resolveAction(trigger.action, row.type, row.provider, adapter.actions(row.capability)) : undefined;
+    if (!action) throw unprocessable('ACTION_UNAVAILABLE', `${row.provider} does not offer "${trigger.action}" for ${row.capability}.`);
+    // Safe actions need a developer, anything else an admin; the template may ask for more (ADR 0009).
+    const required = stricterRole(minimumRoleFor(action.catalog?.risk), trigger.role);
+    if (!isPlatformStaff(p) && !p.memberships.some((m) => m.tenantId === instance.tenantId && roleAtLeast(m.role, required))) {
+      throw new AppError(403, 'ACTION_ROLE_REQUIRED', `Running "${name}" needs the ${required} role or higher (${action.catalog ? `${action.catalog.risk} action` : 'provider specific action'}).`);
+    }
+    const resolved = resolveTriggerParams(withProviderParams(trigger, action.params), toProviderParams(body.params, action.params), action.descriptor);
     if (!resolved.ok) throw unprocessable('INVALID_TRIGGER_PARAMS', resolved.errors[0]!, { errors: resolved.errors });
+    if (action.catalog?.id === 'service.scale') {
+      const replicas = resolved.params[action.params.replicas ?? 'replicas'];
+      const resource = environmentTemplate.safeParse(instance.templateVersion.document).data?.spec.resources.find((r) => r.id === trigger.resource);
+      const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: instance.tenantId }, select: { limits: true } });
+      const range = scaleRange(resource, readTenantLimits(tenant.limits).maxReplicasPerService);
+      if (typeof replicas !== 'number' || !Number.isInteger(replicas) || replicas < range.min || replicas > range.max) {
+        throw unprocessable('INVALID_TRIGGER_PARAMS', `replicas must be a whole number from ${range.min} to ${range.max}.`);
+      }
+    }
 
     const run = await this.prisma.triggerRun.create({
       data: {

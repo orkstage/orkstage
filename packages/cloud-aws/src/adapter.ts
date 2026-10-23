@@ -10,6 +10,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { ACMClient } from '@aws-sdk/client-acm';
+import { ECSClient } from '@aws-sdk/client-ecs';
 import { RDSClient } from '@aws-sdk/client-rds';
 import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { IAMClient } from '@aws-sdk/client-iam';
@@ -42,6 +43,7 @@ import {
   type ValidateTargetOptions,
 } from '@orkstage/cloud-core';
 import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
+import { ECS_ACTIONS, RDS_OPERATIONS, rebootDatabase, restartService, scaleService, snapshotDatabase } from './actions.js';
 import { readBackups, RDS_ACTIONS, restoreToPointInTime } from './backups.js';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { readCertificates } from './certificates.js';
@@ -273,19 +275,37 @@ export class AwsAdapter implements CloudProviderAdapter {
   }
 
   actions(capability: string): ResourceActionDescriptor[] {
-    return capability === 'rds-postgres' ? RDS_ACTIONS : [];
+    if (capability === 'rds-postgres') return [...RDS_ACTIONS, ...RDS_OPERATIONS];
+    if (capability === 'ecs-fargate' || capability === 'ecs-ec2') return ECS_ACTIONS;
+    return [];
   }
 
-  /** Provider actions for triggers: point in time restore of an RDS database to a new instance. */
+  /**
+   * Provider actions for triggers (ADR 0009): restart and scale of ECS services; reboot, snapshot and
+   * point in time restore (to a new instance) of RDS databases.
+   */
   async runAction(rawCtx: ProviderContext, res: ResourceIdentifier, request: ResourceActionRequest): Promise<ResourceActionResult> {
     const ctx = this.effective(rawCtx);
-    if (res.capability !== 'rds-postgres' || request.action !== 'restore') {
+    if (!this.actions(res.capability).some((a) => a.name === request.action)) {
       throw new ProviderError('AWS_ACTION_UNKNOWN', `${request.action} is not available on ${res.capability}.`, 'VALIDATION_ERROR', 'aws');
     }
     const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
-    if (!outputs.identifier) throw new ProviderError('AWS_DB_UNKNOWN', `${res.resourceId} has no RDS identifier yet.`, 'VALIDATION_ERROR', 'aws');
-    const at = typeof request.params.pointInTime === 'string' && request.params.pointInTime ? request.params.pointInTime : undefined;
-    return restoreToPointInTime(new RDSClient(await this.creds.clientConfig(ctx)), String(outputs.identifier), at, ctx.signal);
+    if (res.capability === 'rds-postgres') {
+      if (!outputs.identifier) throw new ProviderError('AWS_DB_UNKNOWN', `${res.resourceId} has no RDS identifier yet.`, 'VALIDATION_ERROR', 'aws');
+      const rds = new RDSClient(await this.creds.clientConfig(ctx));
+      const identifier = String(outputs.identifier);
+      if (request.action === 'database.reboot') return rebootDatabase(rds, identifier, ctx.signal);
+      if (request.action === 'database.snapshot') return snapshotDatabase(rds, identifier, ctx.signal);
+      const at = typeof request.params.pointInTime === 'string' && request.params.pointInTime ? request.params.pointInTime : undefined;
+      return restoreToPointInTime(rds, identifier, at, ctx.signal);
+    }
+    if (!outputs.cluster_name || !outputs.service_name) {
+      throw new ProviderError('AWS_SERVICE_UNKNOWN', `${res.resourceId} has no ECS cluster or service recorded yet.`, 'VALIDATION_ERROR', 'aws');
+    }
+    const ecs = new ECSClient(await this.creds.clientConfig(ctx));
+    const [cluster, service] = [String(outputs.cluster_name), String(outputs.service_name)];
+    if (request.action === 'service.scale') return scaleService(ecs, cluster, service, Number(request.params.replicas), ctx.signal);
+    return restartService(ecs, cluster, service, ctx.signal);
   }
 
   /** ACM certificates of a `dns` resource: the platform subdomain and the verified custom domains. */

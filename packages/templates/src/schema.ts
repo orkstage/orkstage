@@ -210,8 +210,13 @@ export const templateTrigger = z.object({
   name: id,
   description: z.string().max(300).optional(),
   resource: id,
-  /** Action offered by the resource's provider, e.g. `redeploy`. Checked at deploy time. */
-  action: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
+  /**
+   * A catalog action (`service.restart`, ADR 0009) or one the resource's provider offers by its own
+   * name (`redeploy`). Checked when the trigger runs.
+   */
+  action: z.string().regex(/^[a-z][a-z0-9-]{1,40}(\.[a-z][a-zA-Z0-9-]{1,40})?$/),
+  /** Raises the role needed to run it above the action's own minimum (never lowers it). */
+  role: z.enum(['CustomerDeveloper', 'CustomerAdmin', 'CustomerOwner']).optional(),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
   overridable: z.array(z.string()).default([]),
   on: z
