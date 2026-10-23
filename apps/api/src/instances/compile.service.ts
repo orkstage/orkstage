@@ -18,6 +18,7 @@ import { applyVariables, environmentTemplate, type VariableValues } from '@orkst
 import { Inject, Injectable } from '@nestjs/common';
 import { unprocessable } from '../common/errors.js';
 import { FeatureFlagsService } from '../common/feature-flags.service.js';
+import { LivePrices } from './live-prices.service.js';
 import { Adapters, PRISMA } from '../infra/infra.module.js';
 import { bindFromProfile, defaultProfile, serves, visibleTo } from './profiles.js';
 
@@ -44,6 +45,7 @@ export class CompileService {
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     private readonly adapters: Adapters,
     private readonly flags: FeatureFlagsService,
+    private readonly livePrices: LivePrices,
   ) {}
 
   async compile(req: CompileRequest): Promise<ResolvedInfrastructure> {
@@ -103,6 +105,8 @@ export class CompileService {
         providerEnabled: (provider) => isProviderEnabled(flags, provider),
         customDomains,
         customCertificatesIssued,
+        // Live list prices first (ADR 0010); the bundled tables answer whatever they do not.
+        livePricing: await this.livePrices.forBindings(bindings),
       },
       this.adapters.registry,
     );

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { CloudTarget } from '@orkstage/cloud-core';
+import type { CapabilityPricing, CloudCapability, CloudTarget } from '@orkstage/cloud-core';
 import type { CloudProvider, TenantFeatures, TenantLimits } from '@orkstage/domain';
 import type { ConnectivityRequirement, EnvironmentTemplate, ValidationIssue } from '@orkstage/templates';
 
@@ -31,6 +31,11 @@ export interface CompileInput {
   providerEnabled?: (provider: CloudProvider) => boolean;
   /** Verified custom hostnames by logical resource id (`dns` or `web.frontend`), open item 9. */
   customDomains?: Record<string, string[]>;
+  /**
+   * Live prices (ADR 0010), for example from the AWS Pricing API, looked up before compiling. When
+   * it answers nothing, the capability's bundled table for the region applies.
+   */
+  livePricing?: (capability: CloudCapability, region: string) => LivePricing | undefined;
   /** Resources whose custom domain certificate was seen issued, so the listener can use it. */
   customCertificatesIssued?: string[];
 }
@@ -121,7 +126,10 @@ export interface CostLine {
   category: 'compute' | 'database' | 'cache' | 'storage' | 'network' | 'messaging' | 'other';
   provider: string;
   monthly: number | null;
+  /** Where the price comes from, with the region it applies to. */
   source: string;
+  /** Date of the price data, when known (ADR 0010). */
+  asOf?: string | null;
 }
 
 export interface CostEstimate {
@@ -131,6 +139,8 @@ export interface CostEstimate {
   /** `approximate` when every line priced; `partial` when some lines lack pricing. */
   confidence: 'approximate' | 'partial' | 'unavailable';
   lines: CostLine[];
+  /** Every price source the lines used, with its date (ADR 0010). */
+  sources?: { source: string; asOf: string | null }[];
 }
 
 export interface ResolvedInfrastructure {
@@ -146,4 +156,11 @@ export interface ResolvedInfrastructure {
   cost: CostEstimate;
   desiredStateHash: string;
   valid: boolean;
+}
+
+/** Prices read from a provider's pricing API for one capability and region. */
+export interface LivePricing {
+  pricing: CapabilityPricing;
+  source: string;
+  asOf: string;
 }

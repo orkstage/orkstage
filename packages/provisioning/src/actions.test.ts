@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { ResourceActionDescriptor } from '@orkstage/cloud-core';
+import type { CloudCapability, ResourceActionDescriptor } from '@orkstage/cloud-core';
 import type { TemplateResource, TemplateTrigger } from '@orkstage/templates';
 import { describe, expect, it } from 'vitest';
+import { priceLine, summarizeCost } from './cost.js';
 import { resolveAction, resolveTriggerParams, scaleRange, toProviderParams, withProviderParams } from './triggers.js';
 
 const render: ResourceActionDescriptor[] = [
@@ -47,5 +48,41 @@ describe('scaleRange', () => {
   it('otherwise allows 1 up to the tenant limit', () => {
     expect(scaleRange(service(), 6)).toEqual({ min: 1, max: 6 });
     expect(scaleRange(undefined)).toEqual({ min: 1, max: 100 });
+  });
+});
+
+describe('priceLine (ADR 0010)', () => {
+  const cap = {
+    provider: 'aws',
+    serviceKind: 'compute.container-service',
+    capability: 'ecs-fargate',
+    pricing: {
+      currency: 'USD',
+      baseMonthly: 0,
+      perUnitMonthly: { vcpu: 29.55, memoryGiB: 3.24 },
+      source: 'AWS list prices.',
+      asOf: '2026-10-20',
+      regions: { 'sa-east-1': { perUnitMonthly: { vcpu: 50.81, memoryGiB: 5.55 } } },
+    },
+  } as unknown as CloudCapability;
+  const api = { id: 'api', type: 'compute.container-service', cpu: 1, memoryMiB: 2048, replicas: 2 } as unknown as TemplateResource;
+
+  it('prices a resource in its region and says which table it used', () => {
+    expect(priceLine(api, cap, 'sa-east-1')).toEqual({ monthly: 123.82, source: 'AWS list prices. (sa-east-1)', asOf: '2026-10-20' });
+    expect(priceLine(api, cap, 'eu-north-1')).toEqual({ monthly: 72.06, source: 'AWS list prices. (no table for eu-north-1, default region prices)', asOf: '2026-10-20' });
+  });
+
+  it('prefers live prices, and has no price without pricing', () => {
+    const live = { pricing: { ...cap.pricing!, perUnitMonthly: { vcpu: 30, memoryGiB: 3 } }, source: 'AWS pricing API, us-east-1.', asOf: '2026-10-23' };
+    expect(priceLine(api, cap, 'us-east-1', live)).toEqual({ monthly: 72, source: 'AWS pricing API, us-east-1.', asOf: '2026-10-23' });
+    expect(priceLine(api, { ...cap, pricing: undefined }, 'us-east-1')).toEqual({ monthly: null, source: 'No pricing data', asOf: null });
+  });
+
+  it('lists every source the estimate used, with its date', () => {
+    const lines = [
+      { resourceId: 'a', category: 'compute' as const, provider: 'aws', ...priceLine(api, cap, 'sa-east-1') },
+      { resourceId: 'b', category: 'compute' as const, provider: 'aws', ...priceLine(api, cap, 'sa-east-1') },
+    ];
+    expect(summarizeCost(lines).sources).toEqual([{ source: 'AWS list prices. (sa-east-1)', asOf: '2026-10-20' }]);
   });
 });

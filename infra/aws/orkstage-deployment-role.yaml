@@ -139,6 +139,12 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:s3:::orkstage-tfstate-${AWS::AccountId}-*/*'
                   - !If [HasStateBucketName, !Sub 'arn:${AWS::Partition}:s3:::${StateBucketName}', !Ref 'AWS::NoValue']
                   - !If [HasStateBucketName, !Sub 'arn:${AWS::Partition}:s3:::${StateBucketName}/*', !Ref 'AWS::NoValue']
+              # Cost estimates read current list prices (ADR 0010); the Pricing API has no resource scope.
+              - Sid: Pricing
+                Effect: Allow
+                Action:
+                  - pricing:GetProducts
+                Resource: '*'
               # Task execution and EC2 instance roles for services, limited to OrkStage names.
               - Sid: ServiceRoles
                 Effect: Allow

@@ -1,7 +1,9 @@
 # ADR 0010: Prices from provider pricing APIs, with bundled tables per region
 
 **Status:** accepted on October 23, 2026 (owner decision; orkstage-dev `docs/aws-items.md`, A11).
-Not built yet.
+Built for AWS: the bundled table per region (`packages/cloud-aws/src/prices.generated.ts`, from
+`scripts/refresh-prices.mjs`), the live Pricing API (`livePrices` on the adapter, cached by the API),
+and the source and date on every estimate. Bundled tables for the other providers are not built yet.
 
 ## Context
 
