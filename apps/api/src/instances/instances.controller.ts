@@ -109,7 +109,7 @@ export class InstancesController {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: body.tenantId } });
     if (!tenant) throw notFound('Tenant');
     const version = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
-    if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
+    if (version?.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
     const { bindings } = await this.compiler.withProfileBindings({
       tenantId: tenant.id,
       environment: body.environment,
@@ -136,7 +136,7 @@ export class InstancesController {
     if (version?.status === 'DEPRECATED') {
       throw unprocessable('TEMPLATE_DEPRECATED', `Version ${version.version} is deprecated.${version.deprecationNote ? ` ${version.deprecationNote}` : ''} Choose a newer version.`);
     }
-    if (!version || version.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
+    if (version?.status !== 'PUBLISHED') throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'Instances can only use published template versions.');
 
     const { maxInstances } = readTenantLimits(tenant.limits);
     if (maxInstances !== undefined) {
@@ -247,7 +247,7 @@ export class InstancesController {
     // ?templateVersionId= previews an upgrade or rollback: the plan from what runs to that version.
     if (templateVersionId) {
       const version = await this.prisma.templateVersion.findUnique({ where: { id: templateVersionId } });
-      if (!version || version.status !== 'PUBLISHED' || version.templateId !== instance.templateVersion.template.id) {
+      if (version?.status !== 'PUBLISHED' || version.templateId !== instance.templateVersion.template.id) {
         throw unprocessable('INVALID_UPGRADE', 'Previews must target a published version of the same template.');
       }
     }
@@ -286,7 +286,7 @@ export class InstancesController {
     const instance = await this.load(p, id, 'update');
     if (isInstanceBusy(instance.status)) throw conflict('INSTANCE_BUSY', 'Wait for the current operation to finish.');
     const target = await this.prisma.templateVersion.findUnique({ where: { id: body.templateVersionId } });
-    if (!target || target.status !== 'PUBLISHED' || target.templateId !== instance.templateVersion.template.id) {
+    if (target?.status !== 'PUBLISHED' || target.templateId !== instance.templateVersion.template.id) {
       throw unprocessable('INVALID_UPGRADE', 'Upgrades must target a published version of the same template.');
     }
     if (target.id === instance.templateVersionId) throw unprocessable('SAME_VERSION', `The instance already runs version ${target.version}.`);

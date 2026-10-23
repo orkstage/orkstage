@@ -21,8 +21,22 @@ jobs:
       - uses: actions/checkout@v7
       - name: Trivy (lockfiles)
         run: >-
-          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.57.1 fs --quiet --scanners vuln
+          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.75.0 fs --quiet --scanners vuln
           --severity CRITICAL --ignore-unfixed --exit-code 1 --skip-dirs node_modules /src
+
+  # Known vulnerabilities in the platform image (base image packages and the installed
+  # dependencies). Fails on critical or high ones that have a fix; the table lists them.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the platform image
+        run: docker build -f infra/docker/platform.Dockerfile -t orkstage-platform:scan .
+      - name: Trivy (platform image)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image
+          --quiet --scanners vuln --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1
+          orkstage-platform:scan
 
   # Code scanning and the OpenSSF Scorecard report through GitHub Advanced Security, which private
   # repositories do not have here; these jobs start on their own once the repository is public.

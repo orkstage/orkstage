@@ -46,7 +46,7 @@ export function vercelConfig(target: CloudTarget): VercelTargetConfig {
 /** Offline checks on the target configuration (no API calls). */
 export function configChecks(target: CloudTarget, region: string): TargetValidationCheck[] {
   const checks: TargetValidationCheck[] = [];
-  const teamId = (target.config ?? {}).teamId;
+  const teamId = target.config?.teamId;
   if (teamId === undefined || teamId === '') {
     checks.push({ name: 'Team', status: 'ok', message: 'No teamId: projects go to the personal account that owns the token.' });
   } else if (typeof teamId === 'string' && /^team_[A-Za-z0-9]+$/.test(teamId)) {

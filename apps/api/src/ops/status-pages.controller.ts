@@ -439,7 +439,7 @@ If it was not you, ignore this email and nothing will be sent.`,
   /** A page that is not public looks exactly like a missing one. */
   private async publicPage(slug: string): Promise<StatusPage & { tenant: { name: string } }> {
     const page = /^[a-z0-9][a-z0-9-]{2,40}$/.test(slug) ? await this.prisma.statusPage.findUnique({ where: { slug }, include: { tenant: { select: { name: true } } } }) : null;
-    if (!page || page.visibility !== 'PUBLIC') throw notFound('Status page');
+    if (page?.visibility !== 'PUBLIC') throw notFound('Status page');
     return page;
   }
 

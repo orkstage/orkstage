@@ -21,9 +21,14 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm -r --workspace-concurrency=1 run build
+# TypeScript 7 is a native compiler binary that only the build needs; the runtime runs dist/.
+RUN rm -rf node_modules/.pnpm/@typescript+typescript-*
 
 FROM base AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+# npm and corepack only install pnpm in the base stage; nothing runs them at runtime, and the npm
+# bundled with Node carries its own dependencies (and their advisories).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 COPY --from=build --chown=orkstage:orkstage /repo /repo
 # The worker needs the Docker socket (root-owned) to start runner containers; api/web/migrate
 # run as the unprivileged user (set per service in Compose).

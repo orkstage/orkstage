@@ -99,7 +99,7 @@ interface Desired {
 }
 
 function staticDesired(spec: FrontendSpec): Desired {
-  const buildCommand = [spec.installCommand, spec.buildCommand].filter((c) => c && c.trim()).join(' && ');
+  const buildCommand = [spec.installCommand, spec.buildCommand].filter((c) => c?.trim()).join(' && ');
   const repo = repoUrl(spec.source);
   const branch = spec.source.branch ?? 'main';
   const rootDir = spec.source.rootDirectory ?? '';

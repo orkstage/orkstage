@@ -48,7 +48,14 @@ pnpm db:deploy && pnpm db:seed      # needs DATABASE_URL (local stack: see orkst
 # seeded database with Redis; AUTH_DEV_LOGIN_ENABLED=true. CI runs them on every pull request.
 pnpm --filter @orkstage/api test:integration
 pnpm audit --audit-level high       # CI runs this
+pnpm lint           # Biome (biome.json); CI fails on warnings too
+# Where native binaries are blocked, the same check in a container:
+docker run --rm -v "$PWD:/code" -w /code ghcr.io/biomejs/biome:2.5.15 lint --error-on-warnings .
 ```
+
+Lint keeps the correctness and suspicious rules of Biome's recommended set; style rules that fight
+conventions here are off in `biome.json` (non null assertions, `import type`, which would break
+NestJS injection, and `${}` in OpenTofu strings). Formatting stays with Prettier.
 
 Packages consume each other through `dist/`: after changing a package, `pnpm -C packages/<name>
 build` before typechecking its dependents.

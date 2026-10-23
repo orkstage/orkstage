@@ -120,7 +120,7 @@ export class TriggersController {
     }
 
     const row = await this.prisma.instanceResource.findUnique({ where: { instanceId_resourceId: { instanceId: id, resourceId: trigger.resource } } });
-    if (!row || row.status !== 'ACTIVE') throw unprocessable('RESOURCE_NOT_DEPLOYED', `Resource "${trigger.resource}" is not deployed.`);
+    if (row?.status !== 'ACTIVE') throw unprocessable('RESOURCE_NOT_DEPLOYED', `Resource "${trigger.resource}" is not deployed.`);
     const adapter = this.adapters.registry.has(row.provider) ? this.adapters.registry.get(row.provider) : undefined;
     const descriptor = adapter?.actions?.(row.capability).find((a) => a.name === trigger.action);
     if (!descriptor) throw unprocessable('ACTION_UNAVAILABLE', `${row.provider} does not offer "${trigger.action}" for ${row.capability}.`);

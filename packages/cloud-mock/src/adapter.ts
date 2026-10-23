@@ -255,7 +255,7 @@ export class MockAdapter implements CloudProviderAdapter {
    */
   async getBackups(_ctx: ProviderContext, res: ResourceIdentifier): Promise<BackupInfo | null> {
     if (res.serviceKind !== 'database.postgresql') return null;
-    const retentionDays = Number((res.outputs ?? {}).backup_retention_days ?? 7);
+    const retentionDays = Number(res.outputs?.backup_retention_days ?? 7);
     if (retentionDays <= 0) return { enabled: false };
     const now = Date.now();
     const today = new Date(now);

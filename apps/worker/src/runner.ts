@@ -655,7 +655,7 @@ export class DeploymentRunner {
   /** Fails a deployment from outside its job (the stuck deployment reaper). */
   async abandon(deploymentId: string, message: string): Promise<void> {
     const d = await this.ctx.prisma.deployment.findUnique({ where: { id: deploymentId } });
-    if (!d || d.status !== 'RUNNING') return;
+    if (d?.status !== 'RUNNING') return;
     await this.event(d.id, 'error', null, message);
     await this.fail(d, 'TIMEOUT', message);
   }

@@ -11,19 +11,17 @@ import {
   type OverviewDto,
 } from '@orkstage/contracts';
 import type { AuditEvent, PrismaClient } from '@orkstage/database';
-import { worstStatus, type StatusState } from '@orkstage/domain';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Redis } from 'ioredis';
 import { authorize, CurrentPrincipal, isPlatformStaff, Public, Scope } from '../common/auth.js';
-import { AppError, forbidden, notFound } from '../common/errors.js';
+import { AppError, forbidden } from '../common/errors.js';
 import { iso, page } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
 import type { z } from 'zod';
 import { PRISMA, REDIS } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
-import { toIncidentDto } from './incidents.controller.js';
 
 function toAuditDto(e: AuditEvent): AuditEventDto {
   return {
