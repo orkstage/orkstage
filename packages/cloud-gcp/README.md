@@ -88,6 +88,10 @@ Roles for the deployer service account on the project:
 
 ## Known limits
 
+- Backups (open item 18): the worker reads a Cloud SQL instance's backup configuration, its last
+  successful and failed backup runs and the next backup window (`roles/cloudsql.admin` covers it).
+  The restore window is not shown: Cloud SQL does not expose its start. Not yet verified on a live
+  account.
 - Cloud Run CPU is rounded up to 1, 2, 4, 6 or 8 vCPU; fractional CPU would force one request per instance.
 - Cloud Run scales on request concurrency; `targetCpuPercent` is not used.
 - There is no shared HTTPS load balancer with path routing yet; each service keeps its own run.app URL.

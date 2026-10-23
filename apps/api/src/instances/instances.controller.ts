@@ -12,7 +12,7 @@ import {
   type ResourceDto,
 } from '@orkstage/contracts';
 import type { ResourceOutputs } from '@orkstage/cloud-core';
-import type { Instance, InstanceResource, PrismaClient } from '@orkstage/database';
+import { Prisma, type Instance, type InstanceResource, type PrismaClient } from '@orkstage/database';
 import { challengeName, isInstanceBusy, readTenantLimits } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
@@ -383,7 +383,12 @@ export class InstancesController {
     if (body.health !== undefined) await this.adapters.mock.setHealthOverride(ctx, resource.name, body.health);
     if (body.drift !== undefined) await this.adapters.mock.simulateDrift(ctx, resource.name, body.drift);
     if (body.metric) await this.adapters.mock.setMetricOverride(ctx, resource.name, body.metric.name, body.metric.value);
-    if (body.backupFailure !== undefined) await this.adapters.mock.setBackupFailure(resource.name, body.backupFailure);
+    if (body.backupFailure !== undefined) {
+      await this.adapters.mock.setBackupFailure(resource.name, body.backupFailure);
+      // The worker reads backups at most every 30 minutes; clearing the state makes the next health
+      // tick read them again, so a pinned failure (or its recovery) shows within one tick.
+      await this.prisma.instanceResource.updateMany({ where: { instanceId: id, resourceId: body.resourceId }, data: { backupState: Prisma.DbNull } });
+    }
     if (body.domain) {
       // Only hostnames of this instance: the simulated DNS is shared by every simulated target.
       const domain = await this.prisma.domain.findFirst({ where: { instanceId: id, hostname: body.domain.hostname.toLowerCase() } });
