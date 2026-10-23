@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { ProviderError, type ProviderContext, type ResourceOutputs, type ResourceRequest } from '@orkstage/cloud-core';
 import { fitName, sha256 } from '@orkstage/domain';
-import { awsConfig, EMULATED_SERVICES, isEmulator, stateBucketFor } from './config.js';
+import { awsConfig, EMULATED_SERVICES, isEmulator, stateBucketFor, stateRegionFor } from './config.js';
 
 const MODULE_BY_CAPABILITY: Record<string, string> = {
   vpc: 'network',
@@ -33,6 +33,15 @@ const CACHE_NODE: Record<string, string> = {
 
 export function stateKeyFor(name: string): string {
   return `orkstage/${name}.tfstate`;
+}
+
+/**
+ * Where a resource's state lives (A5). The default bucket belongs to one account and region, so
+ * the plain key never collides. A custom bucket serves every region of the target: a new state gets
+ * the region in its key, and a state written before that keeps its key.
+ */
+export function chooseStateKey(customBucket: boolean, existsAtPlainKey: boolean, region: string, name: string): string {
+  return !customBucket || existsAtPlainKey ? stateKeyFor(name) : `orkstage/${region}/${name}.tfstate`;
 }
 
 type Spec = Record<string, unknown>;
@@ -226,7 +235,7 @@ export function externalSecretIds(req: ResourceRequest): string[] {
 }
 
 /** Complete root configuration (OpenTofu JSON syntax) for one resource's isolated state. */
-export function rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<string, unknown> {
+export function rootConfig(ctx: ProviderContext, req: ResourceRequest, stateKey = stateKeyFor(req.name)): Record<string, unknown> {
   const cfg = awsConfig(ctx.target);
   const { module, inputs } = moduleInputs(ctx, req);
   const external = externalSecretIds(req).length > 0;
@@ -246,8 +255,8 @@ export function rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<s
       backend: {
         s3: {
           bucket: stateBucketFor(cfg, ctx.region),
-          key: stateKeyFor(req.name),
-          region: ctx.region,
+          key: stateKey,
+          region: stateRegionFor(ctx.target, ctx.region),
           encrypt: true,
           use_lockfile: true,
           ...(emulator ? { ...skip, skip_region_validation: true, use_path_style: true, endpoints: { s3: runnerEndpoint } } : {}),

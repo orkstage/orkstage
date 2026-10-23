@@ -16,6 +16,8 @@ export interface AwsTargetConfig {
   publicEndpointUrl?: string;
   /** S3 bucket holding OpenTofu state. Must exist (versioned, encrypted) on real AWS. */
   stateBucket?: string;
+  /** Region of a custom `stateBucket`, which serves every region of the target (A5); the target's default region when empty. */
+  stateRegion?: string;
   /** Platform DNS zone for instance subdomains, e.g. apps.example.com. */
   dnsZone?: string;
   /** Create the DNS zone when missing (emulator convenience; real zones are pre-provisioned). */
@@ -34,6 +36,15 @@ export function isEmulator(cfg: AwsTargetConfig): boolean {
 
 export function stateBucketFor(cfg: AwsTargetConfig, region: string): string {
   return cfg.stateBucket ?? `orkstage-tfstate-${cfg.accountId}-${region}`;
+}
+
+/**
+ * Region of the state bucket: the deploy region for the default bucket (one per account and
+ * region), the configured region of a custom bucket shared by every region (A5).
+ */
+export function stateRegionFor(target: CloudTarget, region: string): string {
+  const cfg = awsConfig(target);
+  return cfg.stateBucket ? (cfg.stateRegion ?? target.defaultRegion ?? region) : region;
 }
 
 /** Services whose endpoints are overridden for emulators (SDK and OpenTofu provider). */

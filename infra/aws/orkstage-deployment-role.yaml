@@ -21,6 +21,13 @@ Parameters:
     Description: >-
       Shared secret OrkStage presents when assuming the role. Generate a random value, store it in
       your secret manager and reference it from the cloud target (env:// or aws-sm://).
+  StateBucketName:
+    Type: String
+    Default: ''
+    Description: >-
+      Custom OpenTofu state bucket (the target's stateBucket), when it does not follow the default
+      name orkstage-tfstate-<account>-<region>. Empty: only default names are allowed.
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
   RoleName:
     Type: String
     Default: orkstage-deploy
@@ -33,6 +40,9 @@ Parameters:
     Description: >-
       Longest session OrkStage may request, in seconds. Keep it at least as long as
       AWS_ROLE_SESSION_MINUTES (60 by default), which must outlive TOFU_TIMEOUT_MINUTES.
+
+Conditions:
+  HasStateBucketName: !Not [!Equals [!Ref StateBucketName, '']]
 
 Resources:
   DeploymentRole:
@@ -127,6 +137,8 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::orkstage-tfstate-${AWS::AccountId}-*'
                   - !Sub 'arn:${AWS::Partition}:s3:::orkstage-tfstate-${AWS::AccountId}-*/*'
+                  - !If [HasStateBucketName, !Sub 'arn:${AWS::Partition}:s3:::${StateBucketName}', !Ref 'AWS::NoValue']
+                  - !If [HasStateBucketName, !Sub 'arn:${AWS::Partition}:s3:::${StateBucketName}/*', !Ref 'AWS::NoValue']
               # Task execution and EC2 instance roles for services, limited to OrkStage names.
               - Sid: ServiceRoles
                 Effect: Allow
