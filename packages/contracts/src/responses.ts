@@ -424,9 +424,13 @@ export interface TriggerDto {
   /** False when the resource is not deployed or its provider does not offer the action. */
   available: boolean;
   unavailableReason: string | null;
-  /** Parameters the provider accepts for this action. */
+  /** Parameters the provider accepts for this action (catalog names for a catalog action). */
   actionParams: TriggerParamDto[];
   provider: string | null;
+  /** The catalog action it runs (ADR 0009), or null for a provider specific action. */
+  catalogAction: { id: string; risk: 'safe' | 'disruptive' | 'destructive'; reversible: boolean } | null;
+  /** Least tenant role that may run it: the action's own minimum, raised by the template. */
+  requiredRole: 'CustomerDeveloper' | 'CustomerAdmin' | 'CustomerOwner';
   lastRun: TriggerRunDto | null;
 }
 

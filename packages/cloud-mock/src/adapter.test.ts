@@ -58,7 +58,7 @@ describe('MockAdapter simulation', () => {
   it('simulates trigger actions on existing resources', async () => {
     const { adapter, context, sampleRequest } = fixture();
     const id = { resourceId: sampleRequest.resourceId, serviceKind: sampleRequest.serviceKind, capability: sampleRequest.capability, name: sampleRequest.name };
-    expect(adapter.actions().map((a) => a.name)).toEqual(['redeploy', 'restart', 'backup', 'restore']);
+    expect(adapter.actions().map((a) => a.name)).toEqual(['redeploy', 'restart', 'service.scale', 'database.reboot', 'cdn.invalidate', 'backup', 'restore']);
     await expect(adapter.runAction(context, id, { action: 'restart', params: {} })).rejects.toMatchObject({ code: 'SIM_NOT_FOUND' });
     await adapter.ensureResource(context, sampleRequest);
     const run = await adapter.runAction(context, id, { action: 'redeploy', params: { ref: 'main' } });

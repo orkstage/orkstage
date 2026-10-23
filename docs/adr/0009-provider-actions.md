@@ -1,7 +1,9 @@
 # ADR 0009: Provider actions as one catalog for triggers and future agents
 
 **Status:** accepted on October 23, 2026 (owner decision; orkstage-dev `docs/aws-items.md`, A8).
-Not built yet.
+Round 1 built: the catalog (`packages/domain/src/actions.ts`), resolution and roles for triggers,
+and the AWS operations. Release strategies (round 2) and the production approval rule for
+disruptive actions are not built yet.
 
 ## Context
 

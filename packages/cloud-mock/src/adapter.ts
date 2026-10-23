@@ -402,6 +402,9 @@ const SIMULATED_ACTIONS: ResourceActionDescriptor[] = [
     ],
   },
   { name: 'restart', description: 'Restart running instances (simulated).', params: [] },
+  { name: 'service.scale', description: 'Set the number of running instances (simulated).', params: [{ name: 'replicas', type: 'number', required: true, description: 'Instances to run.' }] },
+  { name: 'database.reboot', description: 'Reboot the database server (simulated).', params: [] },
+  { name: 'cdn.invalidate', description: 'Drop cached responses (simulated).', params: [] },
   { name: 'backup', description: 'Take an on demand backup (simulated).', params: [] },
   {
     name: 'restore',

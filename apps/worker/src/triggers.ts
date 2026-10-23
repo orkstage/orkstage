@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { TriggerJob } from '@orkstage/contracts';
-import { resolveTriggerParams, triggerAllows, triggerSchedulerId } from '@orkstage/provisioning';
+import { resolveAction, resolveTriggerParams, triggerAllows, triggerSchedulerId } from '@orkstage/provisioning';
 import { toCloudTarget } from '@orkstage/runtime';
 import { environmentTemplate, type TemplateTrigger } from '@orkstage/templates';
 import type { Queue } from 'bullmq';
@@ -74,7 +74,9 @@ export class TriggerRunner {
     const row = await prisma.instanceResource.findUnique({ where: { instanceId_resourceId: { instanceId: run.instanceId, resourceId: run.resourceId } } });
     if (row?.status !== 'ACTIVE') return finish(false, { message: `Resource "${run.resourceId}" is not deployed.`, errorClass: 'VALIDATION_ERROR' });
     const adapter = registry.has(row.provider) ? registry.get(row.provider) : undefined;
-    if (!adapter?.runAction || !(adapter.actions?.(row.capability) ?? []).some((a) => a.name === run.action)) {
+    // The run keeps the template's name (a catalog id or the provider's own); the provider gets its own.
+    const action = adapter?.runAction && adapter.actions ? resolveAction(run.action, row.type, row.provider, adapter.actions(row.capability)) : undefined;
+    if (!adapter?.runAction || !action) {
       return finish(false, { message: `${row.provider} does not offer "${run.action}" for ${row.capability}.`, errorClass: 'VALIDATION_ERROR' });
     }
     const target = await prisma.cloudTarget.findUniqueOrThrow({ where: { id: row.targetId } });
@@ -89,7 +91,7 @@ export class TriggerRunner {
           providerResourceId: row.providerResourceId ?? undefined,
           outputs: (row.outputs ?? undefined) as ResourceOutputs | undefined,
         },
-        { action: run.action, params: run.params as Record<string, string | number | boolean> },
+        { action: action.descriptor.name, params: run.params as Record<string, string | number | boolean> },
       );
       await finish(true, { message: result.message, reference: result.reference, url: result.url });
     } catch (err) {
