@@ -75,6 +75,21 @@ build` before typechecking its dependents.
 - **Providers other than AWS and the simulation provider are disabled by default** behind
   `PROVIDER_<NAME>` feature flags; new providers follow the same rule until tested on live accounts.
 
+## Decided, not built yet
+
+Owner decisions that changes must move toward, not away from. Read the ADR before touching the area.
+
+- **Shared sandbox network** (ADR 0008): `network.strategy: shared` becomes one platform owned
+  network per target and region, isolated by per instance security groups, refused in production.
+  Do not remove the option from the schema or the `free-validation` template.
+- **Provider actions** (ADR 0009): trigger actions move to one provider neutral catalog in
+  `packages/domain` (stable id, risk level, minimum role), including release strategies (canary,
+  blue/green, smart rollback). Future AI agents may only propose catalog actions. Add new actions
+  to the catalog, not as adapter only names.
+- **Prices** (ADR 0010): estimates come from a `PriceSource`: the AWS Pricing API first, bundled
+  per region tables in each adapter's catalog as the fallback and for providers without an API.
+  Every estimate records its source and date. Prices live only in catalog tables.
+
 ## How to make common changes
 
 - **New API endpoint:** controller method with `authorize(...)` first, zod body via
