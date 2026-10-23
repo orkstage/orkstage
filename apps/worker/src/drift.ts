@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DriftChange, ResourceOutputs } from '@orkstage/cloud-core';
 import type { InstanceResource } from '@orkstage/database';
+import { flagsByTenant } from '@orkstage/domain';
 import { idempotencyKeyFor, readDependencySecret, type ResolvedInfrastructure } from '@orkstage/provisioning';
 import { toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
@@ -53,10 +54,15 @@ export class DriftDetector {
       include: { resources: { where: { status: 'ACTIVE' } } },
     });
     const targets = new Map((await prisma.cloudTarget.findMany({ where: { status: 'ACTIVE' } })).map((t) => [t.id, t]));
+    const flagsFor = flagsByTenant(await prisma.featureFlag.findMany());
 
     for (const instance of instances) {
       const planned = instance.resources.filter((r) => registry.has(r.provider) && !registry.get(r.provider).simulated && registry.get(r.provider).detectDrift);
       if (planned.length === 0) continue;
+      if (!flagsFor(instance.tenantId).DRIFT_DETECTION) {
+        result.skipped += planned.length;
+        continue;
+      }
       const last = await prisma.deployment.findFirst({
         where: { instanceId: instance.id, kind: 'APPLY', status: 'SUCCEEDED' },
         orderBy: { finishedAt: 'desc' },

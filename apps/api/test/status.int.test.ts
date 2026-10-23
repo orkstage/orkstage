@@ -61,6 +61,22 @@ describe('status page visibility (open item 8)', () => {
     expect((await anyone.get(`/public/status/${slug}`)).status).toBe(404);
   });
 
+  it('with PUBLIC_STATUS_PAGES off, no page turns public and a public one stops being served (open item 20)', async () => {
+    const t = await freshTenant();
+    const slug = `st-${unique()}`;
+    expect((await put(t.owner, `/status-pages/${t.id}`, { visibility: 'PUBLIC', slug })).status).toBe(200);
+    const anyone = api.anonymous();
+    expect((await anyone.get(`/public/status/${slug}`)).status).toBe(200);
+
+    await api.prisma.featureFlag.create({ data: { key: 'PUBLIC_STATUS_PAGES', tenantId: t.id, enabled: false } });
+    expect((await anyone.get(`/public/status/${slug}`)).status).toBe(404);
+    const refused = await put(t.owner, `/status-pages/${t.id}`, { visibility: 'PUBLIC', slug, title: 'Again' });
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.code).toBe('PUBLIC_STATUS_PAGES_DISABLED');
+    // Members still read it inside the console.
+    expect((await t.viewer.get(`/status/${t.id}`)).status).toBe(200);
+  });
+
   it('automated incidents read as a plain impact on the public page', async () => {
     const t = await freshTenant();
     const slug = `st-${unique()}`;

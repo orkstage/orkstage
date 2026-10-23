@@ -49,6 +49,16 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   { key: 'MULTI_REGION', category: 'feature', defaultEnabled: true, description: 'Instances may place resources in more than one region.' },
   { key: 'AUTOSCALING', category: 'feature', defaultEnabled: true, description: 'Services may scale their replicas automatically.' },
   { key: 'CUSTOM_DOMAINS', category: 'feature', defaultEnabled: true, description: 'DNS resources may use custom domains besides the platform subdomain.' },
+  // Spec §56 switches for features that already exist: on unless turned off for the platform or a tenant.
+  { key: 'DRIFT_DETECTION', category: 'feature', defaultEnabled: true, description: 'Scheduled drift scans compare real resources with the applied configuration.' },
+  {
+    key: 'AUTOMATED_INCIDENTS',
+    category: 'feature',
+    defaultEnabled: true,
+    description: 'Alert rules open incidents on their own. When off, people declare incidents; open ones still resolve and notifications still go out.',
+  },
+  { key: 'COST_ESTIMATION', category: 'feature', defaultEnabled: true, description: 'Plans, previews, deployments and the overview show an approximate monthly cost.' },
+  { key: 'PUBLIC_STATUS_PAGES', category: 'feature', defaultEnabled: true, description: 'Status pages may be public, readable without signing in.' },
 ];
 
 const BY_KEY = new Map(FEATURE_FLAGS.map((f) => [f.key, f]));
@@ -65,6 +75,19 @@ export function resolveFeatureFlags(overrides: readonly FeatureFlagOverride[], t
   const platform = new Map(overrides.filter((o) => o.tenantId === null).map((o) => [o.key, o.enabled]));
   const tenant = new Map(tenantId ? overrides.filter((o) => o.tenantId === tenantId).map((o) => [o.key, o.enabled]) : []);
   return Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, tenant.get(f.key) ?? platform.get(f.key) ?? f.defaultEnabled]));
+}
+
+/** Flags per tenant from one read of the overrides: a worker tick covers many tenants. */
+export function flagsByTenant(overrides: readonly FeatureFlagOverride[]): (tenantId: string | null) => Record<string, boolean> {
+  const cache = new Map<string | null, Record<string, boolean>>();
+  return (tenantId) => {
+    let flags = cache.get(tenantId);
+    if (!flags) {
+      flags = resolveFeatureFlags(overrides, tenantId);
+      cache.set(tenantId, flags);
+    }
+    return flags;
+  };
 }
 
 export function isProviderEnabled(flags: Readonly<Record<string, boolean>>, provider: CloudProvider): boolean {

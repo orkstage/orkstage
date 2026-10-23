@@ -35,4 +35,16 @@ describe('instance preview before creation (open item 14)', () => {
     const outsider = await api.as(ctx.acmeOwner);
     expect((await outsider.post('/instances/preview', body)).status).toBe(403);
   });
+
+  it('shows no cost when the tenant has cost estimation turned off (open item 20)', async () => {
+    const t = await tenant(admin, 'wiz');
+    const owner = await api.as((await member(api.prisma, t.id, 'CustomerOwner')).email);
+    await api.prisma.featureFlag.create({ data: { key: 'COST_ESTIMATION', tenantId: t.id, enabled: false } });
+    const body = { tenantId: t.id, name: 'No cost preview', slug: `wiz-${unique()}`, environment: 'development', templateVersionId: ctx.starterVersionId };
+
+    const res = await owner.post('/instances/preview', body);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.cost).toEqual({ currency: 'USD', period: 'monthly', total: 0, confidence: 'unavailable', lines: [] });
+    expect(res.body.resources.length).toBeGreaterThan(3);
+  });
 });
