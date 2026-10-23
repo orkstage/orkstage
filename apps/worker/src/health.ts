@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import type { AlertRule, InstanceResource } from '@orkstage/database';
-import { healthToStatus, type HealthState } from '@orkstage/domain';
+import { flagsByTenant, healthToStatus, type HealthState } from '@orkstage/domain';
 import { platformMetrics, toCloudTarget } from '@orkstage/runtime';
 import { randomUUID } from 'node:crypto';
 import { notify, systemAudit, type WorkerContext } from './context.js';
@@ -39,6 +39,7 @@ export class HealthMonitor {
       include: { resources: { where: { status: 'ACTIVE' } } },
     });
     const rules = await prisma.alertRule.findMany({ where: { enabled: true } });
+    const flagsFor = flagsByTenant(await prisma.featureFlag.findMany());
     const targets = new Map((await prisma.cloudTarget.findMany()).map((t) => [t.id, t]));
 
     for (const instance of instances) {
@@ -72,7 +73,11 @@ export class HealthMonitor {
         }
       }
       const inMaintenance = await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
-      const scoped = rules.filter((rule) => !rule.tenantId || rule.tenantId === instance.tenantId);
+      // With AUTOMATED_INCIDENTS off, rules still notify and resolve what is open, but open nothing.
+      const automated = flagsFor(instance.tenantId).AUTOMATED_INCIDENTS;
+      const scoped = rules
+        .filter((rule) => !rule.tenantId || rule.tenantId === instance.tenantId)
+        .map((rule) => (automated ? rule : { ...rule, actions: rule.actions.filter((a) => a !== 'create_incident') }));
       await this.evaluateAlerts(instance, fresh, scoped, inMaintenance);
       await this.metricAlerts.evaluate(instance, fresh.filter((r) => !inMaintenance.has(r.resourceId)), scoped, targets);
     }

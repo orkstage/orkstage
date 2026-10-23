@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLOUD_PROVIDERS,
+  flagsByTenant,
   isFeatureFlag,
   isProviderEnabled,
   providerFlagKey,
@@ -169,6 +170,20 @@ describe('feature flags', () => {
     ];
     expect(tenantFeatures(resolveFeatureFlags(off, 't1'))).toEqual({ multiCloud: false, multiRegion: true, autoscaling: false, customDomains: true });
     expect(tenantFeatures(resolveFeatureFlags(off, 't2')).autoscaling).toBe(true);
+  });
+
+  it('turns the spec switches on by default, per tenant through overrides', () => {
+    const keys = ['DRIFT_DETECTION', 'AUTOMATED_INCIDENTS', 'COST_ESTIMATION', 'PUBLIC_STATUS_PAGES'];
+    const defaults = resolveFeatureFlags([], 't1');
+    expect(keys.map((k) => defaults[k])).toEqual([true, true, true, true]);
+    const flagsFor = flagsByTenant([
+      { key: 'COST_ESTIMATION', tenantId: 't1', enabled: false },
+      { key: 'PUBLIC_STATUS_PAGES', tenantId: null, enabled: false },
+    ]);
+    expect(flagsFor('t1').COST_ESTIMATION).toBe(false);
+    expect(flagsFor('t2').COST_ESTIMATION).toBe(true);
+    expect(flagsFor('t2').PUBLIC_STATUS_PAGES).toBe(false);
+    expect(flagsFor('t1')).toBe(flagsFor('t1'));
   });
 
   it('reads stored tenant limits, keeping only known non negative numbers', () => {

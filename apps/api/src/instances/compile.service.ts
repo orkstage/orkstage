@@ -88,7 +88,7 @@ export class CompileService {
     const customCertificatesIssued = Object.keys(customDomains).filter((resourceId) =>
       domains.filter((d) => d.resourceId === resourceId).every((d) => d.certificateStatus === 'ISSUED' || d.certificateStatus === 'EXPIRING'),
     );
-    return compileInfrastructure(
+    const resolved = await compileInfrastructure(
       {
         template: applied.template,
         limits: readTenantLimits(tenant.limits),
@@ -106,6 +106,8 @@ export class CompileService {
       },
       this.adapters.registry,
     );
+    // COST_ESTIMATION off: policies (the monthly budget) already saw the estimate; nobody else does.
+    return flags.COST_ESTIMATION ? resolved : { ...resolved, cost: { currency: 'USD', period: 'monthly', total: 0, confidence: 'unavailable', lines: [] } };
   }
 
   /**

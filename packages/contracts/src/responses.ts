@@ -535,7 +535,8 @@ export interface DomainDto {
 /** The first screen of a tenant (spec §42 customer dashboard, open item 11). */
 export interface CustomerOverviewDto {
   tenant: { id: string; name: string };
-  totals: { instances: number; healthy: number; deploying: number; openIncidents: number; estimatedMonthlyCost: number };
+  /** `estimatedMonthlyCost` is null when the tenant's COST_ESTIMATION flag is off. */
+  totals: { instances: number; healthy: number; deploying: number; openIncidents: number; estimatedMonthlyCost: number | null };
   instances: {
     id: string;
     name: string;

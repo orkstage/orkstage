@@ -6,6 +6,7 @@ import { Controller, Get, Inject, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { authorize, CurrentPrincipal, Scope } from '../common/auth.js';
 import { notFound } from '../common/errors.js';
+import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { PRISMA } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
 import { toIncidentDto } from './incidents.controller.js';
@@ -27,7 +28,10 @@ const costOf = (cost: unknown): number | null => {
 @ApiTags('operations')
 @Controller()
 export class CustomerOverviewController {
-  constructor(@Inject(PRISMA) private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly prisma: PrismaClient,
+    private readonly flags: FeatureFlagsService,
+  ) {}
 
   @Scope('instances:read')
   @Get('tenants/:tenantId/overview')
@@ -35,6 +39,7 @@ export class CustomerOverviewController {
     authorize(p, 'read', 'Instance', { tenantId });
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, name: true } });
     if (!tenant) throw notFound('Tenant');
+    const costs = (await this.flags.forTenant(tenantId)).COST_ESTIMATION;
     const days = uptimeDays(UPTIME_DAYS);
     const since = new Date(`${days[0]}T00:00:00Z`);
 
@@ -80,7 +85,7 @@ export class CustomerOverviewController {
         health: i.health,
         simulated: bindings.length > 0 && bindings.every((b) => mock.has(b.targetId)),
         lastDeployment: last ? { id: last.id, kind: last.kind, status: last.status, at: (last.finishedAt ?? last.queuedAt).toISOString() } : null,
-        estimatedMonthlyCost: costBy.get(i.id) ?? null,
+        estimatedMonthlyCost: costs ? (costBy.get(i.id) ?? null) : null,
         uptime30d: uptimeOf(rows, [...new Set(rows.map((r) => r.resourceId))], days).overall,
         components: shown.map((c) => {
           const u = uptimeOf(rows, c.resourceIds, days);
@@ -115,7 +120,7 @@ export class CustomerOverviewController {
         healthy: view.filter(operational).length,
         deploying: view.filter((v) => v.lastDeployment && RUNNING.includes(v.lastDeployment.status)).length,
         openIncidents: open.length,
-        estimatedMonthlyCost: Math.round(view.reduce((s, v) => s + (v.estimatedMonthlyCost ?? 0), 0) * 100) / 100,
+        estimatedMonthlyCost: costs ? Math.round(view.reduce((s, v) => s + (v.estimatedMonthlyCost ?? 0), 0) * 100) / 100 : null,
       },
       instances: view,
       openIncidents: open.map((i) => toIncidentDto(i)),

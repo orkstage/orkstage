@@ -21,7 +21,8 @@ import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
 import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, Public, Scope } from '../common/auth.js';
-import { AppError, conflict, notFound } from '../common/errors.js';
+import { AppError, conflict, notFound, unprocessable } from '../common/errors.js';
+import { FeatureFlagsService } from '../common/feature-flags.service.js';
 import { ApiZodBody, ZodBody } from '../common/validation.js';
 import { CONFIG, PRISMA, Queues } from '../infra/infra.module.js';
 import type { RequestPrincipal } from '../types.js';
@@ -87,6 +88,7 @@ export class StatusPagesController {
     @Inject(CONFIG) private readonly config: PlatformConfig,
     private readonly queues: Queues,
     private readonly audit: AuditService,
+    private readonly flags: FeatureFlagsService,
   ) {}
 
   /** The status page of a tenant, as its members see it. */
@@ -186,6 +188,9 @@ export class StatusPagesController {
   ): Promise<StatusPageSettingsDto> {
     authorize(p, 'update', 'StatusPage', { tenantId });
     if (!(await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }))) throw notFound('Tenant');
+    if (body.visibility === 'PUBLIC' && !(await this.flags.forTenant(tenantId)).PUBLIC_STATUS_PAGES) {
+      throw unprocessable('PUBLIC_STATUS_PAGES_DISABLED', 'Public status pages are turned off for this tenant (feature flag PUBLIC_STATUS_PAGES).');
+    }
     if (body.slug) {
       const taken = await this.prisma.statusPage.findFirst({ where: { slug: body.slug, tenantId: { not: tenantId } }, select: { id: true } });
       if (taken) throw conflict('STATUS_SLUG_TAKEN', 'Another status page already uses this address.');
@@ -440,6 +445,8 @@ If it was not you, ignore this email and nothing will be sent.`,
   private async publicPage(slug: string): Promise<StatusPage & { tenant: { name: string } }> {
     const page = /^[a-z0-9][a-z0-9-]{2,40}$/.test(slug) ? await this.prisma.statusPage.findUnique({ where: { slug }, include: { tenant: { select: { name: true } } } }) : null;
     if (page?.visibility !== 'PUBLIC') throw notFound('Status page');
+    // Turned off after the page went public: it stops being served, its settings stay.
+    if (!(await this.flags.forTenant(page.tenantId)).PUBLIC_STATUS_PAGES) throw notFound('Status page');
     return page;
   }
 
