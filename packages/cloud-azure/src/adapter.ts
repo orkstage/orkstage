@@ -2,6 +2,7 @@
 import {
   ProviderError,
   readCredentialFields,
+  type BackupInfo,
   type CloudCapability,
   type CloudTarget,
   type HealthResult,
@@ -18,6 +19,7 @@ import {
 } from '@orkstage/cloud-core';
 import { OpenTofuAdapter, type ModuleCall, type OpenTofuAdapterOptions, type RootParts, type StateStore } from '@orkstage/cloud-tofu';
 import { ARM, AzureAuth, SCOPES, azureJson } from './auth.js';
+import { readAzureBackups } from './backups.js';
 import { AZURE_CAPABILITIES } from './catalog.js';
 import { azureConfig, configChecks, type AzureCredentials } from './config.js';
 import { armUrl, checkAzureHealth, containerAppLogs, getArm, mainResourceId, type ArmReader } from './health.js';
@@ -127,6 +129,13 @@ export class AzureAdapter extends OpenTofuAdapter<AzureCredentials> {
 
   protected health(ctx: ProviderContext, creds: AzureCredentials, res: ResourceIdentifier, outputs: ResourceOutputs): Promise<HealthResult> {
     return checkAzureHealth(this.arm(ctx, creds), res.serviceKind, outputs);
+  }
+
+  /** Backups of a PostgreSQL flexible server (open item 18). */
+  async getBackups(ctx: ProviderContext, res: ResourceIdentifier): Promise<BackupInfo | null> {
+    if (res.serviceKind !== 'database.postgresql') return null;
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    return readAzureBackups(this.arm(ctx, await this.credentials(ctx)), outputs);
   }
 
   protected override async probe(ctx: ProviderContext, creds: AzureCredentials, _res: ResourceIdentifier, outputs: ResourceOutputs): Promise<boolean | undefined> {

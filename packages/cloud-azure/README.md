@@ -123,6 +123,9 @@ The `restart` action restarts the active revision of a container app. Logs come 
   is always twice the vCPU, so the size follows the larger of `cpu` and `memoryMiB`.
 - Images must be pullable without credentials; private registries are not wired yet.
 - The CPU scale rule cannot wake an app from zero, so autoscaled apps keep at least one replica.
+- Backups (open item 18): the worker reads a PostgreSQL server's retention, earliest restore point
+  and last completed backup through ARM. Azure reports no backup schedule or failed backups there,
+  so a missing backup shows as overdue after 26 hours. Not yet verified on a live account.
 - PostgreSQL backups cannot be disabled (minimum 7 days). High availability needs the General
   Purpose tier, so `micro` and `small` move to `GP_Standard_D2ds_v5` when HA is requested.
   Private PostgreSQL needs a network in the same placement slot; with `publicAccess` the server

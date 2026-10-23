@@ -5,6 +5,7 @@ import {
   ProviderError,
   readCredentialFields,
   safeMessage,
+  type BackupInfo,
   type CloudCapability,
   type CloudTarget,
   type HealthResult,
@@ -22,6 +23,7 @@ import {
 import { OpenTofuAdapter, type ModuleCall, type OpenTofuAdapterOptions, type RootParts, type StateStore } from '@orkstage/cloud-tofu';
 import { gcpApi, GcpTokenSource, type GcpApi } from './auth.js';
 import { GCP_CAPABILITIES } from './catalog.js';
+import { readGcpBackups } from './backups.js';
 import { gcpConfig, gcpConfigChecks, type GcpCredentials } from './config.js';
 import { accessSecret, cloudRunLogs, gcpHealth, gcpProbe, redeployCloudRun } from './health.js';
 import { GcsStateStore, gcsBackend } from './state.js';
@@ -148,6 +150,13 @@ export class GcpAdapter extends OpenTofuAdapter<GcpCredentials> {
 
   protected async health(ctx: ProviderContext, creds: GcpCredentials, res: ResourceIdentifier, outputs: ResourceOutputs): Promise<HealthResult> {
     return gcpHealth(await this.api(ctx, creds), res.serviceKind, outputs, gcpConfig(ctx.target).projectId, { fetch: this.fetch, signal: ctx.signal });
+  }
+
+  /** Backups of a Cloud SQL for PostgreSQL instance (open item 18). */
+  async getBackups(ctx: ProviderContext, res: ResourceIdentifier): Promise<BackupInfo | null> {
+    if (res.serviceKind !== 'database.postgresql') return null;
+    const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
+    return readGcpBackups(await this.api(ctx, await this.credentials(ctx)), outputs, gcpConfig(ctx.target).projectId);
   }
 
   protected override async probe(ctx: ProviderContext, creds: GcpCredentials, res: ResourceIdentifier, outputs: ResourceOutputs): Promise<boolean | undefined> {
