@@ -50,6 +50,11 @@ async function main() {
   const runner = new DeploymentRunner(ctx, new TargetSlots(redis));
   const triggerQueue = new Queue<TriggerJob>(QUEUES.triggers, { connection: redis.duplicate() });
   const triggerRunner = new TriggerRunner(ctx, triggerQueue);
+  // Scheduled triggers live in Redis as job schedulers. Register them again at startup, so after a
+  // Redis loss they do not wait for each instance's next deployment (syncSchedules is idempotent).
+  for (const { id } of await prisma.instance.findMany({ where: { status: { not: 'DESTROYED' } }, select: { id: true } })) {
+    await triggerRunner.syncSchedules(id).catch((err: unknown) => logger.warn({ instanceId: id, err: (err as Error).message }, 'trigger schedules not synced'));
+  }
   const monitor = new HealthMonitor(ctx);
   const emailQueue = new Queue<StatusEmailJob>(QUEUES.emails, { connection: redis.duplicate() });
   const notifier = new Notifier(ctx, emailQueue);
