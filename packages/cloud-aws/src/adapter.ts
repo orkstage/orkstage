@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { ACMClient } from '@aws-sdk/client-acm';
 import { ECSClient } from '@aws-sdk/client-ecs';
+import { PricingClient } from '@aws-sdk/client-pricing';
 import { RDSClient } from '@aws-sdk/client-rds';
 import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
 import { IAMClient } from '@aws-sdk/client-iam';
@@ -25,6 +26,7 @@ import {
   type CloudTarget,
   type DriftChange,
   type HealthResult,
+  type LivePriceTable,
   type LogLine,
   type BackupInfo,
   type CertificateInfo,
@@ -45,6 +47,7 @@ import {
 import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
 import { ECS_ACTIONS, RDS_OPERATIONS, rebootDatabase, restartService, scaleService, snapshotDatabase } from './actions.js';
 import { readBackups, RDS_ACTIONS, restoreToPointInTime } from './backups.js';
+import { awsLivePrices } from './pricing-api.js';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { readCertificates } from './certificates.js';
 import { awsConfig, isEmulator, stateBucketFor, stateRegionFor } from './config.js';
@@ -272,6 +275,15 @@ export class AwsAdapter implements CloudProviderAdapter {
     const outputs = res.outputs && Object.keys(res.outputs).length ? res.outputs : (await this.getResource(ctx, res)).outputs;
     if (!outputs.identifier) return null;
     return readBackups(new RDSClient(await this.creds.clientConfig(ctx)), String(outputs.identifier), ctx.signal);
+  }
+
+  /** Live prices of the context's region from the AWS Pricing API (ADR 0010); none for emulators. */
+  async livePrices(rawCtx: ProviderContext): Promise<LivePriceTable | null> {
+    const ctx = this.effective(rawCtx);
+    if (isEmulator(awsConfig(ctx.target))) return null;
+    // The Pricing API is served from us-east-1 whatever the region priced.
+    const client = new PricingClient({ ...(await this.creds.clientConfig(ctx)), region: 'us-east-1' });
+    return awsLivePrices(client, ctx.region, ctx.signal);
   }
 
   actions(capability: string): ResourceActionDescriptor[] {

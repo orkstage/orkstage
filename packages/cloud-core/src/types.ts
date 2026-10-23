@@ -70,6 +70,45 @@ export interface CapabilityPricing {
   haMultiplier?: number;
   /** Where the numbers come from, shown next to estimates. */
   source: string;
+  /** Date of the price data (ADR 0010), `YYYY-MM-DD`. */
+  asOf?: string;
+  /** Prices of other regions; a region without an entry uses the values above. */
+  regions?: Record<string, RegionalPricing>;
+}
+
+/** Prices of one region per capability, read from a provider's pricing API (ADR 0010). */
+export interface LivePriceTable {
+  prices: Record<string, RegionalPricing>;
+  /** Date of the provider's price data, `YYYY-MM-DD`. */
+  asOf: string;
+}
+
+/** Prices of one region (ADR 0010); a missing field keeps the capability's default value. */
+export interface RegionalPricing {
+  baseMonthly?: number;
+  perUnitMonthly?: CapabilityPricing['perUnitMonthly'];
+  bySize?: Record<string, number>;
+  /** Derived from other prices of the region rather than read from the provider's price list. */
+  derived?: boolean;
+}
+
+/**
+ * The pricing of one region: the region's table merged over the defaults. `region` is null when the
+ * capability has no table for it, so the estimate can say it used the default prices.
+ */
+export function pricingInRegion(pricing: CapabilityPricing, region: string): { pricing: CapabilityPricing; region: string | null; derived: boolean } {
+  const own = pricing.regions?.[region];
+  if (!own) return { pricing, region: null, derived: false };
+  return {
+    pricing: {
+      ...pricing,
+      baseMonthly: own.baseMonthly ?? pricing.baseMonthly,
+      perUnitMonthly: { ...pricing.perUnitMonthly, ...own.perUnitMonthly },
+      bySize: own.bySize ? { ...pricing.bySize, ...own.bySize } : pricing.bySize,
+    },
+    region,
+    derived: Boolean(own.derived),
+  };
 }
 
 export interface ResourceRequest {
@@ -281,6 +320,12 @@ export interface CloudProviderAdapter {
 
   /** Backups of a database resource; null for kinds without backups (open item 18). */
   getBackups?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<BackupInfo | null>;
+
+  /**
+   * Current list prices of the context's region from the provider's pricing API (ADR 0010), per
+   * capability; null when the target cannot be asked (an emulator). Callers cache the answer.
+   */
+  livePrices?(ctx: ProviderContext): Promise<LivePriceTable | null>;
 
   /** Certificates of the hostnames a `dns` or `web.frontend` resource serves (open item 9). */
   getCertificates?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<CertificateInfo[]>;

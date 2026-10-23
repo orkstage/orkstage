@@ -5,10 +5,11 @@ import { LauncherService } from '../deployments/launcher.service.js';
 import { CompileService } from './compile.service.js';
 import { DomainsController } from './domains.controller.js';
 import { InstancesController } from './instances.controller.js';
+import { LivePrices } from './live-prices.service.js';
 import { TriggersController } from './triggers.controller.js';
 
 @Module({
   controllers: [InstancesController, TriggersController, DeploymentsController, DomainsController],
-  providers: [CompileService, LauncherService],
+  providers: [CompileService, LauncherService, LivePrices],
 })
 export class InstancesModule {}

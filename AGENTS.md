@@ -95,9 +95,12 @@ Owner decisions that changes must move toward, not away from. Read the ADR befor
   release strategies (canary, blue/green, smart rollback) and production approval for disruptive
   actions. Future AI agents may only propose catalog actions. Add new actions to the catalog, not
   as adapter only names.
-- **Prices** (ADR 0010): estimates come from a `PriceSource`: the AWS Pricing API first, bundled
-  per region tables in each adapter's catalog as the fallback and for providers without an API.
-  Every estimate records its source and date. Prices live only in catalog tables.
+- **Prices** (ADR 0010): estimates price each resource in its region. Live prices first (an
+  adapter's `livePrices`, AWS Pricing API, cached a day by the API's `LivePrices`), then the
+  capability's bundled table for the region (`pricing.regions`), then its default prices; every
+  line says which, and the estimate lists its sources and dates. AWS tables are generated
+  (`pnpm -C packages/cloud-aws build && node packages/cloud-aws/scripts/refresh-prices.mjs`, at
+  release time); other providers still have one table. Prices live only in catalog tables.
 
 ## How to make common changes
 

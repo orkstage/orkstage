@@ -12,7 +12,7 @@ import {
   type ValidationIssue,
 } from '@orkstage/templates';
 import { resolveConnectivity, wireAllowlist } from './connectivity.js';
-import { categoryOf, estimateResourceMonthly, summarizeCost } from './cost.js';
+import { categoryOf, priceLine, summarizeCost } from './cost.js';
 import { evaluatePolicies } from './policies.js';
 import type { CompileInput, CostLine, ResolvedConnectivity, ResolvedInfrastructure, ResolvedResource } from './types.js';
 
@@ -153,8 +153,7 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
       resourceId: r.id,
       category: categoryOf(r.type),
       provider: cap.provider,
-      monthly: estimateResourceMonthly(r, cap),
-      source: cap.pricing?.source ?? 'No pricing data',
+      ...priceLine(r, cap, region, input.livePricing?.(cap, region)),
     });
   }
 

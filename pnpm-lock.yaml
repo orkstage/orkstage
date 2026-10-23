@@ -362,6 +362,9 @@ importers:
       '@aws-sdk/client-iam':
         specifier: 3.1153.0
         version: 3.1153.0
+      '@aws-sdk/client-pricing':
+        specifier: 3.1153.0
+        version: 3.1153.0
       '@aws-sdk/client-rds':
         specifier: 3.1153.0
         version: 3.1153.0
@@ -789,6 +792,10 @@ packages:
 
   '@aws-sdk/client-iam@3.1153.0':
     resolution: {integrity: sha512-HL5UKP2izuUakWi7RhN7HbZ613wdT2eJ4C7P63rZWsE4jC5QednU44Pz2bldCCsvfzobC8iYBBHOmXSsa1Jrcg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-pricing@3.1153.0':
+    resolution: {integrity: sha512-12xL5uEpC+k1YuHTunGbcejrjylXQc0jhwtYBHrI19QNY/cAahaeWSnh7TLNE97wysjLP2Fi9OmZzfKQ0flv7Q==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-rds@3.1153.0':
@@ -3098,6 +3105,17 @@ snapshots:
       '@aws-sdk/core': 3.978.5
       '@aws-sdk/credential-provider-node': 3.972.88
       '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.2
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-pricing@3.1153.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.5
+      '@aws-sdk/credential-provider-node': 3.972.88
+      '@aws-sdk/types': 3.975.0
       '@smithy/core': 3.36.2
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1

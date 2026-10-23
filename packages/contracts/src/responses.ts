@@ -201,7 +201,9 @@ export interface PreviewDto {
     currency: string;
     total: number;
     confidence: string;
-    lines: { resourceId: string; category: string; provider: string; monthly: number | null; source: string }[];
+    lines: { resourceId: string; category: string; provider: string; monthly: number | null; source: string; asOf?: string | null }[];
+    /** Every price source the lines used, with its date (ADR 0010). */
+    sources?: { source: string; asOf: string | null }[];
   };
   plan: {
     counts: Record<'CREATE' | 'UPDATE' | 'DELETE' | 'NOOP', number>;
