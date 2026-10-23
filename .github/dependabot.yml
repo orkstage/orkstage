@@ -46,7 +46,11 @@ updates:
           - minor
           - patch
     ignore:
+      # The Dockerfile names the image library/node (mirror.gcr.io), so both names are listed.
       - dependency-name: node
+        update-types:
+          - version-update:semver-major
+      - dependency-name: library/node
         update-types:
           - version-update:semver-major
 

@@ -23,13 +23,13 @@
   "dependencies": {
     "@orkstage/domain": "workspace:*",
     "@orkstage/templates": "workspace:*",
-    "@prisma/adapter-pg": "7.10.0",
-    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "pg": "^8.16.0"
   },
   "devDependencies": {
     "@types/pg": "^8.15.0",
-    "prisma": "7.10.0"
+    "prisma": "7.10.1"
   },
   "files": [
     "dist",

@@ -25,9 +25,9 @@
     "check:spdx": "bash scripts/spdx.sh"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "prettier": "3.9.9",
+    "@types/node": "^24.19.2",
+    "prettier": "3.9.10",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }
