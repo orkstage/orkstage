@@ -62,7 +62,7 @@ export async function checkVultrHealth(api: VultrApi, kind: string, out: Resourc
     case 'object-storage': {
       const r = await api.get<{ object_storage: VultrObjectStorage }>(`/object-storage/${out.id}`);
       const sub = r?.object_storage;
-      if (!sub || sub.status !== 'active') return result('DEGRADED', `Object Storage subscription ${sub?.status ?? 'unknown'}`, started);
+      if (sub?.status !== 'active') return result('DEGRADED', `Object Storage subscription ${sub?.status ?? 'unknown'}`, started);
       try {
         await deps.headBucket(
           { endpoint: `https://${sub.s3_hostname}`, region: STATE_SIGNING_REGION, bucket: String(out.bucket), accessKeyId: sub.s3_access_key, secretAccessKey: sub.s3_secret_key, pathStyle: true },

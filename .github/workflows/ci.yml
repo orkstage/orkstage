@@ -58,6 +58,8 @@ jobs:
           node-version: 24.22.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Biome (biome.json): correctness and suspicious rules; warnings fail too.
+      - run: pnpm lint
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test

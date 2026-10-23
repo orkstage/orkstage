@@ -276,7 +276,7 @@ export abstract class OpenTofuAdapter<Creds> implements CloudProviderAdapter {
   rootConfig(ctx: ProviderContext, req: ResourceRequest): Record<string, unknown> {
     const { module, inputs, externalSecrets } = this.moduleCall(ctx, req);
     const parts = this.rootParts(ctx, req);
-    const external = externalSecrets?.length ? true : false;
+    const external = Boolean(externalSecrets?.length);
     const variables = { ...(parts.variables ?? {}), ...(external ? { external_secrets: EXTERNAL_SECRETS_VARIABLE } : {}) };
     return {
       terraform: {

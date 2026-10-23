@@ -450,7 +450,7 @@ export class SupabaseAdapter implements CloudProviderAdapter {
 
 function bucketLocation(resource: ResourceIdentifier): { ref: string; bucket: string } | undefined {
   const id = resource.providerResourceId;
-  if (id && id.includes('/')) {
+  if (id?.includes('/')) {
     const [ref, bucket] = id.split('/', 2) as [string, string];
     return { ref, bucket };
   }

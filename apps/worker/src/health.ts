@@ -182,7 +182,7 @@ export class HealthMonitor {
         const c = rule.condition as unknown as HealthCondition;
         return c.signal === 'health' && (c.critical === undefined || c.critical === r.critical) && r.consecutiveHealthFailures >= c.consecutiveFailures;
       });
-      if (!rule || !rule.actions.includes('create_incident')) continue;
+      if (!rule?.actions.includes('create_incident')) continue;
 
       // Cooldown: avoid flapping incidents right after one was resolved.
       const recent = await prisma.incident.findFirst({ where: { dedupKey, resolvedAt: { gte: new Date(Date.now() - rule.cooldownSeconds * 1000) } } });

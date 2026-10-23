@@ -11,6 +11,7 @@ import { SESSION_COOKIE } from './auth.js';
  */
 @Injectable()
 export class ClientThrottlerGuard extends ThrottlerGuard {
+  // biome-ignore lint/suspicious/noExplicitAny: the signature of ThrottlerGuard.getTracker, which this overrides.
   protected override async getTracker(req: Record<string, any>): Promise<string> {
     // Sign in and public routes never check the token, so a made up one must not buy a new bucket.
     const byAddress = typeof req.url === 'string' && (req.url.includes('/auth/') || req.url.includes('/public/'));

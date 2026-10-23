@@ -214,7 +214,7 @@ export class MarketplaceController {
     await this.ensureEnabled(p);
     authorize(p, 'read', 'Template');
     const row = await this.prisma.marketplaceListing.findUnique({ where: { id }, include });
-    if (!row || row.status !== 'PUBLISHED') throw notFound('Listing');
+    if (row?.status !== 'PUBLISHED') throw notFound('Listing');
     const version = row.template.versions[0];
     if (!version) throw unprocessable('TEMPLATE_NOT_PUBLISHED', 'This template has no published version.');
     await this.prisma.marketplaceListing.update({ where: { id }, data: { useCount: { increment: 1 } } });

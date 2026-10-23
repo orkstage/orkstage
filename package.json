@@ -13,6 +13,7 @@
     "dev": "pnpm -r --parallel --filter \"./apps/**\" run dev",
     "test": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
+    "lint": "biome lint --error-on-warnings .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @orkstage/database run generate",
@@ -25,6 +26,7 @@
     "check:spdx": "bash scripts/spdx.sh"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^24.19.2",
     "prettier": "3.9.10",
     "typescript": "7.0.2",

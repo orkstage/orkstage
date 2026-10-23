@@ -55,7 +55,7 @@ export class TriggerRunner {
   private async execute(runId: string): Promise<void> {
     const { prisma, registry } = this.ctx;
     const run = await prisma.triggerRun.findUnique({ where: { id: runId } });
-    if (!run || run.status !== 'QUEUED') return; // already handled (duplicate delivery)
+    if (run?.status !== 'QUEUED') return; // already handled (duplicate delivery)
     await prisma.triggerRun.update({ where: { id: run.id }, data: { status: 'RUNNING', startedAt: new Date() } });
 
     const finish = async (ok: boolean, data: { message: string; reference?: string; url?: string; errorClass?: string }) => {
@@ -72,7 +72,7 @@ export class TriggerRunner {
     };
 
     const row = await prisma.instanceResource.findUnique({ where: { instanceId_resourceId: { instanceId: run.instanceId, resourceId: run.resourceId } } });
-    if (!row || row.status !== 'ACTIVE') return finish(false, { message: `Resource "${run.resourceId}" is not deployed.`, errorClass: 'VALIDATION_ERROR' });
+    if (row?.status !== 'ACTIVE') return finish(false, { message: `Resource "${run.resourceId}" is not deployed.`, errorClass: 'VALIDATION_ERROR' });
     const adapter = registry.has(row.provider) ? registry.get(row.provider) : undefined;
     if (!adapter?.runAction || !(adapter.actions?.(row.capability) ?? []).some((a) => a.name === run.action)) {
       return finish(false, { message: `${row.provider} does not offer "${run.action}" for ${row.capability}.`, errorClass: 'VALIDATION_ERROR' });
