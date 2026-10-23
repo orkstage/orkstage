@@ -16,7 +16,7 @@ export const MODULE_BY_CAPABILITY: Record<string, string> = {
 export const CLUSTER_KINDS = new Set(['compute.container-service', 'ingress']);
 
 const PROVIDERS = {
-  coreweave: { source: 'coreweave/coreweave', version: '~> 0.24.0' },
+  coreweave: { source: 'coreweave/coreweave', version: '~> 0.26.0' },
   kubernetes: { source: 'hashicorp/kubernetes', version: '~> 3.3' },
 };
 
