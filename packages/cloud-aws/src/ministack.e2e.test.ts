@@ -24,7 +24,7 @@ const target: CloudTarget = {
 
 function fixture() {
   const runner = new TofuRunner({
-    image: process.env.TOFU_IMAGE ?? 'ghcr.io/opentofu/opentofu:1.12.9',
+    image: process.env.TOFU_IMAGE ?? 'ghcr.io/opentofu/opentofu:1.13.2',
     modulesDir: resolve(__dirname, '../../../infra/tofu/modules'),
     workRoot: join(tmpdir(), 'orkstage-tofu-e2e'),
     pluginCacheVolume: 'orkstage-tofu-plugins',
