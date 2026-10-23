@@ -41,7 +41,7 @@ const schema = z
     // Drift scans re-plan every applied resource on real providers (one OpenTofu plan each). 0 = off.
     DRIFT_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(360),
     // OpenTofu runner (worker only). Each command runs in a throwaway container.
-    TOFU_IMAGE: z.string().default('ghcr.io/opentofu/opentofu:1.12.9'),
+    TOFU_IMAGE: z.string().default('ghcr.io/opentofu/opentofu:1.13.2'),
     TOFU_MODULES_DIR: z.string().optional(),
     TOFU_WORK_DIR: z.string().optional(),
     TOFU_PLUGIN_CACHE_VOLUME: z.string().default('orkstage-tofu-plugins'),

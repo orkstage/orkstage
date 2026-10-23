@@ -5,7 +5,7 @@
 ## Decision
 
 - **Isolated runner.** The worker never runs IaC in its own process. Every `tofu` command runs
-  in a throwaway container (`ghcr.io/opentofu/opentofu:1.12.9`, pinned) with the module library
+  in a throwaway container (`ghcr.io/opentofu/opentofu:1.13.2`, pinned) with the module library
   mounted read only and a shared cache volume for provider plugins. Credentials are passed as
   environment variables to that one container only, never in files, command lines or state
   (`packages/iac`).
