@@ -42,6 +42,7 @@ export const PROVIDER_FORMS: Record<Provider, ProviderForm> = {
       { key: 'accountId', required: true, example: '123456789012', pattern: '^\\d{12}$', fixed: true },
       { key: 'roleArn', required: true, example: 'arn:aws:iam::123456789012:role/orkstage-deploy', pattern: '^arn:aws[a-z-]*:iam::\\d{12}:role\\/.+$' },
       { key: 'stateBucket', required: false, example: 'orkstage-tfstate-123456789012-us-east-1', fixed: true },
+      { key: 'stateRegion', required: false, example: 'us-east-1', fixed: true },
       { key: 'dnsZone', required: false, example: 'apps.example.com', pattern: '^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$' },
     ],
     credentialFields: ['externalId'],

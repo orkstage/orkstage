@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AwsAdapter, isDestructivePlan } from './adapter.js';
 import { isAwsNotFound } from './health.js';
 import { probePermissions, REQUIRED_ACTIONS } from './permissions.js';
-import { externalSecretIds, moduleInputs, rootConfig, serviceAutoscaling } from './stacks.js';
+import { stateRegionFor } from './config.js';
+import { chooseStateKey, externalSecretIds, moduleInputs, rootConfig, serviceAutoscaling } from './stacks.js';
 
 const target: CloudTarget = {
   id: 't1',
@@ -113,6 +114,23 @@ describe('OpenTofu stack rendering', () => {
     expect(cfg.terraform.backend.s3.key).toBe('orkstage/ork-acme-prod-api.tfstate');
     expect(cfg.provider.aws.endpoints.ecs).toBe('http://ministack:4566');
     expect(cfg.provider.aws.default_tags.tags['platform:managed']).toBe('true');
+  });
+
+  it('keeps a custom state bucket in its own region and puts the region in new state keys (A5)', () => {
+    const shared = { ...ctx, region: 'sa-east-1', target: { ...ctx.target, defaultRegion: 'us-east-1', config: { ...ctx.target.config, stateBucket: 'acme-orkstage-tfstate', stateRegion: 'eu-west-1' } } };
+    const key = chooseStateKey(true, false, 'sa-east-1', 'ork-acme-prod-api');
+    expect(key).toBe('orkstage/sa-east-1/ork-acme-prod-api.tfstate');
+    const cfg = rootConfig(shared, request({ serviceKind: 'queue', capability: 'sqs', spec: {} }), key) as { terraform: { backend: { s3: { bucket: string; key: string; region: string } } } };
+    expect(cfg.terraform.backend.s3).toMatchObject({ bucket: 'acme-orkstage-tfstate', key, region: 'eu-west-1' });
+    // Without stateRegion, the target's default region; the default bucket stays in the deploy region.
+    const noRegion = { ...shared, target: { ...shared.target, config: { ...shared.target.config, stateRegion: undefined } } };
+    expect(stateRegionFor(noRegion.target, 'sa-east-1')).toBe('us-east-1');
+    expect(stateRegionFor(ctx.target, 'sa-east-1')).toBe('sa-east-1');
+  });
+
+  it('keeps existing state keys and the plain key of the default bucket (A5)', () => {
+    expect(chooseStateKey(true, true, 'sa-east-1', 'ork-acme-prod-api')).toBe('orkstage/ork-acme-prod-api.tfstate');
+    expect(chooseStateKey(false, false, 'sa-east-1', 'ork-acme-prod-api')).toBe('orkstage/ork-acme-prod-api.tfstate');
   });
 
   it('never renders secret values into configuration', () => {

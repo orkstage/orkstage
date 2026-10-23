@@ -29,7 +29,7 @@ describe('provider config checks', () => {
   });
 
   it('keeps the account and the state location of every provider fixed', () => {
-    expect(contracts.fixedConfigKeys('aws')).toEqual(['accountId', 'stateBucket']);
+    expect(contracts.fixedConfigKeys('aws')).toEqual(['accountId', 'stateBucket', 'stateRegion']);
     for (const provider of contracts.PROVIDERS) {
       const keys = contracts.PROVIDER_FORMS[provider].config.map((f) => f.key);
       for (const key of keys.filter((k) => /^state(Bucket|Endpoint|Region|StorageAccount|ResourceGroup|Container)$/.test(k))) {

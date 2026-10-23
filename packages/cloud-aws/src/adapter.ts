@@ -4,6 +4,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutBucketVersioningCommand,
   PutObjectCommand,
   S3Client,
@@ -44,12 +45,12 @@ import { TofuError, type TofuRunner, type TofuStack } from '@orkstage/iac';
 import { readBackups, RDS_ACTIONS, restoreToPointInTime } from './backups.js';
 import { AWS_CAPABILITIES } from './catalog.js';
 import { readCertificates } from './certificates.js';
-import { awsConfig, isEmulator, stateBucketFor } from './config.js';
+import { awsConfig, isEmulator, stateBucketFor, stateRegionFor } from './config.js';
 import { AwsCredentialProvider, REFRESH_MARGIN_MS, type ExternalIdResolver, type StsClientFactory } from './credentials.js';
 import { checkAwsHealth, probeAwsExists, readAwsLogs } from './health.js';
 import { cloudWatchQuery, readCloudWatch } from './metrics.js';
 import { probePermissions } from './permissions.js';
-import { externalSecretIds, flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
+import { chooseStateKey, externalSecretIds, flattenOutputs, rootConfig, stateKeyFor } from './stacks.js';
 
 export interface AwsAdapterOptions {
   resolveExternalId: ExternalIdResolver;
@@ -165,12 +166,13 @@ export class AwsAdapter implements CloudProviderAdapter {
       ctx.log?.('warn', `${req.resourceId}: autoscaling is not emulated; running ${String(req.spec.replicas ?? 1)} fixed replica(s).`);
     }
     await this.ensureStateBucket(ctx);
-    const config = rootConfig(ctx, req);
+    const key = await this.stateKey(ctx, req.name);
+    const config = rootConfig(ctx, req, key);
     const stack = await this.stack(ctx, req.name, config, savedPlanFor(req), await this.externalSecrets(ctx, req));
     try {
       const result = await runner.apply(stack);
       // Keep the exact configuration beside its state so destroy never depends on a stale template.
-      await this.putObject(ctx, `${stateKeyFor(req.name)}.config.json`, JSON.stringify(config));
+      await this.putObject(ctx, `${key}.config.json`, JSON.stringify(config));
       const outputs = flattenOutputs(result.outputs.all);
       const unchanged = result.changes.add + result.changes.change + result.changes.remove === 0;
       return { providerResourceId: providerIdFrom(req.serviceKind, outputs), outputs, unchanged };
@@ -183,7 +185,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
     try {
-      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req), savedPlanFor(req), await this.externalSecrets(ctx, req)));
+      const plan = await runner.plan(await this.stack(ctx, req.name, rootConfig(ctx, req, await this.stateKey(ctx, req.name)), savedPlanFor(req), await this.externalSecrets(ctx, req)));
       return { ...plan, destructive: isDestructivePlan(plan.actions) };
     } catch (err) {
       throw toProviderError(err);
@@ -194,7 +196,7 @@ export class AwsAdapter implements CloudProviderAdapter {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
     try {
-      return await runner.drift(await this.stack(ctx, req.name, rootConfig(ctx, req), undefined, await this.externalSecrets(ctx, req)));
+      return await runner.drift(await this.stack(ctx, req.name, rootConfig(ctx, req, await this.stateKey(ctx, req.name)), undefined, await this.externalSecrets(ctx, req)));
     } catch (err) {
       throw toProviderError(err);
     }
@@ -203,11 +205,12 @@ export class AwsAdapter implements CloudProviderAdapter {
   async deleteResource(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<void> {
     const ctx = this.effective(rawCtx);
     const runner = this.requireRunner();
-    const raw = await this.getObject(ctx, `${stateKeyFor(res.name)}.config.json`);
+    const key = await this.stateKey(ctx, res.name);
+    const raw = await this.getObject(ctx, `${key}.config.json`);
     if (!raw) return; // never applied, or already destroyed: idempotent
     try {
       await runner.destroy(await this.stack(ctx, res.name, JSON.parse(raw) as Record<string, unknown>));
-      await this.deleteObject(ctx, `${stateKeyFor(res.name)}.config.json`);
+      await this.deleteObject(ctx, `${key}.config.json`);
     } catch (err) {
       throw toProviderError(err);
     }
@@ -215,7 +218,7 @@ export class AwsAdapter implements CloudProviderAdapter {
 
   async getResource(rawCtx: ProviderContext, res: ResourceIdentifier): Promise<ResourceState> {
     const ctx = this.effective(rawCtx);
-    const raw = await this.getObject(ctx, stateKeyFor(res.name));
+    const raw = await this.getObject(ctx, await this.stateKey(ctx, res.name));
     if (!raw) return { exists: false, outputs: {} };
     const state = JSON.parse(raw) as { resources?: { mode: string }[]; outputs?: { all?: { value: unknown } } };
     const exists = (state.resources ?? []).some((r) => r.mode === 'managed');
@@ -360,8 +363,26 @@ export class AwsAdapter implements CloudProviderAdapter {
     };
   }
 
+  /** S3 in the state bucket's region, which differs from the deploy region for a custom bucket (A5). */
   private async s3(ctx: ProviderContext) {
-    return new S3Client({ ...(await this.creds.clientConfig(ctx)), forcePathStyle: true });
+    return new S3Client({ ...(await this.creds.clientConfig(ctx)), region: stateRegionFor(ctx.target, ctx.region), forcePathStyle: true });
+  }
+
+  private async stateKey(ctx: ProviderContext, name: string): Promise<string> {
+    const custom = Boolean(awsConfig(ctx.target).stateBucket);
+    return chooseStateKey(custom, custom && (await this.objectExists(ctx, stateKeyFor(name))), ctx.region, name);
+  }
+
+  private async objectExists(ctx: ProviderContext, key: string): Promise<boolean> {
+    const bucket = stateBucketFor(awsConfig(ctx.target), ctx.region);
+    try {
+      await (await this.s3(ctx)).send(new HeadObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: ctx.signal });
+      return true;
+    } catch (err) {
+      const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (e.name === 'NotFound' || e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) return false;
+      throw err;
+    }
   }
 
   private async stateBucketCheck(ctx: ProviderContext): Promise<TargetValidationCheck> {
