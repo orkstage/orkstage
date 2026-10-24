@@ -40,6 +40,8 @@ export interface ExecuteOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Adapter progress output per resource (e.g. OpenTofu diagnostics). */
   log?: (resourceId: string, level: 'info' | 'warn' | 'error', message: string) => void;
+  /** Canary or blue/green release of the container services this apply changes (ADR 0009). */
+  release?: { strategy: 'canary' | 'blueGreen'; trafficPercent: number };
 }
 
 export type ExecutionOutcome = Record<string, StepStatus>;
@@ -108,6 +110,7 @@ export async function executeApply(opts: ExecuteOptions): Promise<ExecutionOutco
           dependencyOutputs,
           idempotencyKey: idempotencyKeyFor(opts.tenantId, opts.instanceId, r),
           planId: opts.planId,
+          ...(opts.release && r.type === 'compute.container-service' ? { release: opts.release } : {}),
         });
         outputs[r.id] = result.outputs;
         status[r.id] = 'SUCCEEDED';

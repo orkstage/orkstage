@@ -47,6 +47,8 @@ export interface MockTargetConfig {
   failures?: Record<string, InjectedFailure>;
   /** Resource ids that report UNHEALTHY. Runtime overrides live in the state store. */
   unhealthy?: string[];
+  /** Container images that report UNHEALTHY while they run, to exercise automatic rollback. */
+  unhealthyImages?: string[];
   /** Fail target validation, to exercise the connection-health flow. */
   invalidCredentials?: boolean;
   /** Resource ids whose changes plan as replacements (to exercise destructive-change approval). */
@@ -134,7 +136,7 @@ export class MockAdapter implements CloudProviderAdapter {
     const simulate = cfg.simulate ?? 'aws';
     const providerResourceId =
       existing?.providerResourceId ?? `sim-${simulate}-${req.serviceKind.split('.')[0]}-${hash(`${ctx.target.id}:${ctx.region}:${req.name}`).slice(0, 10)}`;
-    const outputs = outputsFor(req, ctx.region, simulate, providerResourceId);
+    const outputs = { ...outputsFor(req, ctx.region, simulate, providerResourceId), ...releaseOutputs(req, existing?.outputs) };
     // Like the real adapters: a service copies the credentials of a dependency on another
     // (simulated) provider into its own secret store. Only the names are kept, never the values.
     if (req.serviceKind === 'compute.container-service') {
@@ -192,7 +194,8 @@ export class MockAdapter implements CloudProviderAdapter {
       return { state: 'UNHEALTHY', message: 'Resource does not exist.', checkedAt };
     }
     const override = (await this.store.get(this.healthKey(ctx, res.name))) as HealthState | null;
-    const cfgUnhealthy = config(ctx.target).unhealthy?.includes(res.resourceId);
+    const image = String((await this.read(this.key(ctx, res.name)))?.outputs.image ?? '');
+    const cfgUnhealthy = config(ctx.target).unhealthy?.includes(res.resourceId) || (image !== '' && (config(ctx.target).unhealthyImages ?? []).includes(image));
     const state: HealthState = override ?? (cfgUnhealthy ? 'UNHEALTHY' : 'HEALTHY');
     const latencyMs = 20 + (parseInt(hash(`${res.resourceId}:${checkedAt.slice(0, 16)}`).slice(0, 4), 16) % 60);
     return {
@@ -207,6 +210,20 @@ export class MockAdapter implements CloudProviderAdapter {
   async readSecret(_ctx: ProviderContext, ref: string): Promise<Record<string, string>> {
     if (!ref.startsWith('secret://')) throw new ProviderError('SIM_SECRET_UNKNOWN', `${ref} is not a simulated secret.`, 'VALIDATION_ERROR', 'mock');
     return { username: 'app', password: `sim-${hash(ref).slice(0, 16)}` };
+  }
+
+  /** Canary and blue/green releases of container services, simulated as traffic weights (ADR 0009). */
+  releaseStrategies(capability: string): ('canary' | 'blueGreen')[] {
+    const service = Object.values(SIMULATED_CATALOGS).some((list) => list.some((c) => c.capability === capability && c.serviceKind === 'compute.container-service'));
+    return service ? ['canary', 'blueGreen'] : [];
+  }
+
+  async promoteRelease(ctx: ProviderContext, res: ResourceIdentifier): Promise<void> {
+    const key = this.key(ctx, res.name);
+    const stored = await this.read(key);
+    if (!stored?.outputs.previous_image) return;
+    const { previous_image: _old, release_strategy: _strategy, ...outputs } = stored.outputs;
+    await this.store.set(key, JSON.stringify({ ...stored, outputs: { ...outputs, traffic_percent: 100 } }));
   }
 
   /** The actions real platforms offer, simulated, so templates with triggers work without accounts. */
@@ -417,6 +434,20 @@ const SIMULATED_ACTIONS: ResourceActionDescriptor[] = [
 function simulated(target: CloudTarget): SimulatedProvider {
   const value = config(target).simulate;
   return value && value in SIMULATED_CATALOGS ? value : 'aws';
+}
+
+/**
+ * The image a container service runs and, during a canary or blue/green release, the share of
+ * traffic the new release gets and the image it replaces. Any other apply ends a release in favour
+ * of what it applies (that is how a rollback looks).
+ */
+function releaseOutputs(req: ResourceRequest, previous: ResourceOutputs | undefined): ResourceOutputs {
+  if (req.serviceKind !== 'compute.container-service') return {};
+  const image = String(req.spec.image ?? '');
+  const before = previous?.image === undefined ? undefined : String(previous.image);
+  if (!req.release || before === undefined || before === image) return { image, traffic_percent: 100 };
+  const percent = req.release.strategy === 'canary' ? req.release.trafficPercent : 100;
+  return { image, traffic_percent: percent, previous_image: before, release_strategy: req.release.strategy };
 }
 
 function outputsFor(req: ResourceRequest, region: string, simulate: string, id: string): ResourceOutputs {

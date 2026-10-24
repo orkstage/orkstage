@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { TenantFeatures, TenantLimits } from '@orkstage/domain/core';
+import { catalogAction, type TenantFeatures, type TenantLimits } from '@orkstage/domain/core';
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';
 import { activeResources, buildDependencyGraph, DependencyCycleError, topologicalLevels } from './graph.js';
@@ -120,6 +120,8 @@ export function validateSemantics(template: EnvironmentTemplate): ValidationIssu
     triggerNames.add(t.name);
     if (!ids.has(t.resource)) err('UNKNOWN_TRIGGER_RESOURCE', `Trigger "${t.name}" targets unknown resource "${t.resource}".`, `${path}.resource`);
     if (!t.on.manual && !t.on.webhook && !t.on.schedule) err('TRIGGER_NEVER_RUNS', `Trigger "${t.name}" is not manual, scheduled or a webhook, so it can never run.`, `${path}.on`);
+    // Releases and rollbacks are deployments a person or a pipeline starts, never a clock (ADR 0009).
+    if (t.on.schedule && catalogAction(t.action)?.platform) err('TRIGGER_NOT_SCHEDULABLE', `Trigger "${t.name}" runs ${t.action}, which cannot run on a schedule.`, `${path}.on.schedule`);
   }
 
   if (issues.length === 0) {

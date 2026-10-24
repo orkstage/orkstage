@@ -257,6 +257,23 @@ describe('compiler — failing before cloud mutation', () => {
 describe('executor', () => {
   const ids = { tenantId: 'tenant-1', instanceId: 'inst-1', correlationId: 'c1' };
 
+  it('compiles the template release settings and sends a canary to container services only (ADR 0009)', async () => {
+    const reg = registry();
+    const resolved = compileInfrastructure(input(templates['multicloud-reference']!, multiCloudBindings), reg);
+    expect(resolved.release).toEqual({ strategy: 'rolling', trafficPercent: 10, bakeMinutes: 0, autoRollback: true });
+    const seen: Record<string, unknown> = {};
+    const mock = reg.get('mock');
+    const ensure = mock.ensureResource.bind(mock);
+    mock.ensureResource = async (ctx, req) => {
+      seen[req.resourceId] = req.release;
+      return ensure(ctx, req);
+    };
+    const { hooks } = recordingHooks();
+    await executeApply({ resolved, registry: reg, hooks, ...ids, release: { strategy: 'canary', trafficPercent: 25 } });
+    expect(seen.api).toEqual({ strategy: 'canary', trafficPercent: 25 });
+    expect(seen.database).toBeUndefined();
+  });
+
   it('provisions the full DAG in dependency order', async () => {
     const reg = registry();
     const resolved = compileInfrastructure(input(templates['multicloud-reference']!, multiCloudBindings), reg);

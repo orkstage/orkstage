@@ -37,6 +37,49 @@ function fixture(cfg: MockTargetConfig = {}) {
 
 runAdapterContract('MockAdapter', () => fixture({ destructivePlans: ['database'] }));
 
+describe('MockAdapter releases (ADR 0009)', () => {
+  const service = (image: string, key: string, release?: ResourceRequest['release']): ResourceRequest => ({
+    resourceId: 'api',
+    serviceKind: 'compute.container-service',
+    capability: 'ecs-fargate',
+    name: 'ork-acme-prod-api',
+    tags: {},
+    spec: { image, port: 8080 },
+    dependencyOutputs: {},
+    idempotencyKey: key,
+    release,
+  });
+
+  it('offers canary and blue/green for container services only', () => {
+    const { adapter } = fixture();
+    expect(adapter.releaseStrategies('ecs-fargate')).toEqual(['canary', 'blueGreen']);
+    expect(adapter.releaseStrategies('rds-postgres')).toEqual([]);
+  });
+
+  it('runs a canary beside the old release, promotes it, and a plain apply returns to the old one', async () => {
+    const { adapter, context } = fixture();
+    await adapter.ensureResource(context, service('repo/api@sha256:1', 'k1'));
+    const canary = await adapter.ensureResource(context, service('repo/api@sha256:2', 'k2', { strategy: 'canary', trafficPercent: 10 }));
+    expect(canary.outputs).toMatchObject({ image: 'repo/api@sha256:2', traffic_percent: 10, previous_image: 'repo/api@sha256:1', release_strategy: 'canary' });
+    await adapter.promoteRelease(context, { resourceId: 'api', serviceKind: 'compute.container-service', capability: 'ecs-fargate', name: 'ork-acme-prod-api' });
+    const promoted = await adapter.getResource(context, { resourceId: 'api', serviceKind: 'compute.container-service', capability: 'ecs-fargate', name: 'ork-acme-prod-api' });
+    expect(promoted.outputs).toMatchObject({ image: 'repo/api@sha256:2', traffic_percent: 100 });
+    expect(promoted.outputs.previous_image).toBeUndefined();
+    const back = await adapter.ensureResource(context, service('repo/api@sha256:1', 'k1'));
+    expect(back.outputs).toMatchObject({ image: 'repo/api@sha256:1', traffic_percent: 100 });
+    expect(back.outputs.previous_image).toBeUndefined();
+  });
+
+  it('reports a configured bad image as unhealthy while it runs', async () => {
+    const { adapter, context } = fixture({ unhealthyImages: ['repo/api@sha256:bad'] });
+    const ref = { resourceId: 'api', serviceKind: 'compute.container-service', capability: 'ecs-fargate', name: 'ork-acme-prod-api' };
+    await adapter.ensureResource(context, service('repo/api@sha256:bad', 'k1'));
+    expect((await adapter.checkHealth(context, ref)).state).toBe('UNHEALTHY');
+    await adapter.ensureResource(context, service('repo/api@sha256:good', 'k2'));
+    expect((await adapter.checkHealth(context, ref)).state).toBe('HEALTHY');
+  });
+});
+
 describe('MockAdapter simulation', () => {
   it('is deterministic for the same target and resource', async () => {
     const a = fixture();

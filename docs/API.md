@@ -70,7 +70,12 @@ package is the source of truth, and this page is the map.
 | GET/POST | `/instances` | list (`?tenantId`) or create a DRAFT; slots left out of `bindings` come from `profileId` or the default profile |
 | GET/PATCH | `/instances/:id` | `InstanceDto` with resources and the last deployment |
 | POST | `/instances/:id/preview` | `PreviewDto`: compile, policies, cost and plan, without changes |
-| POST | `/instances/:id/deploy` | `202 DeploymentSummaryDto` |
+| POST | `/instances/:id/deploy` `{release?: {strategy?, trafficPercent?, bakeMinutes?, autoRollback?}}` | `202 DeploymentSummaryDto`; the release settings go over the template's `spec.release` (ADR 0009) |
+| POST | `/instances/:id/rollback` `{deploymentId?}` | `202 DeploymentSummaryDto`: an apply of an earlier deployment's configuration, by default the last verified one; admins |
+| GET | `/instances/:id/triggers` | `TriggerDto[]` with availability, catalog action, risk and required role |
+| POST | `/instances/:id/triggers/:name/runs` `{params?}` | `202 TriggerRunDto`; disruptive actions on production wait in `AWAITING_APPROVAL` |
+| POST | `/instances/:id/trigger-runs/:runId/approve` | runs a trigger run that waited for approval (the action's role and the approval permission) |
+| POST | `/instances/:id/trigger-runs/:runId/cancel` | cancels a trigger run that waits for approval |
 | POST | `/instances/:id/upgrade` `{templateVersionId}` | explicit template version change (deploy afterwards) |
 | POST | `/instances/:id/destroy` `{confirm: slug}` | `202 DeploymentSummaryDto` |
 | GET | `/instances/:id/deployments` | `Page<DeploymentSummaryDto>` |

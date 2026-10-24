@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { ACTION_CATALOG, catalogActionFor, minimumRoleFor, roleAtLeast, stricterRole } from './actions.js';
+import { ACTION_CATALOG, catalogAction, catalogActionFor, minimumRoleFor, releaseSettings, roleAtLeast, stricterRole } from './actions.js';
 
 describe('action catalog (ADR 0009)', () => {
   it('maps a provider name to the catalog action of the resource type', () => {
@@ -27,6 +27,22 @@ describe('action catalog (ADR 0009)', () => {
     expect(stricterRole('CustomerDeveloper', 'CustomerOwner')).toBe('CustomerOwner');
     expect(roleAtLeast('CustomerOwner', 'CustomerAdmin')).toBe(true);
     expect(roleAtLeast('CustomerViewer', 'CustomerDeveloper')).toBe(false);
+  });
+
+  it('runs releases and rollbacks as platform deployments, disruptive and reversible (round 2)', () => {
+    for (const id of ['release.canary', 'release.blueGreen', 'release.rollback']) {
+      expect(catalogAction(id)).toMatchObject({ platform: true, risk: 'disruptive', reversible: true });
+    }
+    // Providers with their own rollback keep it.
+    expect(catalogActionFor('rollback', 'web.frontend', 'vercel')?.action.id).toBe('release.rollback');
+    expect(catalogAction('release.canary')?.params.map((p) => p.name)).toEqual(['trafficPercent', 'bakeMinutes']);
+  });
+
+  it('merges release settings: template, then the deployment; canaries always get a bake period', () => {
+    expect(releaseSettings()).toEqual({ strategy: 'rolling', trafficPercent: 10, bakeMinutes: 0, autoRollback: true });
+    expect(releaseSettings({ strategy: 'canary', trafficPercent: 20 })).toMatchObject({ strategy: 'canary', trafficPercent: 20, bakeMinutes: 15 });
+    expect(releaseSettings({ strategy: 'blueGreen', bakeMinutes: 30 }, { bakeMinutes: undefined, autoRollback: false })).toMatchObject({ bakeMinutes: 30, autoRollback: false });
+    expect(releaseSettings({ bakeMinutes: 10 }, { strategy: 'rolling', bakeMinutes: 0 }).bakeMinutes).toBe(0);
   });
 
   it('has unique ids, a risk and at least one resource type per action', () => {

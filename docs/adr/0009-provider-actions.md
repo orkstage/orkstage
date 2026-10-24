@@ -2,8 +2,10 @@
 
 **Status:** accepted on October 23, 2026 (owner decision; orkstage-dev `docs/aws-items.md`, A8).
 Round 1 built: the catalog (`packages/domain/src/actions.ts`), resolution and roles for triggers,
-and the AWS operations. Release strategies (round 2) and the production approval rule for
-disruptive actions are not built yet.
+and the AWS operations. Round 2 built (October 24): release settings, bake periods, smart and
+manual rollback, canary and blue/green through the adapter contract (the simulator implements
+them; AWS offers them after the first real account run, A1), and production approval for
+disruptive trigger runs. See "As built" at the end.
 
 ## Context
 
@@ -60,3 +62,33 @@ names, neither templates nor agents can be written once for every cloud.
   module gains the parts they need, off unless a template asks for a strategy.
 - The trigger schema keeps accepting existing action names; adapters map them to catalog ids during
   a deprecation period.
+
+## As built (round 2)
+
+- **Release settings** come from the template (`spec.release`: `strategy` rolling, canary or
+  blueGreen; `trafficPercent`; `bakeMinutes`; `autoRollback`) with the deploy call's own on top,
+  and are stored on the deployment. A canary or blue/green release without a bake period gets 15
+  minutes.
+- **Bake period.** After a successful apply with `bakeMinutes`, the worker watches the instance on
+  every health tick. An automated incident on the instance, or a critical resource failing three
+  checks in a row, fails the bake; a period that passes marks the deployment verified and, for a
+  canary or blue/green release, calls the adapter's `promoteRelease`. An apply without a bake
+  period is verified when it finishes healthy. A watched release that fails its health checks in
+  the verify phase is rolled back right away, so a bad canary never keeps its share of traffic.
+- **Smart rollback** is an apply of the target deployment's frozen configuration (template
+  version, image digests, variables), marked with `rollbackToId`. The automatic one targets the
+  last verified deployment before the failed one; `POST /instances/:id/rollback` and the
+  `release.rollback` trigger take a deployment id or default to the last verified one. Production
+  rollbacks follow the plan approval rule like any apply.
+- **Canary and blue/green** reach adapters as `release` on the container service request; adapters
+  declare `releaseStrategies` and implement `promoteRelease`. A deploy that asks for a strategy a
+  provider does not offer is refused (`RELEASE_STRATEGY_UNSUPPORTED`). The simulator implements
+  both as traffic weights, and `unhealthyImages` on a simulated target makes a release fail its
+  checks. AWS declares none yet: the ECS deployment controller strategies come with A1.
+- **Platform actions.** `release.canary`, `release.blueGreen` and `release.rollback` are run by the
+  API as deployments (`platform: true` in the catalog), never on a schedule
+  (`TRIGGER_NOT_SCHEDULABLE`). Providers with their own rollback (Render, Vercel) keep it.
+- **Production approval.** A trigger run of a disruptive or destructive action on a production
+  instance waits in `AWAITING_APPROVAL`, scheduled ones too, and notifies
+  `trigger.awaiting_approval`; an approver with the approval permission and the action's role runs
+  it, anyone allowed to deploy can cancel it.

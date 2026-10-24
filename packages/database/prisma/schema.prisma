@@ -514,10 +514,13 @@ enum TriggerSource {
 }
 
 enum TriggerRunStatus {
+  /// Disruptive action on a production instance: waits for a person with the approval permission (ADR 0009).
+  AWAITING_APPROVAL
   QUEUED
   RUNNING
   SUCCEEDED
   FAILED
+  CANCELLED
 }
 
 /// One run of a template trigger: an action (redeploy, restart, purge cache) on one resource.
@@ -540,6 +543,8 @@ model TriggerRun {
   url           String?
   message       String?
   errorClass    String?
+  approvedById  String?          @db.Uuid
+  approvedAt    DateTime?        @db.Timestamptz(3)
   queuedAt      DateTime         @default(now()) @db.Timestamptz(3)
   startedAt     DateTime?        @db.Timestamptz(3)
   finishedAt    DateTime?        @db.Timestamptz(3)
@@ -569,6 +574,17 @@ model Deployment {
   /// Resources to (re)run on a retry; empty means all.
   onlyResources     String[]         @default([])
   retryOfId         String?          @db.Uuid
+  /// How this apply is released and watched (ADR 0009): { strategy, trafficPercent, bakeMinutes, autoRollback }.
+  release           Json?
+  /// End of the bake period; the worker watches the instance until then.
+  bakeUntil         DateTime?        @db.Timestamptz(3)
+  /// Stayed healthy through its bake period (or had none): a target for smart rollback.
+  verifiedAt        DateTime?        @db.Timestamptz(3)
+  /// An incident or an unhealthy service during the bake period.
+  bakeFailedAt      DateTime?        @db.Timestamptz(3)
+  bakeFailure       String?
+  /// This deployment returns the instance to that earlier deployment's configuration.
+  rollbackToId      String?          @db.Uuid
   resolved          Json?
   plan              Json?
   cost              Json?

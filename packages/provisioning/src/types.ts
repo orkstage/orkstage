@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { CapabilityPricing, CloudCapability, CloudTarget } from '@orkstage/cloud-core';
-import type { CloudProvider, TenantFeatures, TenantLimits } from '@orkstage/domain';
+import type { CloudProvider, ReleaseSettings, TenantFeatures, TenantLimits } from '@orkstage/domain';
 import type { ConnectivityRequirement, EnvironmentTemplate, ValidationIssue } from '@orkstage/templates';
 
 export type EnvironmentKind = 'production' | 'staging' | 'development' | 'sandbox';
@@ -156,6 +156,8 @@ export interface ResolvedInfrastructure {
   cost: CostEstimate;
   desiredStateHash: string;
   valid: boolean;
+  /** How deployments of this template are released and watched (ADR 0009); absent in older snapshots. */
+  release?: ReleaseSettings;
 }
 
 /** Prices read from a provider's pricing API for one capability and region. */

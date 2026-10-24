@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DeploymentSummaryDto } from '@orkstage/contracts';
 import type { Deployment, Instance, InstanceStatus, PrismaClient } from '@orkstage/database';
-import { canStartDeployment, canStartDestroy, operationKey } from '@orkstage/domain';
-import { diffPlan, requiresApproval, workflowSteps, type ResolvedInfrastructure, type WorkflowKind } from '@orkstage/provisioning';
+import { canStartDeployment, canStartDestroy, operationKey, releaseSettings, type ReleaseSettings } from '@orkstage/domain';
+import { diffPlan, requiresApproval, type ResolvedInfrastructure, type WorkflowKind } from '@orkstage/provisioning';
+import { DEPLOYABLE, InstanceBusyError, recordDeployment, recordRollback, rollbackTarget } from '@orkstage/runtime';
 import { Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../common/audit.service.js';
 import { conflict, unprocessable } from '../common/errors.js';
 import { iso } from '../common/pagination.js';
-import { PRISMA, Queues } from '../infra/infra.module.js';
+import { Adapters, PRISMA, Queues } from '../infra/infra.module.js';
 import { CompileService } from '../instances/compile.service.js';
 import type { RequestPrincipal } from '../types.js';
 
-const DEPLOYABLE: InstanceStatus[] = ['DRAFT', 'READY', 'DEGRADED', 'VALIDATION_FAILED', 'PLAN_FAILED', 'PROVISION_FAILED', 'DEPLOY_FAILED', 'VERIFICATION_FAILED'];
 const DESTROYABLE: InstanceStatus[] = ['READY', 'DEGRADED', 'VALIDATION_FAILED', 'PLAN_FAILED', 'PROVISION_FAILED', 'DEPLOY_FAILED', 'VERIFICATION_FAILED', 'DESTROY_FAILED'];
 
 export function toDeploymentSummary(d: Deployment): DeploymentSummaryDto {
@@ -28,6 +28,12 @@ export function toDeploymentSummary(d: Deployment): DeploymentSummaryDto {
     finishedAt: iso(d.finishedAt),
     errorClass: d.errorClass,
     errorMessage: d.errorMessage,
+    release: (d.release as DeploymentSummaryDto['release']) ?? null,
+    bakeUntil: iso(d.bakeUntil),
+    verifiedAt: iso(d.verifiedAt),
+    bakeFailedAt: iso(d.bakeFailedAt),
+    bakeFailure: d.bakeFailure,
+    rollbackToId: d.rollbackToId,
   };
 }
 
@@ -43,13 +49,21 @@ export class LauncherService {
     private readonly compiler: CompileService,
     private readonly queues: Queues,
     private readonly audit: AuditService,
+    private readonly adapters: Adapters,
   ) {}
 
   /**
    * Starts an apply. `templateVersionId` deploys another version of the instance's template (an
    * upgrade or a rollback); the instance moves to it only when the apply succeeds.
    */
-  async apply(instance: Instance, p: RequestPrincipal, correlationId: string, templateVersionId = instance.templateVersionId): Promise<{ deployment: Deployment; reused: boolean }> {
+  async apply(
+    instance: Instance,
+    p: RequestPrincipal,
+    correlationId: string,
+    templateVersionId = instance.templateVersionId,
+    release: Partial<ReleaseSettings> = {},
+    opts: { releaseOnly?: boolean } = {},
+  ): Promise<{ deployment: Deployment; reused: boolean }> {
     if (instance.status === 'DESTROYED') {
       throw conflict('INSTANCE_DESTROYED', 'This instance has been destroyed. Create a new instance to deploy again.');
     }
@@ -76,11 +90,59 @@ export class LauncherService {
     });
     if (active) return { deployment: active, reused: true };
 
+    const settings = releaseSettings(resolved.release, release);
+    this.checkStrategy(resolved, settings);
     const plan = diffPlan(resolved, await this.compiler.knownResources(instance.id));
+    if (opts.releaseOnly && !plan.changes.some((c) => c.type === 'compute.container-service' && (c.action === 'CREATE' || c.action === 'UPDATE'))) {
+      throw unprocessable('NOTHING_TO_RELEASE', 'No container service changes since the last deployment: there is nothing to release.');
+    }
     const approvalRequired = requiresApproval(instance.environment, plan);
-    const deployment = await this.create('APPLY', instance, resolved, { opKey, plan, approvalRequired, p, correlationId, deployable: DEPLOYABLE, templateVersionId });
-    await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: instance.id, action: 'DEPLOY', correlationId, changes: { deploymentId: deployment.id, plan: plan.counts, risk: plan.risk, approvalRequired } });
+    const deployment = await this.create('APPLY', instance, resolved, { opKey, plan, approvalRequired, p, correlationId, deployable: DEPLOYABLE, templateVersionId, release: settings });
+    await this.audit.record({
+      principal: p,
+      tenantId: instance.tenantId,
+      resourceType: 'Instance',
+      resourceId: instance.id,
+      action: 'DEPLOY',
+      correlationId,
+      changes: { deploymentId: deployment.id, plan: plan.counts, risk: plan.risk, approvalRequired, release: settings.strategy, bakeMinutes: settings.bakeMinutes },
+    });
     return { deployment, reused: false };
+  }
+
+  /**
+   * Returns the instance to an earlier deployment's configuration (ADR 0009): the one asked for, or
+   * the last that stayed healthy through its bake period.
+   */
+  async rollback(instance: Instance, p: RequestPrincipal, correlationId: string, deploymentId?: string): Promise<Deployment> {
+    if (instance.status === 'DESTROYED') throw conflict('INSTANCE_DESTROYED', 'This instance has been destroyed.');
+    if (!canStartDeployment(instance.status)) throw conflict('INSTANCE_BUSY', `Instance is ${instance.status}; wait for the current operation to finish.`);
+    const latest = await this.prisma.deployment.findFirst({ where: { instanceId: instance.id, kind: 'APPLY', status: 'SUCCEEDED' }, orderBy: { queuedAt: 'desc' } });
+    const target = await rollbackTarget(this.prisma, instance.id, { deploymentId, before: latest?.queuedAt ?? new Date() });
+    if (!target.ok) throw unprocessable('NO_ROLLBACK_TARGET', target.reason);
+    if (latest?.id === target.deployment.id) throw unprocessable('NO_ROLLBACK_TARGET', 'The instance already runs that deployment.');
+    let deployment: Deployment;
+    try {
+      deployment = await recordRollback(this.prisma, { instance, target: target.deployment, requestedById: p.userId, requestedBy: p.email, correlationId });
+    } catch (err) {
+      if (err instanceof InstanceBusyError) throw conflict('INSTANCE_BUSY', err.message);
+      throw err;
+    }
+    await this.queues.enqueueDeployment(deployment.id);
+    await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'Instance', resourceId: instance.id, action: 'ROLLBACK', correlationId, changes: { deploymentId: deployment.id, to: target.deployment.id } });
+    return deployment;
+  }
+
+  /** A canary or blue/green release needs a provider that offers it for every container service. */
+  private checkStrategy(resolved: ResolvedInfrastructure, release: ReleaseSettings): void {
+    if (release.strategy === 'rolling') return;
+    for (const r of resolved.resources.filter((x) => x.type === 'compute.container-service')) {
+      const adapter = this.adapters.registry.has(r.provider) ? this.adapters.registry.get(r.provider) : undefined;
+      const strategies = adapter?.releaseStrategies?.(r.capability) ?? [];
+      if (!strategies.includes(release.strategy)) {
+        throw unprocessable('RELEASE_STRATEGY_UNSUPPORTED', `${r.provider} does not offer ${release.strategy === 'canary' ? 'canary' : 'blue/green'} releases for ${r.capability} (service ${r.id}) yet. Deploy with the rolling strategy.`);
+      }
+    }
   }
 
   async destroy(instance: Instance, p: RequestPrincipal, correlationId: string): Promise<Deployment> {
@@ -147,43 +209,31 @@ export class LauncherService {
       onlyResources?: string[];
       retryOfId?: string;
       templateVersionId?: string;
+      release?: ReleaseSettings;
     },
   ): Promise<Deployment> {
-    const nextStatus: InstanceStatus = kind === 'APPLY' ? 'VALIDATING' : 'DESTROYING';
-    // Production applies always carry an approval step: the worker may escalate to it when the
-    // provider plan turns out destructive, or marks it skipped with the reason.
-    const steps = workflowSteps(kind, resolved, o.approvalRequired || (kind === 'APPLY' && instance.environment === 'production'));
-    const deployment = await this.prisma.$transaction(async (tx) => {
-      const claimed = await tx.instance.updateMany({
-        where: { id: instance.id, status: { in: o.deployable } },
-        data: { status: nextStatus },
+    let deployment: Deployment;
+    try {
+      deployment = await recordDeployment(this.prisma, {
+        kind,
+        instance,
+        resolved,
+        opKey: o.opKey,
+        plan: o.plan,
+        approvalRequired: o.approvalRequired,
+        requestedById: o.p.userId,
+        requestedBy: o.p.email,
+        correlationId: o.correlationId,
+        deployable: o.deployable,
+        onlyResources: o.onlyResources,
+        retryOfId: o.retryOfId,
+        templateVersionId: o.templateVersionId,
+        release: o.release,
       });
-      if (claimed.count === 0) throw conflict('INSTANCE_BUSY', 'Another operation started on this instance. Refresh and try again.');
-      const d = await tx.deployment.create({
-        data: {
-          tenantId: instance.tenantId,
-          instanceId: instance.id,
-          kind,
-          templateVersionId: o.templateVersionId ?? instance.templateVersionId,
-          requestedById: o.p.userId,
-          correlationId: o.correlationId,
-          operationKey: o.opKey,
-          simulated: resolved.resources.length > 0 && resolved.resources.every((r) => r.provider === 'mock'),
-          approvalRequired: o.approvalRequired,
-          resolved: resolved as object,
-          plan: (o.plan ?? undefined) as object | undefined,
-          cost: resolved.cost as object,
-          onlyResources: o.onlyResources ?? [],
-          retryOfId: o.retryOfId,
-          steps: { create: steps.map((s) => ({ key: s.key, kind: s.kind, name: s.name, position: s.position, provider: s.provider, region: s.region })) },
-          events: { create: { level: 'info', message: `${kind === 'APPLY' ? 'Deployment' : 'Destroy'} requested by ${o.p.email}.` } },
-        },
-      });
-      await tx.instanceTransition.create({
-        data: { instanceId: instance.id, tenantId: instance.tenantId, from: instance.status, to: nextStatus, deploymentId: d.id, reason: `${kind} requested` },
-      });
-      return d;
-    });
+    } catch (err) {
+      if (err instanceof InstanceBusyError) throw conflict('INSTANCE_BUSY', err.message);
+      throw err;
+    }
     await this.queues.enqueueDeployment(deployment.id);
     return deployment;
   }
