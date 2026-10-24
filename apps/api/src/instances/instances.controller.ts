@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   createInstanceSchema,
+  deployInstanceSchema,
   destroyInstanceSchema,
   listQuerySchema,
+  rollbackInstanceSchema,
   simulateSchema,
   updateInstanceSchema,
   upgradeInstanceSchema,
@@ -13,7 +15,7 @@ import {
 } from '@orkstage/contracts';
 import type { ResourceOutputs } from '@orkstage/cloud-core';
 import { Prisma, type Instance, type InstanceResource, type PrismaClient } from '@orkstage/database';
-import { challengeName, isInstanceBusy, readTenantLimits } from '@orkstage/domain';
+import { challengeName, isInstanceBusy, minimumRoleFor, readTenantLimits, roleAtLeast } from '@orkstage/domain';
 import { toCloudTarget } from '@orkstage/runtime';
 import { Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -21,7 +23,7 @@ import { Throttle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { AuditService } from '../common/audit.service.js';
-import { authorize, CorrelationId, CurrentPrincipal, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
+import { authorize, CorrelationId, CurrentPrincipal, isPlatformStaff, scopedToTenant, tenantScope, Scope } from '../common/auth.js';
 import { AppError, conflict, notFound, unprocessable } from '../common/errors.js';
 import { iso, listOrder, page, pageArgs } from '../common/pagination.js';
 import { ApiZodBody, ZodBody, ZodQuery } from '../common/validation.js';
@@ -266,10 +268,39 @@ export class InstancesController {
   @Post(':id/deploy')
   @HttpCode(202)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async deploy(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {
+  @ApiZodBody(deployInstanceSchema)
+  async deploy(
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZodBody(deployInstanceSchema) body: z.infer<typeof deployInstanceSchema>,
+    @CorrelationId() correlationId: string,
+  ) {
     const instance = await this.load(p, id, 'deploy');
-    const { deployment } = await this.launcher.apply(instance, p, correlationId);
+    const { deployment } = await this.launcher.apply(instance, p, correlationId, undefined, body.release ?? {});
     return toDeploymentSummary(deployment);
+  }
+
+  /**
+   * Returns the instance to an earlier deployment's configuration (ADR 0009), by default the last
+   * one that stayed healthy through its bake period. A disruptive action: admins only.
+   */
+  @Scope('instances:deploy')
+  @Post(':id/rollback')
+  @HttpCode(202)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiZodBody(rollbackInstanceSchema)
+  async rollback(
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZodBody(rollbackInstanceSchema) body: z.infer<typeof rollbackInstanceSchema>,
+    @CorrelationId() correlationId: string,
+  ) {
+    const instance = await this.load(p, id, 'deploy');
+    const required = minimumRoleFor('disruptive');
+    if (!isPlatformStaff(p) && !p.memberships.some((m) => m.tenantId === instance.tenantId && roleAtLeast(m.role, required))) {
+      throw new AppError(403, 'ACTION_ROLE_REQUIRED', `A rollback needs the ${required} role or higher.`);
+    }
+    return toDeploymentSummary(await this.launcher.rollback(instance, p, correlationId, body.deploymentId));
   }
 
   /** Explicit template upgrade (spec §71). Existing infrastructure never changes silently. */

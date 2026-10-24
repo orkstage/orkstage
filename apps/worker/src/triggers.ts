@@ -79,6 +79,20 @@ export class TriggerRunner {
     if (!adapter?.runAction || !action) {
       return finish(false, { message: `${row.provider} does not offer "${run.action}" for ${row.capability}.`, errorClass: 'VALIDATION_ERROR' });
     }
+    // A scheduled disruptive action on production waits for a person, like one started by hand (ADR 0009).
+    const instance = await prisma.instance.findUniqueOrThrow({ where: { id: run.instanceId }, select: { environment: true, name: true } });
+    if (!run.approvedAt && instance.environment === 'production' && (action.catalog?.risk ?? 'disruptive') !== 'safe') {
+      await prisma.triggerRun.update({ where: { id: run.id }, data: { status: 'AWAITING_APPROVAL', startedAt: null } });
+      await notify(this.ctx, {
+        tenantId: run.tenantId,
+        event: 'trigger.awaiting_approval',
+        title: `${run.trigger} awaits approval`,
+        body: `${run.action} on the production instance ${instance.name} needs approval before it runs.`,
+        link: `/instances/${run.instanceId}`,
+        data: { instanceId: run.instanceId, triggerRunId: run.id, trigger: run.trigger, action: run.action, status: 'AWAITING_APPROVAL' },
+      });
+      return;
+    }
     const target = await prisma.cloudTarget.findUniqueOrThrow({ where: { id: row.targetId } });
     try {
       const result = await adapter.runAction(

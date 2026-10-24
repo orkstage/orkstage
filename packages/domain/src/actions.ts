@@ -4,10 +4,41 @@
  * Provider actions as one catalog (ADR 0009): what template triggers run and the only actions future
  * AI agents may propose. Adapters keep their own action names; a catalog action lists the provider
  * names it stands for, with the parameter names they use, so `service.scale` with `replicas` runs
- * AWS's `service.scale` and Render's `scale` with `numInstances` alike. Release strategies (canary,
- * blue/green) come in a second round; `release.rollback` already maps the providers that have it.
+ * AWS's `service.scale` and Render's `scale` with `numInstances` alike. Release actions
+ * (`release.*`) are run by OrkStage itself as deployments (`platform`), except where a provider has
+ * its own rollback.
  */
 export type ActionRisk = 'safe' | 'disruptive' | 'destructive';
+
+/** How a release reaches traffic (ADR 0009). `rolling` is every provider's default. */
+export const RELEASE_STRATEGIES = ['rolling', 'canary', 'blueGreen'] as const;
+export type ReleaseStrategy = (typeof RELEASE_STRATEGIES)[number];
+
+/**
+ * How a deployment is released and watched: the strategy, the share of traffic a canary gets, the
+ * bake period during which an incident or an unhealthy service rolls it back, and whether that
+ * rollback is automatic.
+ */
+export interface ReleaseSettings {
+  strategy: ReleaseStrategy;
+  trafficPercent: number;
+  bakeMinutes: number;
+  autoRollback: boolean;
+}
+
+export const DEFAULT_RELEASE: ReleaseSettings = { strategy: 'rolling', trafficPercent: 10, bakeMinutes: 0, autoRollback: true };
+
+/**
+ * Release settings from the template's `spec.release` with a deployment's own choices on top. A
+ * canary or blue/green release is only as good as the watching after it, so it gets a 15 minute
+ * bake period when none is set.
+ */
+export function releaseSettings(template?: Partial<ReleaseSettings>, override: Partial<ReleaseSettings> = {}): ReleaseSettings {
+  const defined = (o: Partial<ReleaseSettings>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+  const merged = { ...DEFAULT_RELEASE, ...defined(template ?? {}), ...defined(override) } as ReleaseSettings;
+  if (merged.strategy !== 'rolling' && merged.bakeMinutes === 0) merged.bakeMinutes = 15;
+  return merged;
+}
 export type ActionRole = 'CustomerDeveloper' | 'CustomerAdmin' | 'CustomerOwner';
 
 export interface CatalogParam {
@@ -36,6 +67,11 @@ export interface CatalogAction {
   reversible: boolean;
   params: readonly CatalogParam[];
   aliases: readonly ActionAlias[];
+  /**
+   * OrkStage runs it as a deployment of the instance (release strategies, rollback to an earlier
+   * deployment) when no provider alias applies. Not offered on a schedule.
+   */
+  platform?: boolean;
 }
 
 const SERVICE = ['compute.container-service'];
@@ -108,15 +144,45 @@ export const ACTION_CATALOG: readonly CatalogAction[] = [
   },
   {
     id: 'release.rollback',
-    description: 'Return the service or frontend to an earlier deployment.',
+    description: 'Return to an earlier deployment: by default the last one that stayed healthy through its bake period.',
     resourceTypes: [...SERVICE, ...FRONTEND],
     risk: 'disruptive',
     reversible: true,
-    params: [{ name: 'deployment', type: 'string', description: 'Provider deployment id to return to; the provider default when empty.' }],
+    params: [
+      {
+        name: 'deployment',
+        type: 'string',
+        description: 'Deployment to return to: an OrkStage deployment id, or the provider\'s own on providers with their own rollback. The last verified deployment when empty.',
+      },
+    ],
     aliases: [
       { name: 'rollback', provider: 'render', params: { deployment: 'deployId' } },
       { name: 'rollback', provider: 'vercel', params: { deployment: 'deploymentId' } },
     ],
+    platform: true,
+  },
+  {
+    id: 'release.canary',
+    description: 'Deploy the pending changes to a share of traffic, watch them for the bake period, then promote them or roll them back.',
+    resourceTypes: SERVICE,
+    risk: 'disruptive',
+    reversible: true,
+    params: [
+      { name: 'trafficPercent', type: 'number', description: 'Share of traffic the new release gets during the bake period, 1 to 50 (10 when empty).' },
+      { name: 'bakeMinutes', type: 'number', description: 'Minutes to watch before promoting, 1 to 240 (the template\'s, or 15, when empty).' },
+    ],
+    aliases: [],
+    platform: true,
+  },
+  {
+    id: 'release.blueGreen',
+    description: 'Bring the pending changes up beside the running release, switch traffic once they are healthy, and keep the old release for the bake period.',
+    resourceTypes: SERVICE,
+    risk: 'disruptive',
+    reversible: true,
+    params: [{ name: 'bakeMinutes', type: 'number', description: 'Minutes to keep the old release before removing it, 1 to 240 (the template\'s, or 15, when empty).' }],
+    aliases: [],
+    platform: true,
   },
 ];
 

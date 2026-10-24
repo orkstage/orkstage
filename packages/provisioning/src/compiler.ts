@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { resolveCapability, type AdapterRegistry, type CloudCapability, type CloudTarget } from '@orkstage/cloud-core';
-import { desiredStateHash, resourceName, standardTags } from '@orkstage/domain';
+import { desiredStateHash, releaseSettings, resourceName, standardTags } from '@orkstage/domain';
 import {
   activeResources,
   buildDependencyGraph,
@@ -209,6 +209,7 @@ export function compileInfrastructure(input: CompileInput, registry: AdapterRegi
     cost,
     desiredStateHash: desiredStateHash(resources.map((r) => [r.id, r.specHash])),
     valid,
+    release: releaseSettings(template.spec.release),
   };
 }
 

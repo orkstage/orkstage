@@ -19,6 +19,7 @@ import type { WorkerContext } from './context.js';
 import { DriftDetector } from './drift.js';
 import { HealthMonitor } from './health.js';
 import { Housekeeping } from './housekeeping.js';
+import { ReleaseWatcher } from './releases.js';
 import { Notifier } from './notifier.js';
 import { DeploymentRunner, RetryLater } from './runner.js';
 import { TargetSlots } from './slots.js';
@@ -59,6 +60,9 @@ async function main() {
   const emailQueue = new Queue<StatusEmailJob>(QUEUES.emails, { connection: redis.duplicate() });
   const notifier = new Notifier(ctx, emailQueue);
 
+  const deploymentQueue = new Queue<DeploymentJob>(QUEUES.deployments, { connection: redis.duplicate() });
+  const releases = new ReleaseWatcher(ctx, deploymentQueue);
+
   const deployments = new Worker<DeploymentJob>(
     QUEUES.deployments,
     async (job, token) =>
@@ -72,6 +76,8 @@ async function main() {
           if (done?.finishedAt) platformMetrics.deployment(done.kind, done.status, done.finishedAt.getTime() - done.queuedAt.getTime());
           // Scheduled triggers follow the template version that is now live (or stop on destroy).
           if (done?.status === 'SUCCEEDED') await triggerRunner.syncSchedules(done.instanceId);
+          // A watched release that failed its health checks rolls back like one failing its bake period.
+          if (done?.status === 'FAILED' || done?.status === 'PARTIALLY_FAILED') await releases.afterFailure(job.data.deploymentId);
         } catch (err) {
           if (err instanceof RetryLater) {
             await job.moveToDelayed(Date.now() + SLOT_WAIT_MS, token);
@@ -96,7 +102,6 @@ async function main() {
     { connection: redis.duplicate(), concurrency: 4 },
   );
 
-  const deploymentQueue = new Queue<DeploymentJob>(QUEUES.deployments, { connection: redis.duplicate() });
   const housekeeping = new Housekeeping(ctx, deploymentQueue, (id, message) => runner.abandon(id, message));
   const healthQueue = new Queue(QUEUES.health, { connection: redis.duplicate() });
   await healthQueue.upsertJobScheduler('health-tick', { every: config.HEALTH_CHECK_INTERVAL_SECONDS * 1000 }, { name: 'tick' });
@@ -105,6 +110,8 @@ async function main() {
     async (job) =>
       traceJob(QUEUES.health, job, {}, async () => {
         await monitor.tick();
+        // After the tick: incidents and health counts are current when bake periods are judged.
+        await releases.run();
         await housekeeping.run();
         await notifier.deliverPending();
         await webhooks.deliverDue();

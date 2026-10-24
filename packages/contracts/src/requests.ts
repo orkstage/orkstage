@@ -158,6 +158,19 @@ export const updateInstanceSchema = z.object({
 
 export const upgradeInstanceSchema = z.object({ templateVersionId: uuid });
 
+/** How this apply is released and watched, over the template's `spec.release` (ADR 0009). */
+export const releaseOverrideSchema = z.object({
+  strategy: z.enum(['rolling', 'canary', 'blueGreen']).optional(),
+  trafficPercent: z.number().int().min(1).max(50).optional(),
+  bakeMinutes: z.number().int().min(0).max(240).optional(),
+  autoRollback: z.boolean().optional(),
+});
+
+export const deployInstanceSchema = z.object({ release: releaseOverrideSchema.optional() }).default({});
+
+/** Returns the instance to an earlier deployment; the last verified one when `deploymentId` is absent. */
+export const rollbackInstanceSchema = z.object({ deploymentId: uuid.optional() }).default({});
+
 export const destroyInstanceSchema = z.object({
   /** Must equal the instance slug: an explicit confirmation for a destructive action. */
   confirm: z.string(),

@@ -129,6 +129,11 @@ export interface ResourceRequest {
    * and its apply phase applies exactly that plan (open item 5). Absent for previews.
    */
   planId?: string;
+  /**
+   * How a changed container service reaches traffic (ADR 0009); absent means the provider's
+   * default rolling update. Only sent to adapters whose `releaseStrategies` include it.
+   */
+  release?: { strategy: 'canary' | 'blueGreen'; trafficPercent: number };
 }
 
 export type ResourceOutputs = Record<string, string | number | boolean>;
@@ -346,6 +351,18 @@ export interface CloudProviderAdapter {
   /** Operations available on a capability (redeploy, restart, purge cache, ...): what triggers may run. */
   actions?(capability: string): ResourceActionDescriptor[];
   runAction?(ctx: ProviderContext, resource: ResourceIdentifier, request: ResourceActionRequest): Promise<ResourceActionResult>;
+
+  /**
+   * Release strategies a capability supports besides the default rolling update (ADR 0009). A
+   * canary apply sends `trafficPercent` of traffic to the new release and keeps the old one; a
+   * blue/green apply switches traffic to the new release once healthy and keeps the old one.
+   */
+  releaseStrategies?(capability: string): ('canary' | 'blueGreen')[];
+  /**
+   * Ends a canary or blue/green release after its bake period: all traffic to the new release and
+   * the old one removed. A rollback is a plain apply of the earlier configuration instead.
+   */
+  promoteRelease?(ctx: ProviderContext, resource: ResourceIdentifier): Promise<void>;
 
   /** Recent rollouts, newest first, for platforms that keep a deployment history. */
   listDeployments?(ctx: ProviderContext, resource: ResourceIdentifier, limit: number): Promise<ProviderDeployment[]>;

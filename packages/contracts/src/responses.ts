@@ -228,6 +228,16 @@ export interface DeploymentSummaryDto {
   finishedAt: string | null;
   errorClass: string | null;
   errorMessage: string | null;
+  /** How an apply is released and watched (ADR 0009); null for destroys. */
+  release: { strategy: 'rolling' | 'canary' | 'blueGreen'; trafficPercent: number; bakeMinutes: number; autoRollback: boolean } | null;
+  /** End of the bake period while the worker watches the instance. */
+  bakeUntil: string | null;
+  /** Stayed healthy through its bake period: what a rollback returns to by default. */
+  verifiedAt: string | null;
+  bakeFailedAt: string | null;
+  bakeFailure: string | null;
+  /** This deployment returns the instance to that earlier deployment's configuration. */
+  rollbackToId: string | null;
 }
 
 export interface DeploymentStepDto {
@@ -444,7 +454,9 @@ export interface TriggerRunDto {
   action: string;
   params: Record<string, string | number | boolean>;
   source: 'MANUAL' | 'SCHEDULE' | 'WEBHOOK';
-  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  /** AWAITING_APPROVAL: a disruptive action on a production instance waits for approval (ADR 0009). */
+  status: 'AWAITING_APPROVAL' | 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  approvedAt: string | null;
   reference: string | null;
   url: string | null;
   message: string | null;

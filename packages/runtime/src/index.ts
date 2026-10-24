@@ -9,3 +9,4 @@ export * from './webhooks.js';
 export * from './dns.js';
 export * from './rate-limit.js';
 export * from './metrics.js';
+export * from './deployments.js';

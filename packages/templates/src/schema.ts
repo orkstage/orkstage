@@ -229,6 +229,19 @@ export const templateTrigger = z.object({
     .default({ manual: true, webhook: false }),
 });
 
+/**
+ * How deployments of this template reach traffic and how long they are watched (ADR 0009). A
+ * strategy other than `rolling` needs a provider that supports it for every container service.
+ */
+export const templateRelease = z.object({
+  strategy: z.enum(['rolling', 'canary', 'blueGreen']).default('rolling'),
+  /** Share of traffic a canary gets during the bake period. */
+  trafficPercent: z.number().int().min(1).max(50).default(10),
+  /** Minutes after a deployment during which an incident or an unhealthy service rolls it back; 0 turns watching off. */
+  bakeMinutes: z.number().int().min(0).max(240).default(0),
+  autoRollback: z.boolean().default(true),
+});
+
 export const templateVariable = z.object({
   name: id,
   description: z.string().optional(),
@@ -267,6 +280,7 @@ export const environmentTemplate = z.object({
     resources: z.array(templateResource).min(1),
     connectivity: z.array(connectivityRequirement).default([]),
     triggers: z.array(templateTrigger).default([]),
+    release: templateRelease.optional(),
     observability: z
       .object({
         logs: z.boolean().default(true),
@@ -287,4 +301,5 @@ export type ConnectivityRequirement = z.infer<typeof connectivityRequirement>;
 export type PlacementSlot = z.infer<typeof placementSlot>;
 export type TemplateVariable = z.infer<typeof templateVariable>;
 export type TemplateTrigger = z.infer<typeof templateTrigger>;
+export type TemplateRelease = z.infer<typeof templateRelease>;
 export type WebFrontendResource = z.infer<typeof webFrontendResource>;

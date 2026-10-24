@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ResourceOutputs, ResourceResult } from '@orkstage/cloud-core';
 import type { Deployment, InstanceStatus, StepStatus } from '@orkstage/database';
-import { assertInstanceTransition, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass } from '@orkstage/domain';
+import { assertInstanceTransition, isProviderEnabled, providerFlagKey, resolveFeatureFlags, summarizeSteps, type FailureClass, type ReleaseSettings } from '@orkstage/domain';
 import {
   describeProviderPlan,
   diffPlan,
@@ -237,7 +237,9 @@ export class DeploymentRunner {
         if (!state.exists) throw new PhaseFailure('DEPLOYMENT_ERROR', `Service ${s.id} is not running after provisioning.`);
         await this.event(d.id, 'info', PHASE.rollout, `${s.id}: running ${String(s.spec.image ?? 'image')} (${s.spec.replicas ?? 1} replica(s)).`);
       }
-      return `${services.length} service(s) rolled out with immutable image digests.`;
+      const release = releaseOf(d);
+      const how = !release ? '' : release.strategy === 'canary' ? ` as a canary on ${release.trafficPercent}% of traffic` : ' blue/green (the old release is kept for the bake period)';
+      return `${services.length} service(s) rolled out with immutable image digests${how}.`;
     });
 
     await this.moveInstance(d, 'CONFIGURING');
@@ -259,7 +261,15 @@ export class DeploymentRunner {
     await this.phase(d, PHASE.finalize, async () => {
       const rows = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId, status: 'ACTIVE' } });
       const outputs = Object.fromEntries(rows.map((r) => [r.resourceId, r.outputs]));
-      await prisma.deployment.update({ where: { id: d.id }, data: { status: 'SUCCEEDED', finishedAt: new Date(), outputs: outputs as object } });
+      // Watched through the bake period when it has one; otherwise verified now, unless degraded (ADR 0009).
+      const finishedAt = new Date();
+      const bakeMinutes = (d.release as ReleaseSettings | null)?.bakeMinutes ?? 0;
+      const watch = bakeMinutes > 0 ? { bakeUntil: new Date(finishedAt.getTime() + bakeMinutes * 60_000) } : degraded ? {} : { verifiedAt: finishedAt };
+      await prisma.deployment.update({ where: { id: d.id }, data: { status: 'SUCCEEDED', finishedAt, outputs: outputs as object, ...watch } });
+      if (bakeMinutes > 0) {
+        await this.event(d.id, 'info', PHASE.finalize, `Watching for ${bakeMinutes} minute(s): an incident or a failing service in that time ${(d.release as unknown as ReleaseSettings).autoRollback ? 'rolls the release back automatically' : 'marks the release as failed'}.`);
+      }
+      if (d.rollbackToId) await this.event(d.id, 'info', PHASE.finalize, `Returned to the configuration of deployment ${d.rollbackToId}.`);
       // The template version (an upgrade or rollback) becomes the instance's only now that it is applied.
       await prisma.instance.update({ where: { id: d.instanceId }, data: { desiredStateHash: resolved.desiredStateHash, health: instanceHealth(rows), templateVersionId: d.templateVersionId } });
       await this.moveInstance(d, degraded ? 'DEGRADED' : 'READY');
@@ -298,6 +308,7 @@ export class DeploymentRunner {
         completed,
         only: d.onlyResources.length > 0 ? new Set(d.onlyResources) : undefined,
         concurrency: this.ctx.config.WORKER_CONCURRENCY,
+        release: releaseOf(d),
         signal: abort.signal,
         log: (id, level, message) => void this.event(d.id, level, id, message).catch(() => {}),
         hooks: {
@@ -707,4 +718,11 @@ export class DeploymentRunner {
     const rows = await this.ctx.prisma.instanceResource.findMany({ where: { instanceId, status: { in: ['ACTIVE', 'FAILED'] } } });
     return rows.map((r) => ({ drifted: r.drift === 'DRIFT_DETECTED', resourceId: r.resourceId, type: r.type, specHash: r.status === 'ACTIVE' ? r.specHash : null, targetId: r.targetId, region: r.region, provider: r.simulatedProvider ?? r.provider, capabilityName: r.capabilityName, name: r.name }));
   }
+}
+
+/** The canary or blue/green release an apply asks for; undefined for the default rolling update. */
+function releaseOf(d: Deployment): { strategy: 'canary' | 'blueGreen'; trafficPercent: number } | undefined {
+  const release = d.release as ReleaseSettings | null;
+  if (!release || release.strategy === 'rolling') return undefined;
+  return { strategy: release.strategy, trafficPercent: release.trafficPercent };
 }

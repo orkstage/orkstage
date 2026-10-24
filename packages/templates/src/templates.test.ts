@@ -84,6 +84,17 @@ describe('schema validation', () => {
 describe('semantic validation', () => {
   const base = structuredClone(byName('free-validation'));
 
+  it('refuses releases and rollbacks on a schedule; accepts a release section (ADR 0009)', () => {
+    const t = structuredClone(base);
+    t.spec.triggers = [
+      { name: 'nightly-canary', resource: 'api', action: 'release.canary', params: {}, overridable: [], on: { manual: true, webhook: false, schedule: '0 3 * * *' } },
+      { name: 'canary', resource: 'api', action: 'release.canary', params: {}, overridable: [], on: { manual: true, webhook: true } },
+    ];
+    const codes = validateTemplate({ ...t, spec: { ...t.spec, release: { strategy: 'canary', trafficPercent: 20, bakeMinutes: 30 } } }).issues.map((i) => i.code);
+    expect(codes.filter((c) => c === 'TRIGGER_NOT_SCHEDULABLE')).toHaveLength(1);
+    expect(validateTemplate({ ...t, spec: { ...t.spec, release: { strategy: 'canary', trafficPercent: 80 } } }).issues.some((i) => i.path?.includes('trafficPercent'))).toBe(true);
+  });
+
   it('rejects unknown dependencies', () => {
     const t = structuredClone(base);
     t.spec.resources[2]!.dependsOn = ['ghost'];
