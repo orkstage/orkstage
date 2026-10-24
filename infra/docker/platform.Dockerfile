@@ -26,9 +26,9 @@ RUN rm -rf node_modules/.pnpm/@typescript+typescript-*
 
 FROM base AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
-# npm and corepack only install pnpm in the base stage; nothing runs them at runtime, and the npm
-# bundled with Node carries its own dependencies (and their advisories).
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+# npm, corepack and pnpm only install and build in the earlier stages; nothing runs them at runtime
+# (migrations call Prisma directly), and each bundles its own dependencies (and their advisories).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/lib/node_modules/pnpm  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/pn /usr/local/bin/pnx
 COPY --from=build --chown=orkstage:orkstage /repo /repo
 # With TOFU_RUNNER=docker the worker needs the Docker socket (root-owned) to start runner containers;
 # api/web/migrate run as the unprivileged user (set per service in Compose). User 10001 is fixed so

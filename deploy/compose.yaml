@@ -62,7 +62,7 @@ services:
     restart: 'no'
     user: orkstage
     working_dir: /repo
-    command: ['sh', '-c', 'pnpm db:deploy && pnpm db:seed']
+    command: ['sh', '-c', 'cd orkstage/packages/database && node node_modules/prisma/build/index.js migrate deploy && node dist/seed.js']
     environment:
       <<: *platform-env
       SEED_DEMO_DATA: 'false'
