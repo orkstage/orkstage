@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StartRunnerTasks",
+      "Effect": "Allow",
+      "Action": "ecs:RunTask",
+      "Resource": "arn:aws:ecs:REGION:ACCOUNT_ID:task-definition/orkstage-tofu:*",
+      "Condition": { "ArnEquals": { "ecs:cluster": "arn:aws:ecs:REGION:ACCOUNT_ID:cluster/CLUSTER" } }
+    },
+    {
+      "Sid": "WatchAndStopRunnerTasks",
+      "Effect": "Allow",
+      "Action": ["ecs:DescribeTasks", "ecs:StopTask"],
+      "Resource": "arn:aws:ecs:REGION:ACCOUNT_ID:task/CLUSTER/*"
+    },
+    {
+      "Sid": "PassRunnerExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/orkstage-tofu-execution",
+      "Condition": { "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" } }
+    }
+  ]
+}

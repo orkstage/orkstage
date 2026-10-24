@@ -22,6 +22,22 @@ describe('config', () => {
   it('refuses dev login in production', () => {
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', AUTH_DEV_LOGIN_ENABLED: 'true' })).toThrow(/Dev login/);
   });
+
+  it('checks the runner settings (ADR 0016)', () => {
+    expect(loadConfig(base).TOFU_RUNNER).toBe('docker');
+    expect(() => loadConfig({ ...base, TOFU_RUNNER: 'ecs' })).toThrow(/TOFU_WORK_DIR[\s\S]*TOFU_MODULES_IN_IMAGE[\s\S]*TOFU_ECS_CLUSTER[\s\S]*TOFU_ECS_TASK_DEFINITION[\s\S]*TOFU_ECS_SUBNETS/);
+    const ecs = loadConfig({
+      ...base,
+      TOFU_RUNNER: 'ecs',
+      TOFU_WORK_DIR: '/mnt/tofu',
+      TOFU_MODULES_IN_IMAGE: 'true',
+      TOFU_ECS_CLUSTER: 'orkstage',
+      TOFU_ECS_TASK_DEFINITION: 'orkstage-tofu',
+      TOFU_ECS_SUBNETS: 'subnet-a, subnet-b',
+    });
+    expect(ecs).toMatchObject({ TOFU_ECS_SUBNETS: ['subnet-a', 'subnet-b'], TOFU_ECS_SECURITY_GROUPS: [], TOFU_ECS_LAUNCH_TYPE: 'FARGATE', TOFU_REMOTE_WORK_DIR: '/workspace' });
+    expect(() => loadConfig({ ...base, TOFU_RUNNER: 'kubernetes', TOFU_WORK_DIR: '/mnt/tofu', TOFU_MODULES_IN_IMAGE: 'true' })).toThrow(/TOFU_K8S_WORK_CLAIM/);
+  });
 });
 
 describe('secrets', () => {

@@ -1,0 +1,49 @@
+# OpenTofu runner on Kubernetes (ADR 0016): what the worker needs to start one Job per OpenTofu
+# session. Mount the claim in the worker at TOFU_WORK_DIR, run the worker with this service account
+# and set TOFU_RUNNER=kubernetes, TOFU_K8S_WORK_CLAIM=orkstage-tofu-work, TOFU_MODULES_IN_IMAGE=true
+# and TOFU_IMAGE to the runner image. Runner pods get no service account token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orkstage-worker
+  namespace: orkstage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orkstage-tofu-runner
+  namespace: orkstage
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [create, get, delete]
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orkstage-tofu-runner
+  namespace: orkstage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: orkstage-tofu-runner
+subjects:
+  - kind: ServiceAccount
+    name: orkstage-worker
+    namespace: orkstage
+---
+# Shared by the worker and the runner pods, so it must be ReadWriteMany (EFS, Azure Files,
+# Filestore, NFS). Set storageClassName to such a class in your cluster.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: orkstage-tofu-work
+  namespace: orkstage
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 10Gi
