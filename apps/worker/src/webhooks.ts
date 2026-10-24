@@ -57,7 +57,7 @@ export class WebhookDispatcher {
           id,
           endpointId: e.id,
           event: job.event,
-          payload: { id, type: job.event, createdAt, tenantId: job.tenantId, data: { title: job.title, body: job.body, link: job.link ?? null, ...(job.data ?? {}) } },
+          payload: { id, type: job.event, createdAt, tenantId: job.tenantId, correlationId: job.correlationId ?? null, data: { title: job.title, body: job.body, link: job.link ?? null, ...(job.data ?? {}) } },
         };
       }),
     });

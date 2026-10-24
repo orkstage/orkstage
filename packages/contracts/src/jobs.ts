@@ -64,6 +64,8 @@ export interface NotificationJob extends Traced {
    * status). Ids and states only — never secrets or infrastructure internals.
    */
   data?: Record<string, string | number | boolean | null>;
+  /** The operation that caused it (a deployment, a trigger run), for following it across logs and webhooks. */
+  correlationId?: string;
 }
 
 export const NOTIFICATION_EVENTS = [

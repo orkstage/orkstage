@@ -48,6 +48,11 @@ const schema = z
     HEALTH_CHECK_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(30),
     // Days of per resource health check history kept (uptime and trends); older rows are deleted.
     HEALTH_HISTORY_DAYS: z.coerce.number().int().min(1).max(400).default(30),
+    // Retention (worker housekeeping, hourly): notifications and notification and webhook
+    // deliveries; deployment events (0 keeps them forever). Expired sessions and invitations go
+    // 30 days after they end.
+    NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
+    DEPLOYMENT_EVENT_RETENTION_DAYS: z.coerce.number().int().min(0).max(3650).default(365),
     // Drift scans re-plan every applied resource on real providers (one OpenTofu plan each). 0 = off.
     DRIFT_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(360),
     // OpenTofu runner (worker only, ADR 0016). docker: a throwaway container per command through

@@ -60,6 +60,7 @@ incidents and pages.
   every word written by a person.
 - Uptime (30 days, per instance and component) appears in the customer overview, not on the public
   page.
-- Known gaps: a rule with `autoResolve: false` keeps every health incident open, not only its own;
-  housekeeping resolves orphaned health incidents but not metric ones; uptime does not exclude
-  maintenance windows unless checks stored `MAINTENANCE`.
+- Since item 30: an automated incident records the rule that opened it (`ruleId`), and only that
+  rule's `autoResolve: false` keeps it open; housekeeping also resolves metric incidents whose
+  instance, resource or rule is gone; health checks taken during a maintenance window are stored
+  as `MAINTENANCE`, so uptime counts them neither way.

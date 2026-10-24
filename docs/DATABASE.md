@@ -77,18 +77,18 @@ backup and run the previous release (see the site's upgrades page).
 
 | Table | Grows with | Pruned |
 |---|---|---|
-| `HealthCheckResult` | Every health check (every `HEALTH_CHECK_INTERVAL_SECONDS`, per resource) | Yes: older than `HEALTH_HISTORY_DAYS` (30 by default), by the worker's housekeeping |
-| `DeploymentEvent` | Provider progress lines of every deployment | No |
-| `AuditEvent` | Every audited action | No, and it cannot be (append only) |
-| `Session`, `Invitation` | Sign ins and invitations | No: expired rows stay, and are refused when used |
-| `Notification`, `NotificationDelivery`, `WebhookDelivery` | Every event | No |
+| `HealthCheckResult` | Every health check (every `HEALTH_CHECK_INTERVAL_SECONDS`, per resource) | Older than `HEALTH_HISTORY_DAYS` (30 by default), on every tick |
+| `DeploymentEvent` | Provider progress lines of every deployment | Older than `DEPLOYMENT_EVENT_RETENTION_DAYS` (365 by default; 0 keeps them) |
+| `Session`, `Invitation` | Sign ins and invitations | 30 days after they expired, were revoked or were accepted |
+| `Notification`, `NotificationDelivery`, `WebhookDelivery` | Every event | Older than `NOTIFICATION_RETENTION_DAYS` (90 by default); pending deliveries stay |
+| `AuditEvent` | Every audited action | Never: append only. Retention or export is an Enterprise topic (`audit.export`) |
+
+The worker's housekeeping prunes once an hour across all workers (a Redis claim), in batches of
+5000 rows, so a large first run spreads over several hours instead of holding long locks.
 
 Resources that are destroyed are marked `DELETED`, not removed, so an instance keeps its history.
-Housekeeping also resolves automated health incidents whose instance or resource is gone and fails
-deployments stuck past `TOFU_TIMEOUT_MINUTES + 15`.
-
-For long lived installations, plan for the tables marked "No". Audit retention or export is an
-Enterprise topic (`audit.export`); for the others, a scheduled `DELETE` of old rows is safe.
+Housekeeping also resolves automated incidents whose instance, resource or metric rule is gone and
+fails deployments stuck past `TOFU_TIMEOUT_MINUTES + 15`.
 
 ## Backup and restore
 

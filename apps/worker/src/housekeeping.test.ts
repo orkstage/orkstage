@@ -9,6 +9,7 @@ function context(data: {
   resources?: Record<string, string>;
   deployments?: { id: string }[];
   lastEvent?: Record<string, Date>;
+  rules?: Record<string, boolean>;
 }) {
   const updated: string[] = [];
   const prisma = {
@@ -26,6 +27,7 @@ function context(data: {
     auditEvent: { create: async () => ({}) },
     healthCheckResult: { deleteMany: vi.fn(async () => ({ count: 3 })) },
     deployment: { findMany: async () => data.deployments ?? [] },
+    alertRule: { findUnique: async ({ where }: { where: { id: string } }) => (data.rules?.[where.id] === undefined ? null : { enabled: data.rules[where.id] }) },
     deploymentEvent: { findFirst: async ({ where }: { where: { deploymentId: string } }) => (data.lastEvent?.[where.deploymentId] ? { at: data.lastEvent[where.deploymentId] } : null) },
   };
   const ctx = {
@@ -70,5 +72,47 @@ describe('Housekeeping', () => {
     const h = new Housekeeping(ctx, { getJobs: async () => [{ data: { deploymentId: 'live-job' } }] } as never, abandon);
     expect(await h.reapStuckDeployments(now)).toBe(1);
     expect(abandon).toHaveBeenCalledWith('stuck', expect.stringContaining('stopped'));
+  });
+
+  it('resolves metric incidents whose rule was removed or turned off', async () => {
+    const { ctx, updated } = context({
+      incidents: [
+        { id: 'rule-gone', tenantId: 't', title: 'CPU high', dedupKey: 'metric:r1:i2:api' },
+        { id: 'rule-off', tenantId: 't', title: 'CPU high', dedupKey: 'metric:r2:i2:api' },
+        { id: 'rule-on', tenantId: 't', title: 'CPU high', dedupKey: 'metric:r3:i2:api' },
+      ],
+      instances: { i2: 'READY' },
+      resources: { 'i2/api': 'ACTIVE' },
+      rules: { r2: false, r3: true },
+    });
+    const h = new Housekeeping(ctx, { getJobs: async () => [] } as never, async () => {});
+    expect(await h.resolveOrphanIncidents()).toBe(2);
+    expect(updated).toEqual(['rule-gone', 'rule-off']);
+  });
+
+  it('prunes old records once an hour across workers, in batches', async () => {
+    const statements: string[] = [];
+    let sessionBatches = 0;
+    const { ctx } = context({});
+    const claims = new Set<string>();
+    Object.assign(ctx, {
+      config: { ...ctx.config, NOTIFICATION_RETENTION_DAYS: 90, DEPLOYMENT_EVENT_RETENTION_DAYS: 0 },
+      logger: { info: () => {} },
+      redis: { set: async (key: string) => (claims.has(key) ? null : (claims.add(key), 'OK')) },
+    });
+    Object.assign(ctx.prisma, {
+      $executeRaw: async (sql: { strings: readonly string[] }) => {
+        const text = sql.strings.join('?');
+        statements.push(text.match(/DELETE FROM "(\w+)"/)![1]!);
+        // Two full batches of sessions, then a short one.
+        if (text.includes('"Session"')) return ++sessionBatches < 3 ? 5000 : 12;
+        return 0;
+      },
+    });
+    const h = new Housekeeping(ctx, { getJobs: async () => [] } as never, async () => {});
+    const now = new Date('2026-10-24T12:00:00Z');
+    expect(await h.pruneRecords(now)).toEqual({ sessions: 10_012, invitations: 0, notifications: 0, notificationDeliveries: 0, webhookDeliveries: 0, deploymentEvents: 0 });
+    expect(statements).toEqual(['Session', 'Session', 'Session', 'Invitation', 'Notification', 'NotificationDelivery', 'WebhookDelivery']);
+    expect(await h.pruneRecords(now)).toBeNull();
   });
 });
