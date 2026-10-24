@@ -142,6 +142,7 @@ export class DeploymentRunner {
           await prisma.cloudTarget.update({ where: { id: targetId }, data: { lastValidation: result as object, lastValidatedAt: new Date(), health: result.ok ? 'HEALTHY' : 'UNHEALTHY' } });
           if (!result.ok && row.health !== 'UNHEALTHY') {
             await notify(this.ctx, {
+              correlationId: d.correlationId,
               tenantId: d.tenantId,
               event: 'cloud_target.unhealthy',
               title: `Cloud target ${row.name} failed validation`,
@@ -205,7 +206,7 @@ export class DeploymentRunner {
         await prisma.deployment.update({ where: { id: d.id }, data: { status: 'AWAITING_APPROVAL' } });
         await this.step(d.id, PHASE.approval, 'RUNNING');
         await this.event(d.id, 'warn', PHASE.approval, 'High-risk production change: waiting for approval.');
-        await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.awaiting_approval', title: 'Deployment awaiting approval', body: 'A production deployment needs approval before changes are applied.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+        await notify(this.ctx, { correlationId: d.correlationId, tenantId: d.tenantId, event: 'deployment.awaiting_approval', title: 'Deployment awaiting approval', body: 'A production deployment needs approval before changes are applied.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
         log.info('parked for approval');
         return;
       }
@@ -214,7 +215,7 @@ export class DeploymentRunner {
     }
 
     await this.moveInstance(d, 'PROVISIONING');
-    await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.started', title: 'Deployment started', body: 'Infrastructure provisioning has started.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+    await notify(this.ctx, { correlationId: d.correlationId, tenantId: d.tenantId, event: 'deployment.started', title: 'Deployment started', body: 'Infrastructure provisioning has started.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
     const outcome = await this.provision(d, resolved);
     const statuses = Object.values(outcome);
     if (statuses.some((s) => s !== 'SUCCEEDED')) {
@@ -276,7 +277,7 @@ export class DeploymentRunner {
       return degraded ? 'Instance is up but degraded.' : 'Instance is READY.';
     });
 
-    await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.succeeded', title: 'Deployment completed', body: degraded ? 'The deployment completed, but some components are degraded.' : 'Your environment is ready.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+    await notify(this.ctx, { correlationId: d.correlationId, tenantId: d.tenantId, event: 'deployment.succeeded', title: 'Deployment completed', body: degraded ? 'The deployment completed, but some components are degraded.' : 'Your environment is ready.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
     await systemAudit(this.ctx, { tenantId: d.tenantId, resourceType: 'Deployment', resourceId: d.id, action: 'COMPLETE', correlationId: d.correlationId, changes: { kind: 'APPLY', degraded } });
     log.info({ degraded }, 'deployment succeeded');
   }
@@ -551,7 +552,7 @@ export class DeploymentRunner {
         await prisma.deployment.update({ where: { id: d.id }, data: { status: 'AWAITING_APPROVAL' } });
         await this.step(d.id, PHASE.approval, 'RUNNING');
         await this.event(d.id, 'warn', PHASE.approval, 'Destroying a production instance: waiting for approval.');
-        await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.awaiting_approval', title: 'Destroy awaiting approval', body: 'Destroying a production instance needs approval before anything is deleted.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+        await notify(this.ctx, { correlationId: d.correlationId, tenantId: d.tenantId, event: 'deployment.awaiting_approval', title: 'Destroy awaiting approval', body: 'Destroying a production instance needs approval before anything is deleted.', link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
         log.info('destroy parked for approval');
         return;
       }
@@ -560,6 +561,8 @@ export class DeploymentRunner {
     }
 
     const rows = await prisma.instanceResource.findMany({ where: { instanceId: d.instanceId } });
+    const providerOf = new Map(resolved.resources.map((r) => [r.id, r.provider]));
+    const started = new Map<string, number>();
     const outcome = await executeDestroy({
       resolved,
       registry: this.ctx.registry,
@@ -568,15 +571,18 @@ export class DeploymentRunner {
       concurrency: this.ctx.config.WORKER_CONCURRENCY,
       hooks: {
         onStart: async (id) => {
+          started.set(id, Date.now());
           await this.step(d.id, id, 'RUNNING', { attempt: 1 });
           await this.event(d.id, 'info', id, `Deleting ${id}.`);
         },
         onSuccess: async (id) => {
+          platformMetrics.provider(providerOf.get(id) ?? 'unknown', 'destroy', Date.now() - (started.get(id) ?? Date.now()), 'ok');
           await prisma.instanceResource.updateMany({ where: { instanceId: d.instanceId, resourceId: id }, data: { status: 'DELETED', knowledge: 'ACTUAL', health: 'UNKNOWN' } });
           await this.step(d.id, id, 'SUCCEEDED');
           await this.event(d.id, 'info', id, `${id} deleted.`);
         },
         onFailure: async (id, f) => {
+          platformMetrics.provider(providerOf.get(id) ?? 'unknown', 'destroy', Date.now() - (started.get(id) ?? Date.now()), 'error', f.failureClass);
           await this.step(d.id, id, 'FAILED', { attempt: 1, errorClass: f.failureClass, errorMessage: f.message });
           await this.event(d.id, 'error', id, `${id} could not be deleted (${f.failureClass}): ${f.message}`);
         },
@@ -688,7 +694,7 @@ export class DeploymentRunner {
         prisma.instanceTransition.create({ data: { instanceId: instance.id, tenantId: instance.tenantId, from: instance.status, to: failed, deploymentId: d.id, reason: `${failureClass}: ${message.slice(0, 200)}` } }),
       ]);
     }
-    await notify(this.ctx, { tenantId: d.tenantId, event: 'deployment.failed', title: 'Deployment failed', body: `The deployment did not complete (${failureClass}). Open the deployment for details and safe retry options.`, link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
+    await notify(this.ctx, { correlationId: d.correlationId, tenantId: d.tenantId, event: 'deployment.failed', title: 'Deployment failed', body: `The deployment did not complete (${failureClass}). Open the deployment for details and safe retry options.`, link: `/deployments/${d.id}`, data: { deploymentId: d.id, instanceId: d.instanceId, kind: d.kind } });
     await systemAudit(this.ctx, { tenantId: d.tenantId, resourceType: 'Deployment', resourceId: d.id, action: 'COMPLETE', result: 'FAILURE', correlationId: d.correlationId, changes: { failureClass, status } });
   }
 

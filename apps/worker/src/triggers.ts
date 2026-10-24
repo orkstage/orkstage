@@ -62,6 +62,7 @@ export class TriggerRunner {
       await prisma.triggerRun.update({ where: { id: run.id }, data: { ...data, status: ok ? 'SUCCEEDED' : 'FAILED', finishedAt: new Date() } });
       await systemAudit(this.ctx, { tenantId: run.tenantId, resourceType: 'TriggerRun', resourceId: run.id, action: ok ? 'TRIGGER_SUCCEEDED' : 'TRIGGER_FAILED', correlationId: run.correlationId, changes: { trigger: run.trigger, action: run.action } });
       await notify(this.ctx, {
+        correlationId: run.correlationId,
         tenantId: run.tenantId,
         event: ok ? 'trigger.succeeded' : 'trigger.failed',
         title: ok ? `${run.trigger} started` : `${run.trigger} failed`,
@@ -84,6 +85,7 @@ export class TriggerRunner {
     if (!run.approvedAt && instance.environment === 'production' && (action.catalog?.risk ?? 'disruptive') !== 'safe') {
       await prisma.triggerRun.update({ where: { id: run.id }, data: { status: 'AWAITING_APPROVAL', startedAt: null } });
       await notify(this.ctx, {
+        correlationId: run.correlationId,
         tenantId: run.tenantId,
         event: 'trigger.awaiting_approval',
         title: `${run.trigger} awaits approval`,

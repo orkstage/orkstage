@@ -34,6 +34,7 @@ export class HealthMonitor {
 
   async tick(): Promise<void> {
     const { prisma } = this.ctx;
+    const tickStartedAt = new Date();
     const instances = await prisma.instance.findMany({
       where: { status: { in: ['READY', 'DEGRADED'] } },
       include: { resources: { where: { status: 'ACTIVE' } } },
@@ -73,6 +74,13 @@ export class HealthMonitor {
         }
       }
       const inMaintenance = await syncStatusComponents(this.ctx, instance.id, instance.tenantId);
+      // Checks taken during planned work count neither way in uptime: they are kept as MAINTENANCE.
+      if (inMaintenance.size > 0) {
+        await prisma.healthCheckResult.updateMany({
+          where: { instanceId: instance.id, resourceId: { in: [...inMaintenance] }, checkedAt: { gte: tickStartedAt } },
+          data: { state: 'MAINTENANCE' },
+        });
+      }
       // With AUTOMATED_INCIDENTS off, rules still notify and resolve what is open, but open nothing.
       const automated = flagsFor(instance.tenantId).AUTOMATED_INCIDENTS;
       const scoped = rules
@@ -168,8 +176,9 @@ export class HealthMonitor {
       const dedupKey = `health:${instance.id}:${r.resourceId}`;
       const open = await prisma.incident.findFirst({ where: { dedupKey, status: { not: 'RESOLVED' } } });
 
-      // A matching health rule with auto resolve off leaves the incident for a person to resolve.
-      const keepOpen = rules.some((rule) => (rule.condition as unknown as HealthCondition).signal === 'health' && !rule.autoResolve);
+      // The rule that opened the incident decides: with auto resolve off, a person resolves it.
+      // Incidents from before rules were recorded, or whose rule is gone, resolve on recovery.
+      const keepOpen = open?.ruleId ? rules.some((rule) => rule.id === open.ruleId && !rule.autoResolve) : false;
       if (r.health === 'HEALTHY' && open?.source === 'AUTOMATED' && !keepOpen) {
         await prisma.incident.update({
           where: { id: open.id },
@@ -204,6 +213,7 @@ export class HealthMonitor {
           severity: rule.severity,
           source: 'AUTOMATED',
           dedupKey,
+          ruleId: rule.id,
           updates: { create: { status: 'INVESTIGATING', message: `Automated: ${r.consecutiveHealthFailures} consecutive failed health checks (${rule.name}).` } },
         },
       })

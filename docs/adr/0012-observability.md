@@ -60,7 +60,7 @@ separate concern: their logs and metrics belong to their cloud accounts.
 
 - An installation without a collector loses nothing but traces and metrics; logs, the audit log
   and deployment events keep working.
-- Known gaps: provider metrics are recorded for applies only, not destroys; OTLP logs are not
-  exported; the worker's log `service` (`provisioning-worker`) differs from its telemetry name;
-  notifications and webhook deliveries do not carry the correlation id. Each is small and
-  independent.
+- Since item 30: provider metrics cover destroys as well as applies; logs name the services
+  `orkstage-api` and `orkstage-worker`, like telemetry; notifications started by a deployment or
+  a trigger run carry its correlation id, and webhook payloads include it (`correlationId`).
+- Known gap: OTLP logs are not exported; ship stdout with the platform's log agent.

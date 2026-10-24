@@ -46,6 +46,15 @@ describe('API keys', () => {
     expect(invite.body.error.code).toBe('API_KEY_NOT_ALLOWED');
   });
 
+  it('of another tenant look missing to its admins, like any foreign record (ADR 0004)', async () => {
+    const owner = await api.as(ctx.acmeOwner);
+    const acmeKey = await owner.post('/api-keys', { name: `foreign ${unique()}`, tenantId: ctx.acme.id, role: 'CustomerViewer', scopes: ['instances:read'] });
+    const outsider = await api.as((await member(api.prisma, ctx.globex.id, 'CustomerOwner')).email);
+    const res = await outsider.del(`/api-keys/${acmeKey.body.apiKey.id}`);
+    expect(res.status).toBe(404);
+    expect((await api.withKey(acmeKey.body.token).get('/instances')).status).toBe(200);
+  });
+
   it('stop working when revoked, and when their creator leaves the tenant', async () => {
     const owner = await api.as(ctx.acmeOwner);
     const revoked = await owner.post('/api-keys', { name: `revoked ${unique()}`, tenantId: ctx.acme.id, role: 'CustomerViewer', scopes: ['instances:read'] });

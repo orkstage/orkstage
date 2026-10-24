@@ -35,7 +35,7 @@ export class AppModule {
           inject: [CONFIG],
           useFactory: (config: PlatformConfig) => ({
             pinoHttp: {
-              ...loggerOptions('api', config.LOG_LEVEL),
+              ...loggerOptions('orkstage-api', config.LOG_LEVEL),
               customProps: (req: IncomingMessage) => ({ correlationId: (req as IncomingMessage & { correlationId?: string }).correlationId }),
               autoLogging: { ignore: (req: IncomingMessage) => Boolean(req.url?.includes('/healthz')) },
               ...(config.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty', options: { singleLine: true } } } : {}),

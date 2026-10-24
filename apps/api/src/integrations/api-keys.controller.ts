@@ -104,7 +104,11 @@ export class ApiKeysController {
   @Delete(':id')
   @HttpCode(204)
   async revoke(@CurrentPrincipal() p: RequestPrincipal, @Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string) {
-    const key = await this.prisma.apiKey.findUnique({ where: { id } });
+    // Platform keys belong to staff; tenant keys to members of that tenant. Anything else looks
+    // exactly like a missing key (ADR 0004).
+    const key = await this.prisma.apiKey.findFirst({
+      where: { id, ...(isPlatformStaff(p) ? {} : { tenantId: { in: p.memberships.map((m) => m.tenantId) } }) },
+    });
     if (!key) throw notFound('API key');
     authorize(p, 'delete', 'ApiKey', { tenantId: key.tenantId });
     if (!key.revokedAt) await this.prisma.apiKey.update({ where: { id }, data: { revokedAt: new Date() } });

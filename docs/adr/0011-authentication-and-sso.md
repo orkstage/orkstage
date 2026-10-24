@@ -74,5 +74,5 @@ abilities; this ADR records how people and programs get a principal.
   (`lastSeenAt` and `lastUsedAt` are written at most every five minutes and every minute).
 - Only Entra's variables are validated at startup; other providers are read as they are found, so
   a typo disables that provider silently (SECURITY.md lists it).
-- `DELETE /api-keys/:id` loads the key before checking the tenant and answers 403 for a key of
-  another tenant, where the rest of the API answers 404 (ADR 0004). To be aligned.
+- `DELETE /api-keys/:id` answers 404 for a key outside the caller's tenants, like every other
+  record (ADR 0004); fixed with item 30.

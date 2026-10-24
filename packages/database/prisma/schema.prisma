@@ -158,6 +158,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 // ───────────────────────────── Templates ─────────────────────────────
@@ -638,6 +639,7 @@ model DeploymentEvent {
   deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
 
   @@index([deploymentId, id])
+  @@index([at])
 }
 
 model HealthCheckResult {
@@ -713,6 +715,8 @@ model Incident {
   dedupKey     String?
   componentIds String[]       @default([])
   deploymentId String?        @db.Uuid
+  /// The alert rule that opened an automated incident; its autoResolve decides how it closes.
+  ruleId       String?        @db.Uuid
   openedAt     DateTime       @default(now()) @db.Timestamptz(3)
   resolvedAt   DateTime?      @db.Timestamptz(3)
   createdById  String?        @db.Uuid
@@ -836,6 +840,7 @@ model Notification {
   deliveries NotificationDelivery[]
 
   @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model NotificationPreference {
@@ -863,6 +868,7 @@ model NotificationDelivery {
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@index([status])
+  @@index([createdAt])
 }
 
 // ───────────────────────────── Governance ─────────────────────────────
@@ -963,6 +969,7 @@ model WebhookDelivery {
 
   @@index([status, nextAttemptAt])
   @@index([endpointId, createdAt])
+  @@index([createdAt])
 }
 
 /// Result of importing existing IaC (Terraform, CloudFormation, ...) into an OrkStage template.

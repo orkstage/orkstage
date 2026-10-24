@@ -126,6 +126,7 @@ export class MetricAlerts {
           severity: rule.severity,
           source: 'AUTOMATED',
           dedupKey,
+          ruleId: rule.id,
           updates: {
             create: {
               status: 'INVESTIGATING',

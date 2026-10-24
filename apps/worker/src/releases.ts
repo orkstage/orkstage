@@ -104,6 +104,7 @@ export class ReleaseWatcher {
     await this.event(d.id, rollbackId ? 'warn' : 'error', outcome);
     await prisma.deployment.update({ where: { id: d.id }, data: { bakeFailure: `${reason} ${outcome}` } });
     await notify(this.ctx, {
+      correlationId: d.correlationId,
       tenantId: d.tenantId,
       event: 'deployment.bake_failed',
       title: rollbackId ? 'Release rolled back' : 'Release failed its bake period',

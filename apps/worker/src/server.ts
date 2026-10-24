@@ -31,7 +31,7 @@ const SLOT_WAIT_MS = 5000;
 async function main() {
   loadDotEnv();
   const config = loadConfig();
-  const logger = createLogger('provisioning-worker', config.LOG_LEVEL);
+  const logger = createLogger('orkstage-worker', config.LOG_LEVEL);
   const redis = createRedis(config.REDIS_URL);
   const prisma = createPrismaClient(config.DATABASE_URL);
   // Only the worker provisions: it alone gets an OpenTofu runner (the API validates targets only).

@@ -186,6 +186,7 @@ export class TriggersController {
     await this.audit.record({ principal: p, tenantId: instance.tenantId, resourceType: 'TriggerRun', resourceId: run.id, action: 'RUN_TRIGGER', correlationId, changes: { instanceId: id, trigger: name, params: resolved.params, awaitsApproval } });
     if (awaitsApproval) {
       await this.queues.notify({
+        correlationId: run.correlationId,
         tenantId: instance.tenantId,
         event: 'trigger.awaiting_approval',
         title: `${name} awaits approval`,
