@@ -7,7 +7,7 @@ This page describes the security controls in the platform. To report a vulnerabi
 
 | Area | Control |
 |---|---|
-| Sessions | A 32 byte random opaque token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production). Only its SHA-256 hash is stored. Sessions expire after 12 hours and are revoked on logout. |
+| Sessions | A 32 byte random opaque token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production). Only its SHA-256 hash is stored. Sessions expire after 12 hours, or after `SESSION_IDLE_MINUTES` without use (120 by default), and are revoked on logout. People list their sessions and revoke them one by one or all others at once. See [ADR 0011](adr/0011-authentication-and-sso.md). |
 | CSRF | Every state changing request needs the `x-orkstage-csrf: 1` header. The API grants no cross origin CORS, so browsers cannot send it from another site. |
 | OIDC | Authorization code flow with PKCE (S256); `state` and `nonce` are verified; the flow state lives in a signed cookie with a short lifetime; `returnTo` accepts relative paths only. Provider tokens are discarded. |
 | Account linking | Only by an email the provider verified (`email_verified`, or `xms_edov` for Entra). `preferred_username` is never trusted, which prevents "nOAuth" account takeover. Unknown users get no account unless a tenant allows their email domain. |
@@ -21,12 +21,11 @@ This page describes the security controls in the platform. To report a vulnerabi
 | Rate limits | A global ceiling per client, with stricter limits on login, deploy, destroy, target validation and template publishing. |
 | Audit | Append only: a Postgres trigger rejects `UPDATE` and `DELETE` on `AuditEvent`. |
 | Headers | Helmet with a restrictive Content Security Policy. |
-| Supply chain | pnpm build scripts are allow listed (`pnpm-workspace.yaml`), install time telemetry is denied, and very recent releases are avoided (minimum release age). |
+| Supply chain | Trivy scans the dependencies, the platform image and the runner image in CI. pnpm build scripts are allow listed (`pnpm-workspace.yaml`), install time telemetry is denied, and very recent releases are avoided (minimum release age). |
 
 ## Not yet (tracked)
 
-- MFA policy, a UI to list and revoke sessions, and the invitation acceptance flow.
-- Container image scanning in CI (dependencies are audited with `pnpm audit`).
+- MFA, SAML and SCIM (Enterprise, ADR 0011). With OIDC, the identity provider enforces MFA.
 - Runner isolation without the Docker socket (ECS RunTask or a Kubernetes Job with a scoped role).
 - OIDC providers other than Entra are read from `OIDC_<KEY>_*` without validation at startup.
 

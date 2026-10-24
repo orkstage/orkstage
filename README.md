@@ -182,7 +182,7 @@ packages/          domain, templates, provisioning, cloud-core, cloud-aws, cloud
 infra/local/       Docker Compose for local development (with the MiniStack profile)
 infra/docker/      Platform image
 infra/aws/         CloudFormation for the deployment role in a customer account
-docs/              Architecture, API map, ADRs, roadmap
+docs/              Architecture, API map, database, runbooks, ADRs, roadmap
 ```
 
 ## Documentation
@@ -191,6 +191,7 @@ docs/              Architecture, API map, ADRs, roadmap
 - [Run OrkStage on your own infrastructure](https://orkstage.io/docs/self-hosting/docker-compose)
 - [API reference](https://orkstage.io/docs/developer/api-reference) and [API map](docs/API.md)
 - [Architecture](docs/ARCHITECTURE.md), [decisions](docs/adr), [security model](docs/SECURITY.md)
+- [Database](docs/DATABASE.md) and [runbooks](docs/RUNBOOKS.md) for operators
 
 ## Contributing
 
