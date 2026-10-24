@@ -91,7 +91,8 @@ services:
 
   # Runs deployments, health checks, drift scans and notifications. It starts one throwaway
   # OpenTofu container per command through the Docker socket, so it runs as root and the socket
-  # gives it control of this Docker host: run OrkStage on a host dedicated to it.
+  # gives it control of this Docker host: run OrkStage on a host dedicated to it. On ECS or
+  # Kubernetes, TOFU_RUNNER=ecs or kubernetes starts a task or Job per run instead (ADR 0016).
   worker:
     <<: *platform
     user: root

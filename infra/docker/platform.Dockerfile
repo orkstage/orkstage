@@ -8,7 +8,7 @@ FROM mirror.gcr.io/library/node:24.22.1-alpine AS base
 # openssl: Prisma schema engine (migrations). docker-cli: the worker launches OpenTofu runner containers.
 RUN apk upgrade --no-cache  && apk add --no-cache openssl docker-cli \
  && npm install -g pnpm@12.5.1 \
- && addgroup -S orkstage && adduser -S orkstage -G orkstage
+ && addgroup -S -g 10001 orkstage && adduser -S -u 10001 -G orkstage orkstage
 WORKDIR /repo
 
 FROM base AS build
@@ -30,7 +30,8 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 # bundled with Node carries its own dependencies (and their advisories).
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 COPY --from=build --chown=orkstage:orkstage /repo /repo
-# The worker needs the Docker socket (root-owned) to start runner containers; api/web/migrate
-# run as the unprivileged user (set per service in Compose).
+# With TOFU_RUNNER=docker the worker needs the Docker socket (root-owned) to start runner containers;
+# api/web/migrate run as the unprivileged user (set per service in Compose). User 10001 is fixed so
+# ECS and Kubernetes runners can run as the worker's user (ADR 0016).
 EXPOSE 3000 4000
 CMD ["node", "--version"]

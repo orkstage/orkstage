@@ -1,42 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { spawn } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { type DockerExecutorOptions, dockerExecutor, sequential, type TofuExec, type TofuExecResult, type TofuExecutor } from './executor.js';
 
-export interface TofuRunnerOptions {
-  /** Pinned OpenTofu image, e.g. ghcr.io/opentofu/opentofu:1.13.2. */
-  image: string;
-  /**
-   * Host directory holding the module library, mounted read-only at /modules. Omit when the
-   * runner image already contains the modules at /modules (containerized worker).
-   */
-  modulesDir?: string;
+export interface TofuRunnerOptions extends Partial<DockerExecutorOptions> {
   /** Directory (as seen by this process) for per-state working directories. */
   workRoot: string;
-  /**
-   * Docker volume mounted at `workRoot` in this process. Required when this process runs in a
-   * container itself: the Docker daemon cannot see paths inside our container, but it can mount
-   * the same named volume into the runner.
-   */
-  workVolume?: string;
-  /** Docker volume shared as the provider plugin cache. */
-  pluginCacheVolume: string;
-  /** Docker network to join (e.g. to reach a local emulator). */
-  network?: string;
-  dockerBin?: string;
-  /** Hard ceiling for a single command. */
+  /** Hard ceiling for one OpenTofu session (init, validate and the operation's commands). */
   timeoutMs?: number;
+  /** Where OpenTofu runs (ADR 0016); without it, a container per command on the local Docker daemon. */
+  executor?: TofuExecutor;
   /** Tests only: runs one OpenTofu command instead of a container. */
   exec?: TofuExec;
-}
-
-export type TofuExec = (stack: TofuStack, dir: string, args: string[]) => Promise<TofuExecResult>;
-export interface TofuExecResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-  kind: 'timeout' | 'cancelled' | 'failed';
 }
 
 export interface TofuStack {
@@ -144,44 +120,57 @@ interface JsonLine {
   diagnostic?: { severity: string; summary: string; detail?: string };
 }
 
+const INIT = ['init', '-input=false', '-no-color'];
+const VALIDATE = ['validate', '-json', '-no-color'];
+const OUTPUT = ['output', '-json'];
+const APPLY = ['apply', '-auto-approve', '-input=false', '-json'];
+
 /**
- * Runs OpenTofu in an isolated, throwaway container per command (spec §44): the control plane
- * never executes IaC in-process, the module library is mounted read-only, and credentials reach
- * the container only as environment variables for that one run.
+ * Runs OpenTofu in an isolated, throwaway runner (spec §44): the control plane never executes IaC
+ * in-process, the module library is read-only, and credentials reach the runner only for that one
+ * run. Each operation is one session (init, validate, then its commands) on an executor: a
+ * container per command on Docker, one task or Job per session on ECS and Kubernetes (ADR 0016).
  */
 export class TofuRunner {
-  private readonly docker: string;
-  /** Longest a single OpenTofu command may run before it is stopped. */
+  private readonly executor: TofuExecutor;
+  /** Longest an OpenTofu session may run before it is stopped. */
   readonly timeoutMs: number;
 
   constructor(private readonly opts: TofuRunnerOptions) {
-    this.docker = opts.dockerBin ?? 'docker';
     this.timeoutMs = opts.timeoutMs ?? 45 * 60 * 1000;
+    const { exec, executor, image, pluginCacheVolume } = opts;
+    if (exec) this.executor = sequential((stack, dir, args) => exec(stack, dir, args));
+    else if (executor) this.executor = executor;
+    else if (image && pluginCacheVolume) this.executor = dockerExecutor({ ...opts, image, pluginCacheVolume });
+    else throw new Error('TofuRunner needs an executor, or an image and a plugin cache volume for Docker.');
   }
 
   async apply(stack: TofuStack): Promise<ApplyResult> {
     const dir = await this.prepare(stack, 'main');
-    await this.init(stack, dir);
     const saved = stack.savedPlan ? await this.takeSavedPlan(stack, dir) : null;
+    let results: TofuExecResult[];
     let lines: JsonLine[];
     if (saved) {
       try {
-        lines = await this.run(stack, dir, ['apply', '-input=false', '-json', saved], true);
+        results = await this.session(stack, dir, [['apply', '-input=false', '-json', saved], OUTPUT]);
+        lines = this.parse(stack, dir, APPLY, results[0]!, true);
       } catch (err) {
         if (!(err instanceof TofuError) || !/stale/i.test(err.message)) throw err;
         if (stack.savedPlan!.strict) {
           throw new TofuError('The infrastructure changed after the plan was approved, so it was not applied. Deploy again to plan and approve the current changes.', err.diagnostics, 'failed');
         }
         stack.onLog?.({ level: 'warn', message: 'The saved plan was outdated (the state changed since it was made); planning and applying again.' });
-        lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
+        results = await this.session(stack, dir, [APPLY, OUTPUT]);
+        lines = this.parse(stack, dir, APPLY, results[0]!, true);
       } finally {
         await this.dropSavedPlan(stack, dir);
       }
     } else {
-      lines = await this.run(stack, dir, ['apply', '-auto-approve', '-input=false', '-json'], true);
+      results = await this.session(stack, dir, [APPLY, OUTPUT]);
+      lines = this.parse(stack, dir, APPLY, results[0]!, true);
     }
     const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
-    return { outputs: await this.outputs(stack, dir), changes: { add: summary.add, change: summary.change, remove: summary.remove } };
+    return { outputs: this.outputs(results[1]), changes: { add: summary.add, change: summary.change, remove: summary.remove } };
   }
 
   /**
@@ -191,11 +180,11 @@ export class TofuRunner {
    */
   async plan(stack: TofuStack): Promise<PlanResult> {
     const dir = await this.prepare(stack, stack.savedPlan ? 'main' : 'preview');
-    await this.init(stack, dir);
     const args = stack.savedPlan
       ? ['plan', '-input=false', '-json', `-out=${planFile(stack.savedPlan.id)}`]
       : ['plan', '-input=false', '-json', '-lock=false'];
-    const lines = await this.run(stack, dir, args, true);
+    const [result] = await this.session(stack, dir, [args]);
+    const lines = this.parse(stack, dir, args, result!, true);
     if (stack.savedPlan) await writeFile(join(dir, planHashFile(stack.savedPlan.id)), configHash(stack.config));
     const summary = lines.find((l) => l.type === 'change_summary')?.changes ?? { add: 0, change: 0, remove: 0 };
     const actions = lines
@@ -211,12 +200,12 @@ export class TofuRunner {
    */
   async drift(stack: TofuStack): Promise<DriftChange[]> {
     const dir = await this.prepare(stack, 'drift');
-    await this.init(stack, dir);
     const file = 'drift.tfplan';
     try {
-      await this.run(stack, dir, ['plan', '-input=false', '-json', '-lock=false', '-refresh-only', `-out=${file}`], true);
-      const shown = await this.exec(stack, dir, ['show', '-json', file]);
-      if (shown.code !== 0) throw new TofuError(`tofu show failed: ${shown.stderr.slice(0, 300)}`, [], shown.kind);
+      const plan = ['plan', '-input=false', '-json', '-lock=false', '-refresh-only', `-out=${file}`];
+      const [planned, shown] = await this.session(stack, dir, [plan, ['show', '-json', file]]);
+      this.parse(stack, dir, plan, planned!, true);
+      if (shown?.code !== 0) throw new TofuError(`tofu show failed: ${shown?.stderr.slice(0, 300) ?? ''}`, [], shown?.kind ?? 'failed');
       return driftChanges(JSON.parse(shown.stdout) as ShownPlan);
     } finally {
       // The saved plan holds attribute values (possibly sensitive): never leave it behind.
@@ -226,16 +215,25 @@ export class TofuRunner {
 
   async destroy(stack: TofuStack): Promise<void> {
     const dir = await this.prepare(stack, 'main');
-    await this.init(stack, dir);
-    await this.run(stack, dir, ['destroy', '-auto-approve', '-input=false', '-json'], true);
+    const args = ['destroy', '-auto-approve', '-input=false', '-json'];
+    const [result] = await this.session(stack, dir, [args]);
+    this.parse(stack, dir, args, result!, true);
     await rm(dir, { recursive: true, force: true });
     for (const purpose of ['preview', 'drift'] as const) await rm(this.dirFor(stack, purpose), { recursive: true, force: true });
   }
 
-  /** `init`, then `validate`: a configuration error stops before any plan or apply. */
-  private async init(stack: TofuStack, dir: string): Promise<void> {
-    await this.run(stack, dir, ['init', '-input=false', '-no-color'], false);
-    const res = await this.exec(stack, dir, ['validate', '-json', '-no-color']);
+  /**
+   * `init`, `validate`, then `commands`, in one session: a configuration error stops before any
+   * plan or apply. Returns the results of `commands`; the first one is always there.
+   */
+  private async session(stack: TofuStack, dir: string, commands: string[][]): Promise<TofuExecResult[]> {
+    const [init, validate, ...rest] = await this.executor.run(stack, dir, [INIT, VALIDATE, ...commands], this.timeoutMs);
+    this.parse(stack, dir, INIT, init!, false);
+    this.checkValid(validate!);
+    return rest;
+  }
+
+  private checkValid(res: TofuExecResult): void {
     let report: { valid?: boolean; diagnostics?: { severity: string; summary: string; detail?: string }[] } = {};
     try {
       report = JSON.parse(res.stdout || '{}');
@@ -272,8 +270,8 @@ export class TofuRunner {
     await rm(join(dir, planHashFile(id)), { force: true });
   }
 
-  private async outputs(stack: TofuStack, dir: string): Promise<Record<string, unknown>> {
-    const raw = await this.exec(stack, dir, ['output', '-json']);
+  private outputs(raw: TofuExecResult | undefined): Record<string, unknown> {
+    if (raw?.code !== 0) throw new TofuError(`tofu output failed: ${raw?.stderr.trim().slice(0, 300) ?? ''}`, [], raw?.kind ?? 'failed');
     const parsed = JSON.parse(raw.stdout || '{}') as Record<string, { value: unknown; sensitive?: boolean }>;
     // Sensitive outputs are dropped: the control plane stores references, never secret values.
     return Object.fromEntries(Object.entries(parsed).filter(([, o]) => !o.sensitive).map(([k, o]) => [k, o.value]));
@@ -296,8 +294,8 @@ export class TofuRunner {
     return dir;
   }
 
-  private async run(stack: TofuStack, dir: string, args: string[], json: boolean): Promise<JsonLine[]> {
-    const result = await this.exec(stack, dir, args);
+  /** JSON lines of a command's output; logs its diagnostics and throws when it failed. */
+  private parse(stack: TofuStack, dir: string, args: string[], result: TofuExecResult, json: boolean): JsonLine[] {
     const lines: JsonLine[] = [];
     const diagnostics: string[] = [];
     for (const raw of result.stdout.split('\n')) {
@@ -326,48 +324,5 @@ export class TofuRunner {
       throw new TofuError(`tofu ${args[0]} failed: ${message}`.slice(0, 1400) + where, diagnostics, result.kind);
     }
     return lines;
-  }
-
-  private exec(stack: TofuStack, dir: string, args: string[]): Promise<TofuExecResult> {
-    if (this.opts.exec) return this.opts.exec(stack, dir, args);
-    const name = `orkstage-tofu-${randomBytes(6).toString('hex')}`;
-    const work = this.opts.workVolume
-      ? ['-v', `${this.opts.workVolume}:/workspace`, '-w', `/workspace/${basename(dir)}`]
-      : ['-v', `${dir}:/work`, '-w', '/work'];
-    const dockerArgs = [
-      'run', '--rm', '--name', name,
-      ...(this.opts.network ? ['--network', this.opts.network] : []),
-      ...work,
-      ...(this.opts.modulesDir ? ['-v', `${this.opts.modulesDir}:/modules:ro`] : []),
-      '-v', `${this.opts.pluginCacheVolume}:/plugins`,
-      '-e', 'TF_PLUGIN_CACHE_DIR=/plugins',
-      '-e', 'TF_IN_AUTOMATION=1',
-      ...Object.keys(stack.env).flatMap((k) => ['-e', k]),
-      this.opts.image,
-      ...args,
-    ];
-    return new Promise((resolve) => {
-      const child = spawn(this.docker, dockerArgs, { env: { ...process.env, ...stack.env }, windowsHide: true });
-      let stdout = '';
-      let stderr = '';
-      let kind: 'timeout' | 'cancelled' | 'failed' = 'failed';
-      const kill = (why: 'timeout' | 'cancelled') => {
-        kind = why;
-        spawn(this.docker, ['kill', name], { windowsHide: true }).on('error', () => {});
-      };
-      const timer = setTimeout(() => kill('timeout'), this.timeoutMs);
-      const onAbort = () => kill('cancelled');
-      stack.signal?.addEventListener('abort', onAbort, { once: true });
-      child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
-      child.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
-      child.on('error', (err) => {
-        stderr += err.message;
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        stack.signal?.removeEventListener('abort', onAbort);
-        resolve({ code: code ?? 1, stdout, stderr, kind });
-      });
-    });
   }
 }

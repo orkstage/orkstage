@@ -624,7 +624,11 @@ importers:
 
   packages/domain: {}
 
-  packages/iac: {}
+  packages/iac:
+    dependencies:
+      '@aws-sdk/client-ecs':
+        specifier: 3.1153.0
+        version: 3.1153.0
 
   packages/licensing: {}
 

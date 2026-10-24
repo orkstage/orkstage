@@ -4,6 +4,16 @@ import { z } from 'zod';
 const bool = z
   .enum(['true', 'false', '1', '0'])
   .transform((v) => v === 'true' || v === '1');
+/** Comma separated list. */
+const list = z
+  .string()
+  .default('')
+  .transform((v) =>
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 
 /** Typed, validated environment configuration (spec §55). Startup fails fast on bad config. */
 const schema = z
@@ -40,7 +50,9 @@ const schema = z
     HEALTH_HISTORY_DAYS: z.coerce.number().int().min(1).max(400).default(30),
     // Drift scans re-plan every applied resource on real providers (one OpenTofu plan each). 0 = off.
     DRIFT_CHECK_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(360),
-    // OpenTofu runner (worker only). Each command runs in a throwaway container.
+    // OpenTofu runner (worker only, ADR 0016). docker: a throwaway container per command through
+    // the Docker socket. ecs: an ECS task per session. kubernetes: a Job per session.
+    TOFU_RUNNER: z.enum(['docker', 'ecs', 'kubernetes']).default('docker'),
     TOFU_IMAGE: z.string().default('ghcr.io/opentofu/opentofu:1.13.2'),
     TOFU_MODULES_DIR: z.string().optional(),
     TOFU_WORK_DIR: z.string().optional(),
@@ -49,6 +61,22 @@ const schema = z
     // Containerized worker: named volume mounted at TOFU_WORK_DIR, and modules baked into TOFU_IMAGE.
     TOFU_WORK_VOLUME: z.string().optional(),
     TOFU_MODULES_IN_IMAGE: bool.default(false),
+    // ecs and kubernetes: the work volume (EFS, a ReadWriteMany claim) is mounted at TOFU_WORK_DIR
+    // in the worker and at TOFU_REMOTE_WORK_DIR in the runner.
+    TOFU_REMOTE_WORK_DIR: z.string().default('/workspace'),
+    TOFU_ECS_CLUSTER: z.string().optional(),
+    TOFU_ECS_TASK_DEFINITION: z.string().optional(),
+    TOFU_ECS_CONTAINER: z.string().default('tofu'),
+    TOFU_ECS_SUBNETS: list,
+    TOFU_ECS_SECURITY_GROUPS: list,
+    TOFU_ECS_ASSIGN_PUBLIC_IP: bool.default(false),
+    TOFU_ECS_LAUNCH_TYPE: z.enum(['FARGATE', 'EC2']).default('FARGATE'),
+    TOFU_ECS_REGION: z.string().optional(),
+    // Kubernetes: the namespace defaults to the worker's own.
+    TOFU_K8S_NAMESPACE: z.string().optional(),
+    TOFU_K8S_WORK_CLAIM: z.string().optional(),
+    TOFU_K8S_SERVICE_ACCOUNT: z.string().optional(),
+    TOFU_K8S_API_URL: z.string().optional(),
     // Emulator endpoint as reachable from inside containers (e.g. http://ministack:4566).
     AWS_EMULATOR_ENDPOINT: z.string().optional(),
     // aws-sm:// secret references: default region (ARNs carry their own) and an optional endpoint
@@ -87,6 +115,19 @@ const schema = z
     }
     if (c.NODE_ENV === 'production' && c.SESSION_SECRET.startsWith('change-me')) {
       ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Set a real session secret in production.' });
+    }
+    if (c.TOFU_RUNNER !== 'docker') {
+      if (!c.TOFU_WORK_DIR) ctx.addIssue({ code: 'custom', path: ['TOFU_WORK_DIR'], message: `Set TOFU_WORK_DIR to the mount point of the shared work volume (TOFU_RUNNER=${c.TOFU_RUNNER}).` });
+      if (!c.TOFU_MODULES_IN_IMAGE) ctx.addIssue({ code: 'custom', path: ['TOFU_MODULES_IN_IMAGE'], message: `TOFU_RUNNER=${c.TOFU_RUNNER} needs the runner image with the modules (TOFU_MODULES_IN_IMAGE=true).` });
+    }
+    if (c.TOFU_RUNNER === 'ecs') {
+      for (const key of ['TOFU_ECS_CLUSTER', 'TOFU_ECS_TASK_DEFINITION'] as const) {
+        if (!c[key]) ctx.addIssue({ code: 'custom', path: [key], message: `Required with TOFU_RUNNER=ecs.` });
+      }
+      if (c.TOFU_ECS_SUBNETS.length === 0) ctx.addIssue({ code: 'custom', path: ['TOFU_ECS_SUBNETS'], message: 'Required with TOFU_RUNNER=ecs (comma separated subnet ids).' });
+    }
+    if (c.TOFU_RUNNER === 'kubernetes' && !c.TOFU_K8S_WORK_CLAIM) {
+      ctx.addIssue({ code: 'custom', path: ['TOFU_K8S_WORK_CLAIM'], message: 'Required with TOFU_RUNNER=kubernetes (the ReadWriteMany claim of the work volume).' });
     }
   });
 

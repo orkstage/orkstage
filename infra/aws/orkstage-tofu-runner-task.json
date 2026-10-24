@@ -1,0 +1,38 @@
+{
+  "family": "orkstage-tofu",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "1024",
+  "memory": "2048",
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/orkstage-tofu-execution",
+  "containerDefinitions": [
+    {
+      "name": "tofu",
+      "image": "ghcr.io/orkstage/tofu-runner:VERSION",
+      "essential": true,
+      "entryPoint": ["/bin/sh", "-c"],
+      "user": "10001:10001",
+      "readonlyRootFilesystem": true,
+      "mountPoints": [
+        { "sourceVolume": "work", "containerPath": "/workspace" },
+        { "sourceVolume": "tmp", "containerPath": "/tmp" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": { "awslogs-group": "/orkstage/tofu", "awslogs-region": "REGION", "awslogs-stream-prefix": "tofu", "awslogs-create-group": "true" }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "work",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-FILE_SYSTEM_ID",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": { "accessPointId": "fsap-ACCESS_POINT_ID", "iam": "DISABLED" }
+      }
+    },
+    { "name": "tmp" }
+  ]
+}

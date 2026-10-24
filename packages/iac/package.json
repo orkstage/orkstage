@@ -19,5 +19,8 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@aws-sdk/client-ecs": "3.1153.0"
+  }
 }

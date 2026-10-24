@@ -3,7 +3,8 @@ import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { driftChanges, TofuRunner, type TofuExec, type TofuExecResult, type TofuStack } from './runner.js';
+import type { TofuExec, TofuExecResult } from './executor.js';
+import { driftChanges, TofuRunner, type TofuStack } from './runner.js';
 
 const drift = (address: string, before: Record<string, unknown>, after: Record<string, unknown>, actions = ['update']) => ({
   address,

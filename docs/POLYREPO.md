@@ -72,7 +72,7 @@ Each repository builds and publishes its artifact. A deploy workflow (in `orksta
 private `orkstage-infra`) applies OpenTofu for the hosting environment: ECS Fargate services for
 the API, worker and console, RDS PostgreSQL, ElastiCache Valkey, an ALB with ACM, Secrets Manager
 for `SESSION_SECRET`, `ENCRYPTION_KEY` and the license, and S3 with CloudFront for orkstage.io.
-The worker's OpenTofu runner becomes an ECS RunTask (no Docker socket in production).
+The worker runs OpenTofu as ECS tasks (`TOFU_RUNNER=ecs`, ADR 0016): no Docker socket in production.
 
 ## How the split was done
 
