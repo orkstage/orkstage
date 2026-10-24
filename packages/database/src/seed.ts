@@ -5,7 +5,7 @@ import { createPrismaClient } from './index.js';
 /**
  * Idempotent seed (spec §45).
  *
- * Always: built in and marketplace templates, one organization, and the platform owner
+ * Always: built in and marketplace templates, the platform alert rules, one organization, and the platform owner
  * named by PLATFORM_OWNER_EMAIL (their first SSO sign in with that verified email links to it).
  * Demo data (simulated cloud targets, sample images with placeholder digests, demo tenants and users
  * that can only sign in through the dev login) is added outside production, or with
@@ -98,11 +98,34 @@ async function main() {
   }
 
   await seedPlatformOwner();
+
+  // Platform alert rules in every installation: without them health failures never open incidents.
+  if ((await prisma.alertRule.count({ where: { tenantId: null } })) === 0) {
+    await prisma.alertRule.createMany({
+      data: [
+        {
+          name: 'Critical resource unhealthy',
+          condition: { signal: 'health', critical: true, consecutiveFailures: 3 },
+          severity: 'high',
+          actions: ['create_incident', 'notify_owners'],
+          cooldownSeconds: 900,
+        },
+        {
+          name: 'Non-critical resource unhealthy',
+          condition: { signal: 'health', critical: false, consecutiveFailures: 5 },
+          severity: 'medium',
+          actions: ['create_incident', 'notify_owners'],
+          cooldownSeconds: 1800,
+        },
+      ],
+    });
+  }
+
   if (!withDemoData) {
     if (!(await prisma.organization.findFirst())) {
       await prisma.organization.create({ data: { name: process.env.ORGANIZATION_NAME?.trim() || 'Organization', slug: 'default' } });
     }
-    console.log('Seed complete: templates and the organization (no demo data; SEED_DEMO_DATA=true adds it).');
+    console.log('Seed complete: templates, platform alert rules and the organization (no demo data; SEED_DEMO_DATA=true adds it).');
     return;
   }
 
@@ -217,27 +240,6 @@ async function main() {
   if ((await prisma.profile.count({ where: { tenantId: null, environment: 'any', isDefault: true } })) === 0) {
     await prisma.profile.create({
       data: { name: 'Simulation', environment: 'any', isDefault: true, targets: { create: [{ provider: 'mock', targetId: targetIds.aws! }] } },
-    });
-  }
-
-  if ((await prisma.alertRule.count({ where: { tenantId: null } })) === 0) {
-    await prisma.alertRule.createMany({
-      data: [
-        {
-          name: 'Critical resource unhealthy',
-          condition: { signal: 'health', critical: true, consecutiveFailures: 3 },
-          severity: 'high',
-          actions: ['create_incident', 'notify_owners'],
-          cooldownSeconds: 900,
-        },
-        {
-          name: 'Non-critical resource unhealthy',
-          condition: { signal: 'health', critical: false, consecutiveFailures: 5 },
-          severity: 'medium',
-          actions: ['create_incident', 'notify_owners'],
-          cooldownSeconds: 1800,
-        },
-      ],
     });
   }
 
