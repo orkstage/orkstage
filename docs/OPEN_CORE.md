@@ -14,11 +14,12 @@ the [CLA](https://github.com/orkstage/.github/blob/main/CLA.md) and the [tradema
    deployments, health, incidents, status pages, notifications, audit log, API keys, webhooks,
    the CLI and IaC import. Enterprise adds *organizational scale and compliance*, not basic
    usefulness.
-2. **One codebase, one build.** The official images are built from this repository with the
-   `orkstage-ee` submodule and activate Enterprise features with a signed license key. No separate
-   fork, no feature drift. A clone without access to the submodule builds the Community edition:
-   `apps/api/src/enterprise.ts` loads the Enterprise module only when `src/ee/ee.module.js`
-   exists.
+2. **One codebase, two images.** The public images (`ghcr.io/orkstage/platform`) are the
+   Community edition, built without the private `orkstage-ee` submodule, so no Enterprise code is
+   published. Enterprise subscribers get an image built from the same source with the submodule,
+   distributed privately, and a signed license key turns its features on. No separate fork, no
+   feature drift: `apps/api/src/enterprise.ts` loads the Enterprise module only when
+   `src/ee/ee.module.js` exists.
 3. **Clear boundary.** Everything in the public repositories is AGPL-3.0 (the modules are
    Apache-2.0). The Enterprise source is under the OrkStage Enterprise License
    ([LICENSE-ENTERPRISE](../LICENSE-ENTERPRISE)); it is private, and customers and evaluators get
