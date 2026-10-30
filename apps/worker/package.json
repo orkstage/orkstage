@@ -12,7 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@aws-sdk/client-sesv2": "3.1153.0",
+    "@aws-sdk/client-sesv2": "3.1157.0",
     "@orkstage/cloud-core": "workspace:*",
     "@orkstage/contracts": "workspace:*",
     "@orkstage/database": "workspace:*",
@@ -20,9 +20,9 @@
     "@orkstage/provisioning": "workspace:*",
     "@orkstage/runtime": "workspace:*",
     "@orkstage/templates": "workspace:*",
-    "bullmq": "6.3.18",
+    "bullmq": "6.5.0",
     "ioredis": "6.0.0",
-    "nodemailer": "10.1.7",
+    "nodemailer": "10.2.1",
     "pino": "10.4.0"
   },
   "devDependencies": {
