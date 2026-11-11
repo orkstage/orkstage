@@ -3,6 +3,7 @@ updates:
   # pnpm workspace (root lockfile covers apps/* and packages/*).
   - package-ecosystem: npm
     directory: /
+    target-branch: staging
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -26,6 +27,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: staging
     schedule:
       interval: weekly
     groups:
@@ -36,6 +38,7 @@ updates:
   # Base images of the platform image.
   - package-ecosystem: docker
     directory: /infra/docker
+    target-branch: staging
     schedule:
       interval: weekly
     groups:
@@ -57,6 +60,7 @@ updates:
   # Images pinned in the local Compose stack (Postgres, Redis, MiniStack).
   - package-ecosystem: docker-compose
     directory: /infra/local
+    target-branch: staging
     schedule:
       interval: weekly
     groups:

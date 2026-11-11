@@ -4,7 +4,7 @@ on:
   # Public repository: Actions minutes are free, so every push to main and every pull request is
   # built, plus a weekly run that keeps caches warm.
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
   schedule:
     - cron: '23 5 * * 1'
