@@ -11,7 +11,7 @@ name: orkstage
 
 services:
   postgres:
-    image: mirror.gcr.io/library/postgres:18-alpine
+    image: mirror.gcr.io/library/postgres:19-alpine
     environment:
       POSTGRES_USER: platform
       POSTGRES_PASSWORD: platform
